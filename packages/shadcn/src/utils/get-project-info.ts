@@ -1,10 +1,9 @@
 import path from "path"
-import { Config, RawConfig, getConfig, resolveConfigPaths } from "@/src/utils/get-config"
-import { getPackageInfo } from "@/src/utils/get-package-info"
+import { Config, resolveConfigPaths } from "@/src/utils/get-config"
 import fs from "fs-extra"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
-import yaml from "yaml"
+import * as yaml from "yaml"
 
 export type ProjectInfo = {
   name: string
@@ -64,7 +63,7 @@ const MANIFEST_SCHEMA = z.object({
 })
 
 export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
-  const manifestPath = path.resolve(cwd, "manifest.yml")
+  const manifestPath = path.resolve(cwd, "manifest.yaml")
   const codePath = path.resolve(cwd, "code")
   const functionsPath = path.resolve(codePath, "src/functions")
   
@@ -74,7 +73,7 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
   }
 
   try {
-    // Read and parse manifest.yml
+    // Read and parse manifest.yaml
     const manifestContent = await fs.readFile(manifestPath, "utf8")
     const manifest = MANIFEST_SCHEMA.parse(yaml.parse(manifestContent))
 
@@ -135,9 +134,7 @@ export async function isTypeScriptProject(cwd: string) {
 
 export async function getTsConfig(cwd: string) {
   for (const fallback of [
-    "tsconfig.json",
-    "tsconfig.web.json", 
-    "tsconfig.app.json",
+    "tsconfig.json"
   ]) {
     const filePath = path.resolve(cwd, fallback)
     if (!(await fs.pathExists(filePath))) {
@@ -169,19 +166,12 @@ export async function getProjectConfig(
     return null
   }
 
-  // Generate configuration directly from manifest.yml data
-  const config: RawConfig = {
-    $schema: "https://ui.shadcn.com/schema.json",
+  // Generate configuration directly from manifest.yaml data
+  const config = {
+    $schema: "https://airdrop.dev/schema.json",
     rsc: false, // Airdrop projects are backend functions, not React Server Components
     tsx: projectInfo.isTsx,
     style: "new-york", // Default style for airdrop projects
-    tailwind: {
-      config: "",
-      baseColor: "zinc", 
-      css: "",
-      cssVariables: false, // No Tailwind CSS in airdrop projects
-      prefix: "",
-    },
     iconLibrary: "lucide",
     aliases: {
       components: `${projectInfo.aliasPrefix}/functions`,

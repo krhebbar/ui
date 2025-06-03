@@ -5,7 +5,7 @@ import { Command } from "commander"
 
 export const info = new Command()
   .name("info")
-  .description("get information about your project")
+  .description("get information about your airdrop project")
   .option(
     "-c, --cwd <cwd>",
     "the working directory. defaults to the current directory.",
@@ -15,6 +15,6 @@ export const info = new Command()
     logger.info("> airdrop project info")
     console.log(await getProjectInfo(opts.cwd))
     logger.break()
-    logger.info("> project configuration")
+    logger.info("> airdrop project configuration")
     console.log(await getConfig(opts.cwd))
   })

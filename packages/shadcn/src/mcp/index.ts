@@ -10,7 +10,7 @@ import { zodToJsonSchema } from "zod-to-json-schema"
 
 export const server = new Server(
   {
-    name: "shadcn",
+    name: "airdrop",
     version: "0.0.1",
   },
   {
@@ -27,7 +27,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "init",
         description:
-          "Initialize a new project using a registry style project structure.",
+          "Initialize a new airdrop project using a registry style project structure.",
         inputSchema: zodToJsonSchema(z.object({})),
       },
       {

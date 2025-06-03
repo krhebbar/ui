@@ -9,7 +9,7 @@ import { Project, ScriptKind } from "ts-morph"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
 
-const FILE_EXTENSIONS_FOR_LOOKUP = [".tsx", ".ts", ".jsx", ".js", ".css"]
+const FILE_EXTENSIONS_FOR_LOOKUP = [".tsx", ".ts", ".jsx", ".js"]
 const FILE_PATH_SKIP_LIST = ["lib/utils.ts"]
 const DEPENDENCY_SKIP_LIST = [
   /^(react|react-dom|next)(\/.*)?$/, // Matches react, react-dom, next and their submodules
@@ -173,7 +173,7 @@ export async function recursivelyResolveFileImports(
       target: "",
     }
 
-    // TODO (shadcn): fix this.
+    // TODO (airdrop): fix this.
     if (fileType === "registry:file") {
       file.target = moduleSpecifier
     }
@@ -215,7 +215,7 @@ export async function recursivelyResolveFileImports(
 }
 
 async function createTempSourceFile(filename: string) {
-  const dir = await fs.mkdtemp(path.join(tmpdir(), "shadcn-"))
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "airdrop-"))
   return path.join(dir, filename)
 }
 

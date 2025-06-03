@@ -4,52 +4,24 @@ import { getProjectInfo } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
-// TODO: buildTailwindThemeColorsFromCssVars removed with update-tailwind-config
-// import { buildTailwindThemeColorsFromCssVars } from "@/src/utils/updaters/update-tailwind-config"
 import deepmerge from "deepmerge"
 import { HttpsProxyAgent } from "https-proxy-agent"
 import fetch from "node-fetch"
 import { z } from "zod"
 
 import {
-  iconsSchema,
-  registryBaseColorSchema,
   registryIndexSchema,
   registryItemSchema,
   registryResolvedItemsTreeSchema,
-  stylesSchema,
 } from "./schema"
 
-const REGISTRY_URL = process.env.REGISTRY_URL ?? "https://ui.shadcn.com/r"
+const REGISTRY_URL = process.env.REGISTRY_URL ?? "http://localhost:3000"
 
 const agent = process.env.https_proxy
   ? new HttpsProxyAgent(process.env.https_proxy)
   : undefined
 
 const registryCache = new Map<string, Promise<any>>()
-
-export const BASE_COLORS = [
-  {
-    name: "neutral",
-    label: "Neutral",
-  },
-  {
-    name: "gray",
-    label: "Gray",
-  },
-  {
-    name: "zinc",
-    label: "Zinc",
-  },
-  {
-    name: "stone",
-    label: "Stone",
-  },
-  {
-    name: "slate",
-    label: "Slate",
-  },
-] as const
 
 export async function getRegistryIndex() {
   try {
@@ -59,28 +31,6 @@ export async function getRegistryIndex() {
   } catch (error) {
     logger.error("\n")
     handleError(error)
-  }
-}
-
-export async function getRegistryStyles() {
-  try {
-    const [result] = await fetchRegistry(["styles/index.json"])
-
-    return stylesSchema.parse(result)
-  } catch (error) {
-    logger.error("\n")
-    handleError(error)
-    return []
-  }
-}
-
-export async function getRegistryIcons() {
-  try {
-    const [result] = await fetchRegistry(["icons/index.json"])
-    return iconsSchema.parse(result)
-  } catch (error) {
-    handleError(error)
-    return {}
   }
 }
 
@@ -95,20 +45,6 @@ export async function getRegistryItem(name: string, style: string) {
     logger.break()
     handleError(error)
     return null
-  }
-}
-
-export async function getRegistryBaseColors() {
-  return BASE_COLORS
-}
-
-export async function getRegistryBaseColor(baseColor: string) {
-  try {
-    const [result] = await fetchRegistry([`colors/${baseColor}.json`])
-
-    return registryBaseColorSchema.parse(result)
-  } catch (error) {
-    handleError(error)
   }
 }
 
@@ -284,34 +220,6 @@ export async function registryResolveItemsTree(
       return null
     }
 
-    // If we're resolving the index, we want to fetch
-    // the theme item if a base color is provided.
-    // We do this for index only.
-    // Other components will ship with their theme tokens.
-    if (names.includes("index")) {
-      if (config.tailwind?.baseColor) {
-        const theme = await registryGetTheme(config.tailwind.baseColor, config)
-        if (theme) {
-          payload.unshift(theme)
-        }
-      }
-    }
-
-    let tailwind = {}
-    payload.forEach((item) => {
-      tailwind = deepmerge(tailwind, item.tailwind ?? {})
-    })
-
-    let cssVars = {}
-    payload.forEach((item) => {
-      cssVars = deepmerge(cssVars, item.cssVars ?? {})
-    })
-
-    let css = {}
-    payload.forEach((item) => {
-      css = deepmerge(css, item.css ?? {})
-    })
-
     let docs = ""
     payload.forEach((item) => {
       if (item.docs) {
@@ -327,9 +235,6 @@ export async function registryResolveItemsTree(
         payload.map((item) => item.devDependencies ?? [])
       ),
       files: deepmerge.all(payload.map((item) => item.files ?? [])),
-      tailwind,
-      cssVars,
-      css,
       docs,
     })
   } catch (error) {
@@ -380,66 +285,6 @@ async function resolveRegistryDependencies(
 
   await resolveDependencies(url)
   return Array.from(new Set(payload))
-}
-
-export async function registryGetTheme(name: string, config: Config) {
-  const baseColor = await getRegistryBaseColor(name)
-  if (!baseColor) {
-    return null
-  }
-
-  // TODO: Move this to the registry i.e registry:file for themes.
-  const theme = {
-    name,
-    type: "registry:file",
-    tailwind: {
-      config: {
-        theme: {
-          extend: {
-            borderRadius: {
-              lg: "var(--radius)",
-              md: "calc(var(--radius) - 2px)",
-              sm: "calc(var(--radius) - 4px)",
-            },
-            colors: {},
-          },
-        },
-      },
-    },
-    cssVars: {
-      theme: {},
-      light: {
-        radius: "0.5rem",
-      },
-      dark: {},
-    },
-  } satisfies z.infer<typeof registryItemSchema>
-
-  if (config.tailwind?.cssVariables) {
-    theme.tailwind.config.theme.extend.colors = {
-      ...theme.tailwind.config.theme.extend.colors,
-      // TODO: buildTailwindThemeColorsFromCssVars removed - need replacement
-      // ...buildTailwindThemeColorsFromCssVars(baseColor.cssVars.dark ?? {}),
-    }
-    theme.cssVars = {
-      theme: {
-        ...baseColor.cssVars.theme,
-        ...theme.cssVars.theme,
-      },
-      light: {
-        ...baseColor.cssVars.light,
-        ...theme.cssVars.light,
-      },
-      dark: {
-        ...baseColor.cssVars.dark,
-        ...theme.cssVars.dark,
-      },
-    }
-
-    // Note: Tailwind v4 specific logic removed for airdrop projects
-  }
-
-  return theme
 }
 
 function getRegistryUrl(path: string) {

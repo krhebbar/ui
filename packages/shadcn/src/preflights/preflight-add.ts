@@ -42,7 +42,7 @@ export async function preFlightAdd(options: z.infer<typeof addOptionsSchema>) {
           "manifest.yml"
         )} at ${highlighter.info(
           options.cwd
-        )}.\nBefore you can add components, you must create a valid airdrop project by running the ${highlighter.info("init")} command.`
+        )}.\nBefore you can add items, you must create a valid airdrop project by running the ${highlighter.info("init")} command.`
       )
       logger.break()
       process.exit(1)
@@ -57,7 +57,7 @@ export async function preFlightAdd(options: z.infer<typeof addOptionsSchema>) {
     logger.error(
       `An invalid airdrop project was found at ${highlighter.info(
         options.cwd
-      )}.\nBefore you can add components, you must create a valid airdrop project by running the ${highlighter.info("init")} command.`
+      )}.\nBefore you can add items, you must create a valid airdrop project by running the ${highlighter.info("init")} command.`
     )
     logger.break()
     process.exit(1)

@@ -21,16 +21,11 @@ export const TEMPLATES = {
 export async function createProject(
   options: Pick<
     z.infer<typeof initOptionsSchema>,
-    "cwd" | "force" | "srcDir" | "components" | "template"
+    "cwd" | "force" | "components"
   >
 ) {
-  options = {
-    srcDir: false,
-    ...options,
-  }
-
   let template: keyof typeof TEMPLATES = "airdrop"
-  let projectName: string = "my-airdrop-project"
+  let projectName: string = "airdrop-external-system"
 
   if (!options.force) {
     const { name } = await prompts([
