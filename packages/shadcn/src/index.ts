@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { add } from "@/src/commands/add"
+import { config } from "@/src/commands/config"
 import { info } from "@/src/commands/info"
 import { init } from "@/src/commands/init"
 import { mcp as registryMcp } from "@/src/commands/registry/mcp"
@@ -23,6 +24,7 @@ async function main() {
   program
     .addCommand(init)
     .addCommand(add)
+    .addCommand(config)
     .addCommand(info)
 
   // Registry commands
