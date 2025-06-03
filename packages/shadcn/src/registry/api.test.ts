@@ -10,13 +10,13 @@ const server = setupServer(
   http.get(`${REGISTRY_URL}/styles/new-york/button.json`, () => {
     return HttpResponse.json({
       name: "button",
-      type: "registry:ui",
+      type: "registry:file",
       dependencies: ["@radix-ui/react-slot"],
       files: [
         {
           path: "registry/new-york/ui/button.tsx",
           content: "// button component content",
-          type: "registry:ui",
+          type: "registry:file",
         },
       ],
     })
@@ -24,13 +24,13 @@ const server = setupServer(
   http.get(`${REGISTRY_URL}/styles/new-york/card.json`, () => {
     return HttpResponse.json({
       name: "card",
-      type: "registry:ui",
+      type: "registry:file",
       dependencies: ["@radix-ui/react-slot"],
       files: [
         {
           path: "registry/new-york/ui/card.tsx",
           content: "// card component content",
-          type: "registry:ui",
+          type: "registry:file",
         },
       ],
     })
@@ -51,7 +51,7 @@ describe("fetchRegistry", () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       name: "button",
-      type: "registry:ui",
+      type: "registry:file",
       dependencies: ["@radix-ui/react-slot"],
     })
   })
@@ -71,13 +71,13 @@ describe("fetchRegistry", () => {
         fetchCount++
         return HttpResponse.json({
           name: "button",
-          type: "registry:ui",
+          type: "registry:file",
           dependencies: ["@radix-ui/react-slot"],
           files: [
             {
               path: "registry/new-york/ui/button.tsx",
               content: "// button component content",
-              type: "registry:ui",
+              type: "registry:file",
             },
           ],
         })

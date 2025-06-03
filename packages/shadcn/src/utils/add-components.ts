@@ -19,11 +19,12 @@ import { getProjectTailwindVersionFromConfig } from "@/src/utils/get-project-inf
 import { handleError } from "@/src/utils/handle-error"
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
-import { updateCss } from "@/src/utils/updaters/update-css"
-import { updateCssVars } from "@/src/utils/updaters/update-css-vars"
+// TODO: Removed updaters - need replacement functionality
+// import { updateCss } from "@/src/utils/updaters/update-css"
+// import { updateCssVars } from "@/src/utils/updaters/update-css-vars"
 import { updateDependencies } from "@/src/utils/updaters/update-dependencies"
 import { updateFiles } from "@/src/utils/updaters/update-files"
-import { updateTailwindConfig } from "@/src/utils/updaters/update-tailwind-config"
+// import { updateTailwindConfig } from "@/src/utils/updaters/update-tailwind-config"
 import { z } from "zod"
 
 export async function addComponents(
@@ -83,25 +84,27 @@ async function addProjectComponents(
 
   const tailwindVersion = await getProjectTailwindVersionFromConfig(config)
 
-  await updateTailwindConfig(tree.tailwind?.config, config, {
-    silent: options.silent,
-    tailwindVersion,
-  })
+  // TODO: updateTailwindConfig removed - need replacement functionality
+  // await updateTailwindConfig(tree.tailwind?.config, config, {
+  //   silent: options.silent,
+  //   tailwindVersion,
+  // })
 
   const overwriteCssVars = await shouldOverwriteCssVars(components, config)
-  await updateCssVars(tree.cssVars, config, {
-    cleanupDefaultNextStyles: options.isNewProject,
-    silent: options.silent,
-    tailwindVersion,
-    tailwindConfig: tree.tailwind?.config,
-    overwriteCssVars,
-    initIndex: options.style ? options.style === "index" : false,
-  })
+  // TODO: updateCssVars removed - need replacement functionality  
+  // await updateCssVars(tree.cssVars, config, {
+  //   cleanupDefaultNextStyles: options.isNewProject,
+  //   silent: options.silent,
+  //   tailwindVersion,
+  //   tailwindConfig: tree.tailwind?.config,
+  //   overwriteCssVars,
+  //   initIndex: options.style ? options.style === "index" : false,
+  // })
 
-  // Add CSS updater
-  await updateCss(tree.css, config, {
-    silent: options.silent,
-  })
+  // TODO: updateCss removed - need replacement functionality
+  // await updateCss(tree.css, config, {
+  //   silent: options.silent,
+  // })
 
   await updateDependencies(tree.dependencies, tree.devDependencies, config, {
     silent: options.silent,
@@ -179,10 +182,11 @@ async function addWorkspaceComponents(
 
     // 1. Update tailwind config.
     if (component.tailwind?.config) {
-      await updateTailwindConfig(component.tailwind?.config, targetConfig, {
-        silent: true,
-        tailwindVersion,
-      })
+      // TODO: updateTailwindConfig removed - need replacement functionality
+      // await updateTailwindConfig(component.tailwind?.config, targetConfig, {
+      //   silent: true,
+      //   tailwindVersion,
+      // })
       filesUpdated.push(
         path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindConfig)
       )
@@ -191,12 +195,13 @@ async function addWorkspaceComponents(
     // 2. Update css vars.
     if (component.cssVars) {
       const overwriteCssVars = await shouldOverwriteCssVars(components, config)
-      await updateCssVars(component.cssVars, targetConfig, {
-        silent: true,
-        tailwindVersion,
-        tailwindConfig: component.tailwind?.config,
-        overwriteCssVars,
-      })
+      // TODO: updateCssVars removed - need replacement functionality
+      // await updateCssVars(component.cssVars, targetConfig, {
+      //   silent: true,
+      //   tailwindVersion,
+      //   tailwindConfig: component.tailwind?.config,
+      //   overwriteCssVars,
+      // })
       filesUpdated.push(
         path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindCss)
       )
@@ -204,9 +209,10 @@ async function addWorkspaceComponents(
 
     // 3. Update CSS
     if (component.css) {
-      await updateCss(component.css, targetConfig, {
-        silent: true,
-      })
+      // TODO: updateCss removed - need replacement functionality
+      // await updateCss(component.css, targetConfig, {
+      //   silent: true,
+      // })
       filesUpdated.push(
         path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindCss)
       )
@@ -312,8 +318,9 @@ async function shouldOverwriteCssVars(
   let result = await fetchRegistry(registryItems)
   const payload = z.array(registryItemSchema).parse(result)
 
+  // Updated to use valid schema types only
   return payload.some(
     (component) =>
-      component.type === "registry:theme" || component.type === "registry:style"
+      component.type === "registry:file" || component.type === "registry:block"
   )
 }

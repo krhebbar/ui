@@ -174,7 +174,7 @@ export async function recursivelyResolveFileImports(
     }
 
     // TODO (shadcn): fix this.
-    if (fileType === "registry:page" || fileType === "registry:file") {
+    if (fileType === "registry:file") {
       file.target = moduleSpecifier
     }
 
@@ -224,21 +224,11 @@ async function createTempSourceFile(filename: string) {
 function determineFileType(
   moduleSpecifier: string
 ): z.infer<typeof registryItemSchema>["type"] {
-  if (moduleSpecifier.includes("/ui/")) {
-    return "registry:ui"
+  // Check if it's a block component
+  if (moduleSpecifier.includes("/blocks/")) {
+    return "registry:block"
   }
 
-  if (moduleSpecifier.includes("/lib/")) {
-    return "registry:lib"
-  }
-
-  if (moduleSpecifier.includes("/hooks/")) {
-    return "registry:hook"
-  }
-
-  if (moduleSpecifier.includes("/components/")) {
-    return "registry:component"
-  }
-
-  return "registry:component"
+  // Default to registry:file for all other cases
+  return "registry:file"
 }

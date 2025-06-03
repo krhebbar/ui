@@ -10,11 +10,7 @@ import { logger } from "@/src/utils/logger"
 import { resolveImport } from "@/src/utils/resolve-import"
 import { spinner } from "@/src/utils/spinner"
 import { transform } from "@/src/utils/transformers"
-import { transformCssVars } from "@/src/utils/transformers/transform-css-vars"
-import { transformIcons } from "@/src/utils/transformers/transform-icons"
 import { transformImport } from "@/src/utils/transformers/transform-import"
-import { transformRsc } from "@/src/utils/transformers/transform-rsc"
-import { transformTwPrefixes } from "@/src/utils/transformers/transform-tw-prefix"
 import prompts from "prompts"
 import { Project, ScriptKind } from "ts-morph"
 import { loadConfig } from "tsconfig-paths"
@@ -99,10 +95,11 @@ export async function updateFiles(
       },
       [
         transformImport,
-        transformRsc,
-        transformCssVars,
-        transformTwPrefixes,
-        transformIcons,
+        // TODO: Removed transformers - need replacement functionality
+        // transformRsc,
+        // transformCssVars,
+        // transformTwPrefixes,
+        // transformIcons,
       ]
     )
 
@@ -272,20 +269,13 @@ function resolveFileTargetDirectory(
   file: z.infer<typeof registryItemFileSchema>,
   config: Config
 ) {
-  if (file.type === "registry:ui") {
-    return config.resolvedPaths.ui
-  }
-
-  if (file.type === "registry:lib") {
-    return config.resolvedPaths.lib
-  }
-
-  if (file.type === "registry:block" || file.type === "registry:component") {
+  // Updated to use only valid schema types
+  if (file.type === "registry:block") {
     return config.resolvedPaths.components
   }
 
-  if (file.type === "registry:hook") {
-    return config.resolvedPaths.hooks
+  if (file.type === "registry:file") {
+    return config.resolvedPaths.components
   }
 
   return config.resolvedPaths.components

@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 import { add } from "@/src/commands/add"
-import { build } from "@/src/commands/build"
-import { diff } from "@/src/commands/diff"
 import { info } from "@/src/commands/info"
 import { init } from "@/src/commands/init"
-import { migrate } from "@/src/commands/migrate"
-import { build as registryBuild } from "@/src/commands/registry/build"
 import { mcp as registryMcp } from "@/src/commands/registry/mcp"
 import { Command } from "commander"
 
@@ -27,13 +23,10 @@ async function main() {
   program
     .addCommand(init)
     .addCommand(add)
-    .addCommand(diff)
-    .addCommand(migrate)
     .addCommand(info)
-    .addCommand(build)
 
   // Registry commands
-  program.addCommand(registryBuild).addCommand(registryMcp)
+  program.addCommand(registryMcp)
 
   program.parse()
 }

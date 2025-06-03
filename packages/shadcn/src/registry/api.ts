@@ -4,7 +4,8 @@ import { getProjectTailwindVersionFromConfig } from "@/src/utils/get-project-inf
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
-import { buildTailwindThemeColorsFromCssVars } from "@/src/utils/updaters/update-tailwind-config"
+// TODO: buildTailwindThemeColorsFromCssVars removed with update-tailwind-config
+// import { buildTailwindThemeColorsFromCssVars } from "@/src/utils/updaters/update-tailwind-config"
 import deepmerge from "deepmerge"
 import { HttpsProxyAgent } from "https-proxy-agent"
 import fetch from "node-fetch"
@@ -118,7 +119,7 @@ export async function resolveTree(
   const tree: z.infer<typeof registryIndexSchema> = []
 
   for (const name of names) {
-    const entry = index.find((entry) => entry.name === name)
+    const entry = index.find((item: z.infer<typeof registryItemSchema>) => item.name === name)
 
     if (!entry) {
       continue
@@ -133,7 +134,7 @@ export async function resolveTree(
   }
 
   return tree.filter(
-    (component, index, self) =>
+    (component: z.infer<typeof registryItemSchema>, index, self) =>
       self.findIndex((c) => c.name === component.name) === index
   )
 }
@@ -160,19 +161,16 @@ export async function getItemTargetPath(
     return override
   }
 
-  if (item.type === "registry:ui") {
-    return config.resolvedPaths.ui ?? config.resolvedPaths.components
+  // Default to components path for blocks and files
+  if (item.type === "registry:block") {
+    return config.resolvedPaths.components
   }
 
-  const [parent, type] = item.type?.split(":") ?? []
-  if (!(parent in config.resolvedPaths)) {
-    return null
+  if (item.type === "registry:file") {
+    return config.resolvedPaths.components
   }
 
-  return path.join(
-    config.resolvedPaths[parent as keyof typeof config.resolvedPaths],
-    type
-  )
+  return null
 }
 
 export async function fetchRegistry(
@@ -299,14 +297,6 @@ export async function registryResolveItemsTree(
       }
     }
 
-    // Sort the payload so that registry:theme is always first.
-    payload.sort((a, b) => {
-      if (a.type === "registry:theme") {
-        return -1
-      }
-      return 1
-    })
-
     let tailwind = {}
     payload.forEach((item) => {
       tailwind = deepmerge(tailwind, item.tailwind ?? {})
@@ -401,10 +391,10 @@ export async function registryGetTheme(name: string, config: Config) {
     return null
   }
 
-  // TODO: Move this to the registry i.e registry:theme.
+  // TODO: Move this to the registry i.e registry:file for themes.
   const theme = {
     name,
-    type: "registry:theme",
+    type: "registry:file",
     tailwind: {
       config: {
         theme: {
@@ -431,7 +421,8 @@ export async function registryGetTheme(name: string, config: Config) {
   if (config.tailwind.cssVariables) {
     theme.tailwind.config.theme.extend.colors = {
       ...theme.tailwind.config.theme.extend.colors,
-      ...buildTailwindThemeColorsFromCssVars(baseColor.cssVars.dark ?? {}),
+      // TODO: buildTailwindThemeColorsFromCssVars removed - need replacement
+      // ...buildTailwindThemeColorsFromCssVars(baseColor.cssVars.dark ?? {}),
     }
     theme.cssVars = {
       theme: {
@@ -508,11 +499,8 @@ export async function resolveRegistryItems(names: string[], config: Config) {
 
 export function getRegistryTypeAliasMap() {
   return new Map<string, string>([
-    ["registry:ui", "ui"],
-    ["registry:lib", "lib"],
-    ["registry:hook", "hooks"],
     ["registry:block", "components"],
-    ["registry:component", "components"],
+    ["registry:file", "components"],
   ])
 }
 

@@ -80,9 +80,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (request.params.name) {
       case "init": {
         const registry = await getRegistry(REGISTRY_URL)
-        const style = registry.items.find(
-          (item) => item.type === "registry:style"
-        )
 
         let text = `To initialize a new project, run the following command:
                 \`\`\`bash
@@ -108,31 +105,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 `
         }
 
-        if (!style) {
-          return {
-            content: [
-              {
-                type: "text",
-                text,
-              },
-            ],
-          }
-        }
-
         return {
           content: [
             {
               type: "text",
-              text: `To initialize a new project using the ${
-                style.name
-              } style, run the following command:
-              \`\`\`bash
-              npx shadcn@canary init ${getRegistryItemUrl(
-                style.name,
-                REGISTRY_URL
-              )}
-              \`\`\`
-              `,
+              text,
             },
           ],
         }

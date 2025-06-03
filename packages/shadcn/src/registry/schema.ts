@@ -4,33 +4,22 @@ import { z } from "zod"
 // apps/www/public/schema/registry-item.json file.
 
 export const registryItemTypeSchema = z.enum([
-  "registry:lib",
   "registry:block",
-  "registry:component",
-  "registry:ui",
-  "registry:hook",
-  "registry:page",
   "registry:file",
-  "registry:theme",
-  "registry:style",
-
-  // Internal use only
-  "registry:example",
-  "registry:internal",
 ])
 
 export const registryItemFileSchema = z.discriminatedUnion("type", [
-  // Target is required for registry:file and registry:page
+  // Target is required for registry:file
   z.object({
     path: z.string(),
     content: z.string().optional(),
-    type: z.enum(["registry:file", "registry:page"]),
+    type: z.enum(["registry:file"]),
     target: z.string(),
   }),
   z.object({
     path: z.string(),
     content: z.string().optional(),
-    type: registryItemTypeSchema.exclude(["registry:file", "registry:page"]),
+    type: registryItemTypeSchema.exclude(["registry:file"]),
     target: z.string().optional(),
   }),
 ])

@@ -3,15 +3,16 @@ import { tmpdir } from "os"
 import path from "path"
 import { registryBaseColorSchema } from "@/src/registry/schema"
 import { Config } from "@/src/utils/get-config"
-import { transformCssVars } from "@/src/utils/transformers/transform-css-vars"
-import { transformIcons } from "@/src/utils/transformers/transform-icons"
+// TODO: Removed transformers - need replacement functionality
+// import { transformCssVars } from "@/src/utils/transformers/transform-css-vars"
+// import { transformIcons } from "@/src/utils/transformers/transform-icons"
 import { transformImport } from "@/src/utils/transformers/transform-import"
-import { transformJsx } from "@/src/utils/transformers/transform-jsx"
-import { transformRsc } from "@/src/utils/transformers/transform-rsc"
+// import { transformJsx } from "@/src/utils/transformers/transform-jsx"
+// import { transformRsc } from "@/src/utils/transformers/transform-rsc"
 import { Project, ScriptKind, type SourceFile } from "ts-morph"
 import { z } from "zod"
 
-import { transformTwPrefixes } from "./transform-tw-prefix"
+// import { transformTwPrefixes } from "./transform-tw-prefix"
 
 export type TransformOpts = {
   filename: string
@@ -41,10 +42,11 @@ export async function transform(
   opts: TransformOpts,
   transformers: Transformer[] = [
     transformImport,
-    transformRsc,
-    transformCssVars,
-    transformTwPrefixes,
-    transformIcons,
+    // TODO: Removed transformers - need replacement functionality
+    // transformRsc,
+    // transformCssVars,
+    // transformTwPrefixes,
+    // transformIcons,
   ]
 ) {
   const tempFile = await createTempSourceFile(opts.filename)
@@ -56,11 +58,12 @@ export async function transform(
     await transformer({ sourceFile, ...opts })
   }
 
+  // TODO: transformJsx removed - need replacement functionality
   if (opts.transformJsx) {
-    return await transformJsx({
-      sourceFile,
-      ...opts,
-    })
+    // return await transformJsx({
+    //   sourceFile,
+    //   ...opts,
+    // })
   }
 
   return sourceFile.getText()
