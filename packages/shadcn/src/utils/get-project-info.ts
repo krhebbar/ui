@@ -1,5 +1,4 @@
 import path from "path"
-import { Config, resolveConfigPaths } from "@/src/utils/get-config"
 import fs from "fs-extra"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
@@ -8,7 +7,7 @@ import * as yaml from "yaml"
 export type ProjectInfo = {
   name: string
   description: string
-  slug: string
+  slug: string // We'll derive this from imports[0].slug or use a default
   serviceAccountName?: string
   externalSystemName?: string
   functions?: Array<{ name: string; description: string }>
@@ -42,24 +41,37 @@ const TS_CONFIG_SCHEMA = z.object({
 })
 
 const MANIFEST_SCHEMA = z.object({
+  version: z.string().optional(),
   name: z.string(),
   description: z.string(),
-  slug: z.string(),
-  version: z.string().optional(),
-  service_account_name: z.string().optional(),
-  external_system_name: z.string().optional(),
+  service_account: z.object({
+    display_name: z.string(),
+  }).optional(),
   functions: z.array(z.object({
     name: z.string(),
     description: z.string(),
   })).optional(),
-  keyring: z.object({
-    type: z.string(),
+  keyring_types: z.array(z.object({
     id: z.string(),
-  }).optional(),
-  token_verification: z.object({
-    method: z.string(),
-    url: z.string(),
-  }).optional(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    external_system_name: z.string().optional(),
+    kind: z.string().optional(),
+    is_subdomain: z.boolean().optional(),
+    secret_config: z.any().optional(),
+    token_verification: z.object({
+      url: z.string(),
+      method: z.string(),
+    }).optional(),
+  })).optional(),
+  imports: z.array(z.object({
+    slug: z.string(),
+    display_name: z.string().optional(),
+    description: z.string().optional(),
+    extractor_function: z.string().optional(),
+    loader_function: z.string().optional(),
+    allowed_connection_types: z.array(z.string()).optional(),
+  })).optional(),
 })
 
 export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
@@ -85,12 +97,15 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
     return {
       name: manifest.name,
       description: manifest.description,
-      slug: manifest.slug,
-      serviceAccountName: manifest.service_account_name,
-      externalSystemName: manifest.external_system_name,
+      slug: manifest.imports?.[0]?.slug || "airdrop-project", // Use first import slug or default
+      serviceAccountName: manifest.service_account?.display_name,
+      externalSystemName: manifest.keyring_types?.[0]?.external_system_name,
       functions: manifest.functions,
-      keyring: manifest.keyring,
-      tokenVerification: manifest.token_verification,
+      keyring: manifest.keyring_types?.[0] ? {
+        type: manifest.keyring_types[0].kind || "unknown",
+        id: manifest.keyring_types[0].id,
+      } : undefined,
+      tokenVerification: manifest.keyring_types?.[0]?.token_verification,
       isTsx,
       aliasPrefix,
       manifestPath,
@@ -128,13 +143,13 @@ export async function getTsConfigAliasPrefix(cwd: string) {
 }
 
 export async function isTypeScriptProject(cwd: string) {
-  const tsConfigPath = path.resolve(cwd, "tsconfig.json")
+  const tsConfigPath = path.resolve(cwd, "code/tsconfig.json")
   return fs.existsSync(tsConfigPath)
 }
 
 export async function getTsConfig(cwd: string) {
   for (const fallback of [
-    "tsconfig.json"
+    "code/tsconfig.json"
   ]) {
     const filePath = path.resolve(cwd, fallback)
     if (!(await fs.pathExists(filePath))) {
@@ -156,31 +171,4 @@ export async function getTsConfig(cwd: string) {
   return null
 }
 
-export async function getProjectConfig(
-  cwd: string,
-  defaultProjectInfo: ProjectInfo | null = null
-): Promise<Config | null> {
-  const projectInfo = defaultProjectInfo || await getProjectInfo(cwd)
 
-  if (!projectInfo) {
-    return null
-  }
-
-  // Generate configuration directly from manifest.yaml data
-  const config = {
-    $schema: "https://airdrop.dev/schema.json",
-    rsc: false, // Airdrop projects are backend functions, not React Server Components
-    tsx: projectInfo.isTsx,
-    style: "new-york", // Default style for airdrop projects
-    iconLibrary: "lucide",
-    aliases: {
-      components: `${projectInfo.aliasPrefix}/functions`,
-      ui: `${projectInfo.aliasPrefix}/functions`,
-      hooks: `${projectInfo.aliasPrefix}/hooks`,
-      lib: `${projectInfo.aliasPrefix}/lib`,
-      utils: `${projectInfo.aliasPrefix}/lib/utils`,
-    },
-  }
-
-  return await resolveConfigPaths(cwd, config)
-}

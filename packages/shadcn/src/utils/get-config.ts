@@ -40,7 +40,7 @@ export async function getConfig(cwd: string): Promise<Config | null> {
     return null
   }
 
-  // Generate configuration directly from manifest.yml data
+  // Generate configuration directly from manifest.yaml data
   const config = {
     $schema: "https://airdrop.dev/schema.json",
     rsc: false, // Airdrop projects are backend functions, not React Server Components
@@ -56,7 +56,8 @@ export async function getConfig(cwd: string): Promise<Config | null> {
     },
   }
 
-  return await resolveConfigPaths(cwd, config)
+  // Use the codePath (where tsconfig.json actually is) for path resolution
+  return await resolveConfigPaths(projectInfo.codePath, config)
 }
 
 export async function resolveConfigPaths(cwd: string, config: Omit<Config, 'resolvedPaths'>) {
