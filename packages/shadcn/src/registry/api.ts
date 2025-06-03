@@ -1,6 +1,6 @@
 import path from "path"
 import { Config, getTargetStyleFromConfig } from "@/src/utils/get-config"
-import { getProjectTailwindVersionFromConfig } from "@/src/utils/get-project-info"
+import { getProjectInfo } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
@@ -289,7 +289,7 @@ export async function registryResolveItemsTree(
     // We do this for index only.
     // Other components will ship with their theme tokens.
     if (names.includes("index")) {
-      if (config.tailwind.baseColor) {
+      if (config.tailwind?.baseColor) {
         const theme = await registryGetTheme(config.tailwind.baseColor, config)
         if (theme) {
           payload.unshift(theme)
@@ -383,10 +383,7 @@ async function resolveRegistryDependencies(
 }
 
 export async function registryGetTheme(name: string, config: Config) {
-  const [baseColor, tailwindVersion] = await Promise.all([
-    getRegistryBaseColor(name),
-    getProjectTailwindVersionFromConfig(config),
-  ])
+  const baseColor = await getRegistryBaseColor(name)
   if (!baseColor) {
     return null
   }
@@ -418,7 +415,7 @@ export async function registryGetTheme(name: string, config: Config) {
     },
   } satisfies z.infer<typeof registryItemSchema>
 
-  if (config.tailwind.cssVariables) {
+  if (config.tailwind?.cssVariables) {
     theme.tailwind.config.theme.extend.colors = {
       ...theme.tailwind.config.theme.extend.colors,
       // TODO: buildTailwindThemeColorsFromCssVars removed - need replacement
@@ -439,21 +436,7 @@ export async function registryGetTheme(name: string, config: Config) {
       },
     }
 
-    if (tailwindVersion === "v4" && baseColor.cssVarsV4) {
-      theme.cssVars = {
-        theme: {
-          ...baseColor.cssVarsV4.theme,
-          ...theme.cssVars.theme,
-        },
-        light: {
-          radius: "0.625rem",
-          ...baseColor.cssVarsV4.light,
-        },
-        dark: {
-          ...baseColor.cssVarsV4.dark,
-        },
-      }
-    }
+    // Note: Tailwind v4 specific logic removed for airdrop projects
   }
 
   return theme

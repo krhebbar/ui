@@ -15,7 +15,7 @@ import {
   workspaceConfigSchema,
   type Config,
 } from "@/src/utils/get-config"
-import { getProjectTailwindVersionFromConfig } from "@/src/utils/get-project-info"
+import { getProjectInfo } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
@@ -25,6 +25,9 @@ import { spinner } from "@/src/utils/spinner"
 import { updateDependencies } from "@/src/utils/updaters/update-dependencies"
 import { updateFiles } from "@/src/utils/updaters/update-files"
 // import { updateTailwindConfig } from "@/src/utils/updaters/update-tailwind-config"
+import { Command } from "commander"
+import deepmerge from "deepmerge"
+import prompts from "prompts"
 import { z } from "zod"
 
 export async function addComponents(
@@ -82,23 +85,17 @@ async function addProjectComponents(
   }
   registrySpinner?.succeed()
 
-  const tailwindVersion = await getProjectTailwindVersionFromConfig(config)
+  // Note: Tailwind version checking removed for airdrop projects
+  // const projectInfo = await getProjectInfo(config.resolvedPaths.cwd)
 
   // TODO: updateTailwindConfig removed - need replacement functionality
   // await updateTailwindConfig(tree.tailwind?.config, config, {
   //   silent: options.silent,
-  //   tailwindVersion,
   // })
 
-  const overwriteCssVars = await shouldOverwriteCssVars(components, config)
-  // TODO: updateCssVars removed - need replacement functionality  
+  // TODO: updateCssVars removed - need replacement functionality
   // await updateCssVars(tree.cssVars, config, {
-  //   cleanupDefaultNextStyles: options.isNewProject,
   //   silent: options.silent,
-  //   tailwindVersion,
-  //   tailwindConfig: tree.tailwind?.config,
-  //   overwriteCssVars,
-  //   initIndex: options.style ? options.style === "index" : false,
   // })
 
   // TODO: updateCss removed - need replacement functionality
@@ -168,54 +165,31 @@ async function addWorkspaceComponents(
         ? workspaceConfig.ui
         : config
 
-    const tailwindVersion = await getProjectTailwindVersionFromConfig(
-      targetConfig
-    )
-
-    const workspaceRoot = findCommonRoot(
-      config.resolvedPaths.cwd,
-      targetConfig.resolvedPaths.ui
-    )
-    const packageRoot =
-      (await findPackageRoot(workspaceRoot, targetConfig.resolvedPaths.cwd)) ??
-      targetConfig.resolvedPaths.cwd
-
     // 1. Update tailwind config.
     if (component.tailwind?.config) {
       // TODO: updateTailwindConfig removed - need replacement functionality
       // await updateTailwindConfig(component.tailwind?.config, targetConfig, {
       //   silent: true,
-      //   tailwindVersion,
       // })
-      filesUpdated.push(
-        path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindConfig)
-      )
+      // Note: Tailwind config update skipped for airdrop projects
     }
 
     // 2. Update css vars.
     if (component.cssVars) {
-      const overwriteCssVars = await shouldOverwriteCssVars(components, config)
       // TODO: updateCssVars removed - need replacement functionality
       // await updateCssVars(component.cssVars, targetConfig, {
       //   silent: true,
-      //   tailwindVersion,
-      //   tailwindConfig: component.tailwind?.config,
-      //   overwriteCssVars,
       // })
-      filesUpdated.push(
-        path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindCss)
-      )
+      // Note: CSS vars update skipped for airdrop projects
     }
 
-    // 3. Update CSS
+    // 3. Update css.
     if (component.css) {
       // TODO: updateCss removed - need replacement functionality
       // await updateCss(component.css, targetConfig, {
       //   silent: true,
       // })
-      filesUpdated.push(
-        path.relative(workspaceRoot, targetConfig.resolvedPaths.tailwindCss)
-      )
+      // Note: CSS update skipped for airdrop projects
     }
 
     // 4. Update dependencies.
@@ -238,17 +212,17 @@ async function addWorkspaceComponents(
 
     filesCreated.push(
       ...files.filesCreated.map((file) =>
-        path.relative(workspaceRoot, path.join(packageRoot, file))
+        path.relative(workspaceConfig.resolvedPaths.cwd, path.join(targetConfig.resolvedPaths.cwd, file))
       )
     )
     filesUpdated.push(
       ...files.filesUpdated.map((file) =>
-        path.relative(workspaceRoot, path.join(packageRoot, file))
+        path.relative(workspaceConfig.resolvedPaths.cwd, path.join(targetConfig.resolvedPaths.cwd, file))
       )
     )
     filesSkipped.push(
       ...files.filesSkipped.map((file) =>
-        path.relative(workspaceRoot, path.join(packageRoot, file))
+        path.relative(workspaceConfig.resolvedPaths.cwd, path.join(targetConfig.resolvedPaths.cwd, file))
       )
     )
   }

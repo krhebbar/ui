@@ -8,11 +8,8 @@ import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
 
 export const DEFAULT_STYLE = "default"
-export const DEFAULT_COMPONENTS = "@/components"
+export const DEFAULT_COMPONENTS = "@/functions"
 export const DEFAULT_UTILS = "@/lib/utils"
-export const DEFAULT_TAILWIND_CSS = "app/globals.css"
-export const DEFAULT_TAILWIND_CONFIG = "tailwind.config.js"
-export const DEFAULT_TAILWIND_BASE_COLOR = "slate"
 
 // TODO: Figure out if we want to support all cosmiconfig formats.
 // A simple components.json file would be nice.
@@ -28,11 +25,11 @@ export const rawConfigSchema = z
     tsx: z.coerce.boolean().default(true),
     tailwind: z.object({
       config: z.string().optional(),
-      css: z.string(),
-      baseColor: z.string(),
-      cssVariables: z.boolean().default(true),
+      css: z.string().optional(),
+      baseColor: z.string().optional(),
+      cssVariables: z.boolean().default(false),
       prefix: z.string().default("").optional(),
-    }),
+    }).optional(),
     aliases: z.object({
       components: z.string(),
       utils: z.string(),
@@ -49,8 +46,6 @@ export type RawConfig = z.infer<typeof rawConfigSchema>
 export const configSchema = rawConfigSchema.extend({
   resolvedPaths: z.object({
     cwd: z.string(),
-    tailwindConfig: z.string(),
-    tailwindCss: z.string(),
     utils: z.string(),
     components: z.string(),
     lib: z.string(),
@@ -96,10 +91,6 @@ export async function resolveConfigPaths(cwd: string, config: RawConfig) {
     ...config,
     resolvedPaths: {
       cwd,
-      tailwindConfig: config.tailwind.config
-        ? path.resolve(cwd, config.tailwind.config)
-        : "",
-      tailwindCss: path.resolve(cwd, config.tailwind.css),
       utils: await resolveImport(config.aliases["utils"], tsConfig),
       components: await resolveImport(config.aliases["components"], tsConfig),
       ui: config.aliases["ui"]
@@ -222,6 +213,6 @@ export function findCommonRoot(cwd: string, resolvedPath: string) {
 
 // TODO: Cache this call.
 export async function getTargetStyleFromConfig(cwd: string, fallback: string) {
-  const projectInfo = await getProjectInfo(cwd)
-  return projectInfo?.tailwindVersion === "v4" ? "new-york-v4" : fallback
+  // For airdrop projects, always return the fallback style
+  return fallback
 }

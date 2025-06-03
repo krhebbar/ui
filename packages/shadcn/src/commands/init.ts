@@ -13,8 +13,6 @@ import { TEMPLATES, createProject } from "@/src/utils/create-project"
 import * as ERRORS from "@/src/utils/errors"
 import {
   DEFAULT_COMPONENTS,
-  DEFAULT_TAILWIND_CONFIG,
-  DEFAULT_TAILWIND_CSS,
   DEFAULT_UTILS,
   getConfig,
   rawConfigSchema,
@@ -24,7 +22,6 @@ import {
 import {
   getProjectConfig,
   getProjectInfo,
-  getProjectTailwindVersionFromConfig,
 } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
@@ -281,7 +278,7 @@ async function promptForConfig(defaultConfig: Config | null = null) {
       type: "text",
       name: "tailwindCss",
       message: `Where is your ${highlighter.info("global CSS")} file?`,
-      initial: defaultConfig?.tailwind.css ?? DEFAULT_TAILWIND_CSS,
+      initial: defaultConfig?.tailwind?.css ?? "src/styles/globals.css",
     },
     {
       type: "toggle",
@@ -289,7 +286,7 @@ async function promptForConfig(defaultConfig: Config | null = null) {
       message: `Would you like to use ${highlighter.info(
         "CSS variables"
       )} for theming?`,
-      initial: defaultConfig?.tailwind.cssVariables ?? true,
+      initial: defaultConfig?.tailwind?.cssVariables ?? false,
       active: "yes",
       inactive: "no",
     },
@@ -307,7 +304,7 @@ async function promptForConfig(defaultConfig: Config | null = null) {
       message: `Where is your ${highlighter.info(
         "tailwind.config.js"
       )} located?`,
-      initial: defaultConfig?.tailwind.config ?? DEFAULT_TAILWIND_CONFIG,
+      initial: defaultConfig?.tailwind?.config ?? "tailwind.config.js",
     },
     {
       type: "text",
@@ -361,21 +358,20 @@ async function promptForMinimalConfig(
 ) {
   let style = defaultConfig.style
   let baseColor = opts.baseColor
-  let cssVariables = defaultConfig.tailwind.cssVariables
+  let cssVariables = defaultConfig.tailwind?.cssVariables ?? false
 
   if (!opts.defaults) {
-    const [styles, baseColors, tailwindVersion] = await Promise.all([
+    const [styles, baseColors] = await Promise.all([
       getRegistryStyles(),
       getRegistryBaseColors(),
-      getProjectTailwindVersionFromConfig(defaultConfig),
     ])
 
     const options = await prompts([
       {
-        type: tailwindVersion === "v4" ? null : "select",
+        type: "select",
         name: "style",
         message: `Which ${highlighter.info("style")} would you like to use?`,
-        choices: styles.map((style) => ({
+        choices: styles.map((style: any) => ({
           title:
             style.name === "new-york" ? "New York (Recommended)" : style.label,
           value: style.name,
@@ -388,7 +384,7 @@ async function promptForMinimalConfig(
         message: `Which color would you like to use as the ${highlighter.info(
           "base color"
         )}?`,
-        choices: baseColors.map((color) => ({
+        choices: baseColors.map((color: any) => ({
           title: color.label,
           value: color.name,
         })),

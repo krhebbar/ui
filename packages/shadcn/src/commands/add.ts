@@ -11,7 +11,6 @@ import { getProjectInfo } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
-import { updateAppIndex } from "@/src/utils/update-app-index"
 import { Command } from "commander"
 import prompts from "prompts"
 import { z } from "zod"
@@ -113,21 +112,7 @@ export const add = new Command()
         options.components = await promptForRegistryComponents(options)
       }
 
-      const projectInfo = await getProjectInfo(options.cwd)
-      if (projectInfo?.tailwindVersion === "v4") {
-        const deprecatedComponents = DEPRECATED_COMPONENTS.filter((component) =>
-          options.components?.includes(component.name)
-        )
-
-        if (deprecatedComponents?.length) {
-          logger.break()
-          deprecatedComponents.forEach((component) => {
-            logger.warn(highlighter.warn(component.message))
-          })
-          logger.break()
-          process.exit(1)
-        }
-      }
+      // Note: Deprecated component checking removed since airdrop projects don't use Tailwind
 
       let { errors, config } = await preFlightAdd(options)
 
@@ -161,7 +146,6 @@ export const add = new Command()
         })
       }
 
-      let shouldUpdateAppIndex = false
       if (errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT]) {
         const { projectPath, template } = await createProject({
           cwd: options.cwd,
@@ -175,8 +159,7 @@ export const add = new Command()
         }
         options.cwd = projectPath
 
-        if (template === "next-monorepo") {
-          options.cwd = path.resolve(options.cwd, "apps/web")
+        if (template === "airdrop") {
           config = await getConfig(options.cwd)
         } else {
           config = await runInit({
@@ -191,10 +174,6 @@ export const add = new Command()
             cssVariables: options.cssVariables,
             style: "index",
           })
-
-          shouldUpdateAppIndex =
-            options.components?.length === 1 &&
-            !!options.components[0].match(/\/chat\/b\//)
         }
       }
 
@@ -205,12 +184,6 @@ export const add = new Command()
       }
 
       await addComponents(options.components, config, options)
-
-      // If we're adding a single component and it's from the v0 registry,
-      // let's update the app/page.tsx file to import the component.
-      if (shouldUpdateAppIndex) {
-        await updateAppIndex(options.components[0], config)
-      }
     } catch (error) {
       logger.break()
       handleError(error)
