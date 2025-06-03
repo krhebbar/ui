@@ -9,6 +9,18 @@ import yaml from "yaml"
 export type ProjectInfo = {
   name: string
   description: string
+  slug: string
+  serviceAccountName?: string
+  externalSystemName?: string
+  functions?: Array<{ name: string; description: string }>
+  keyring?: {
+    type: string
+    id: string
+  }
+  tokenVerification?: {
+    method: string
+    url: string
+  }
   isTsx: boolean
   aliasPrefix: string | null
   manifestPath: string
@@ -33,18 +45,26 @@ const TS_CONFIG_SCHEMA = z.object({
 const MANIFEST_SCHEMA = z.object({
   name: z.string(),
   description: z.string(),
+  slug: z.string(),
   version: z.string().optional(),
-  service_account: z.object({
-    display_name: z.string(),
-  }).optional(),
+  service_account_name: z.string().optional(),
+  external_system_name: z.string().optional(),
   functions: z.array(z.object({
     name: z.string(),
     description: z.string(),
   })).optional(),
+  keyring: z.object({
+    type: z.string(),
+    id: z.string(),
+  }).optional(),
+  token_verification: z.object({
+    method: z.string(),
+    url: z.string(),
+  }).optional(),
 })
 
 export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
-  const manifestPath = path.resolve(cwd, "manifest.yaml")
+  const manifestPath = path.resolve(cwd, "manifest.yml")
   const codePath = path.resolve(cwd, "code")
   const functionsPath = path.resolve(codePath, "src/functions")
   
@@ -54,7 +74,7 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
   }
 
   try {
-    // Read and parse manifest.yaml
+    // Read and parse manifest.yml
     const manifestContent = await fs.readFile(manifestPath, "utf8")
     const manifest = MANIFEST_SCHEMA.parse(yaml.parse(manifestContent))
 
@@ -66,6 +86,12 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
     return {
       name: manifest.name,
       description: manifest.description,
+      slug: manifest.slug,
+      serviceAccountName: manifest.service_account_name,
+      externalSystemName: manifest.external_system_name,
+      functions: manifest.functions,
+      keyring: manifest.keyring,
+      tokenVerification: manifest.token_verification,
       isTsx,
       aliasPrefix,
       manifestPath,
@@ -137,27 +163,18 @@ export async function getProjectConfig(
   cwd: string,
   defaultProjectInfo: ProjectInfo | null = null
 ): Promise<Config | null> {
-  // Check for existing component config.
-  const [existingConfig, projectInfo] = await Promise.all([
-    getConfig(cwd),
-    !defaultProjectInfo
-      ? getProjectInfo(cwd)
-      : Promise.resolve(defaultProjectInfo),
-  ])
-
-  if (existingConfig) {
-    return existingConfig
-  }
+  const projectInfo = defaultProjectInfo || await getProjectInfo(cwd)
 
   if (!projectInfo) {
     return null
   }
 
+  // Generate configuration directly from manifest.yml data
   const config: RawConfig = {
     $schema: "https://ui.shadcn.com/schema.json",
     rsc: false, // Airdrop projects are backend functions, not React Server Components
     tsx: projectInfo.isTsx,
-    style: "new-york",
+    style: "new-york", // Default style for airdrop projects
     tailwind: {
       config: "",
       baseColor: "zinc", 

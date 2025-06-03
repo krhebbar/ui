@@ -18,7 +18,7 @@ import { z } from "zod"
 export async function migrateIcons(config: Config) {
   if (!config.resolvedPaths.ui) {
     throw new Error(
-      "We could not find a valid `ui` path in your `components.json` file. Please ensure you have a valid `ui` path in your `components.json` file."
+      "We could not find a valid `ui` path in your airdrop project configuration. Please ensure you have a valid airdrop project setup."
     )
   }
 

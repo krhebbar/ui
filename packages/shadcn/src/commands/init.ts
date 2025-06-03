@@ -188,9 +188,7 @@ export async function runInit(
     const { proceed } = await prompts({
       type: "confirm",
       name: "proceed",
-      message: `Write configuration to ${highlighter.info(
-        "components.json"
-      )}. Proceed?`,
+      message: `Initialize airdrop project configuration. Proceed?`,
       initial: true,
     })
 
@@ -199,11 +197,10 @@ export async function runInit(
     }
   }
 
-  // Write components.json.
-  const componentSpinner = spinner(`Writing components.json.`).start()
-  const targetPath = path.resolve(options.cwd, "components.json")
-  await fs.writeFile(targetPath, JSON.stringify(config, null, 2), "utf8")
-  componentSpinner.succeed()
+  // For airdrop projects, configuration is derived from manifest.yml
+  // No need to write components.json
+  const configSpinner = spinner(`Reading airdrop project configuration.`).start()
+  configSpinner.succeed()
 
   // Add components.
   const fullConfig = await resolveConfigPaths(options.cwd, config)
@@ -216,22 +213,8 @@ export async function runInit(
     overwrite: true,
     silent: options.silent,
     style: options.style,
-    isNewProject:
-      options.isNewProject || projectInfo?.framework.name === "next-app",
+    isNewProject: options.isNewProject,
   })
-
-  // If a new project is using src dir, let's update the tailwind content config.
-  // TODO: Handle this per framework.
-  if (options.isNewProject && options.srcDir) {
-    // TODO: updateTailwindContent removed - need replacement functionality
-    // await updateTailwindContent(
-    //   ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
-    //   fullConfig,
-    //   {
-    //     silent: options.silent,
-    //   }
-    // )
-  }
 
   return fullConfig
 }

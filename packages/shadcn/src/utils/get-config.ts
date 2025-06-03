@@ -2,7 +2,6 @@ import path from "path"
 import { getProjectInfo } from "@/src/utils/get-project-info"
 import { highlighter } from "@/src/utils/highlighter"
 import { resolveImport } from "@/src/utils/resolve-import"
-import { cosmiconfig } from "cosmiconfig"
 import fg from "fast-glob"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
@@ -10,12 +9,6 @@ import { z } from "zod"
 export const DEFAULT_STYLE = "default"
 export const DEFAULT_COMPONENTS = "@/functions"
 export const DEFAULT_UTILS = "@/lib/utils"
-
-// TODO: Figure out if we want to support all cosmiconfig formats.
-// A simple components.json file would be nice.
-const explorer = cosmiconfig("components", {
-  searchPlaces: ["components.json"],
-})
 
 export const rawConfigSchema = z
   .object({
@@ -56,20 +49,36 @@ export const configSchema = rawConfigSchema.extend({
 
 export type Config = z.infer<typeof configSchema>
 
-// TODO: type the key.
-// Okay for now since I don't want a breaking change.
 export const workspaceConfigSchema = z.record(configSchema)
 
 export async function getConfig(cwd: string) {
-  const config = await getRawConfig(cwd)
+  const projectInfo = await getProjectInfo(cwd)
 
-  if (!config) {
+  if (!projectInfo) {
     return null
   }
 
-  // Set default icon library if not provided.
-  if (!config.iconLibrary) {
-    config.iconLibrary = config.style === "new-york" ? "radix" : "lucide"
+  // Generate configuration directly from manifest.yml data
+  const config: RawConfig = {
+    $schema: "https://ui.shadcn.com/schema.json",
+    rsc: false, // Airdrop projects are backend functions, not React Server Components
+    tsx: projectInfo.isTsx,
+    style: "new-york", // Default style for airdrop projects
+    tailwind: {
+      config: "",
+      baseColor: "zinc", 
+      css: "",
+      cssVariables: false, // No Tailwind CSS in airdrop projects
+      prefix: "",
+    },
+    iconLibrary: "lucide",
+    aliases: {
+      components: `${projectInfo.aliasPrefix}/functions`,
+      ui: `${projectInfo.aliasPrefix}/functions`,
+      hooks: `${projectInfo.aliasPrefix}/hooks`,
+      lib: `${projectInfo.aliasPrefix}/lib`,
+      utils: `${projectInfo.aliasPrefix}/lib/utils`,
+    },
   }
 
   return await resolveConfigPaths(cwd, config)
@@ -118,23 +127,6 @@ export async function resolveConfigPaths(cwd: string, config: RawConfig) {
           ),
     },
   })
-}
-
-export async function getRawConfig(cwd: string): Promise<RawConfig | null> {
-  try {
-    const configResult = await explorer.search(cwd)
-
-    if (!configResult) {
-      return null
-    }
-
-    return rawConfigSchema.parse(configResult.config)
-  } catch (error) {
-    const componentPath = `${cwd}/components.json`
-    throw new Error(
-      `Invalid configuration found in ${highlighter.info(componentPath)}.`
-    )
-  }
 }
 
 // Note: we can check for -workspace.yaml or "workspace" in package.json.

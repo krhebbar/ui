@@ -13,10 +13,10 @@ export async function preFlightInit(
   const errors: Record<string, boolean> = {}
 
   // Ensure target directory exists.
-  // Check for empty project. We assume if no manifest.yaml exists, the project is empty.
+  // Check for empty project. We assume if no manifest.yml exists, the project is empty.
   if (
     !fs.existsSync(options.cwd) ||
-    !fs.existsSync(path.resolve(options.cwd, "manifest.yaml"))
+    !fs.existsSync(path.resolve(options.cwd, "manifest.yml"))
   ) {
     errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
     return {
@@ -29,33 +29,14 @@ export async function preFlightInit(
     silent: options.silent,
   }).start()
 
-  if (
-    fs.existsSync(path.resolve(options.cwd, "components.json")) &&
-    !options.force
-  ) {
-    projectSpinner?.fail()
-    logger.break()
-    logger.error(
-      `A ${highlighter.info(
-        "components.json"
-      )} file already exists at ${highlighter.info(
-        options.cwd
-      )}.\nTo start over, remove the ${highlighter.info(
-        "components.json"
-      )} file and run ${highlighter.info("init")} again.`
-    )
-    logger.break()
-    process.exit(1)
-  }
-
   projectSpinner?.succeed()
 
   const manifestSpinner = spinner(`Verifying airdrop project.`, {
     silent: options.silent,
   }).start()
   
-  // Check if this is a valid airdrop project by looking for manifest.yaml and code directory
-  const manifestPath = path.resolve(options.cwd, "manifest.yaml")
+  // Check if this is a valid airdrop project by looking for manifest.yml and code directory
+  const manifestPath = path.resolve(options.cwd, "manifest.yml")
   const codePath = path.resolve(options.cwd, "code")
   
   if (!fs.existsSync(manifestPath) || !fs.existsSync(codePath)) {
@@ -65,14 +46,14 @@ export async function preFlightInit(
       `This does not appear to be a valid airdrop project at ${highlighter.info(
         options.cwd
       )}.\n` +
-        `Expected to find ${highlighter.info("manifest.yaml")} and ${highlighter.info("code/")} directory.`
+        `Expected to find ${highlighter.info("manifest.yml")} and ${highlighter.info("code/")} directory.`
     )
     logger.break()
     process.exit(1)
   }
   
   manifestSpinner?.succeed(
-    `Verifying airdrop project. Found ${highlighter.info("manifest.yaml")}.`
+    `Verifying airdrop project. Found ${highlighter.info("manifest.yml")}.`
   )
 
   return {
