@@ -25,7 +25,8 @@ import {
 } from "@/src/utils/type-generator"
 import { 
   AirdropProjectConfig, 
-  SUPPORTED_DEVREV_OBJECTS
+  SUPPORTED_DEVREV_OBJECTS,
+  SecretConnection // Added SecretConnection import
 } from "@/src/types/airdrop-config" // Updated path
 import { getInitConfig, getDefaultSnapInTemplate, airdropTemplates } from "@/src/utils/init-config";
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
@@ -107,7 +108,8 @@ export async function runInit(
   }
 ) {
   let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo
-  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }; // Added selectedSnapInTemplateName
+  // Updated airdropConfigResult type to include new env var names
+  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; devrevPatEnvVarName?: string; devrevOrgEnvVarName?: string; };
 
   // Handling for new projects in silent (-s) or yes (-y) mode
   // Check if manifest.yml or manifest.yaml exists to determine if it's truly a new project setup area
@@ -377,15 +379,18 @@ export async function runInit(
  */
 async function gatherAirdropConfiguration(
   options: z.infer<typeof initOptionsSchema>
-): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }> {
+): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; devrevPatEnvVarName?: string; devrevOrgEnvVarName?: string; }> {
   if (options.silent || options.yes) {
     // Return default configuration for silent mode
     // Add projectName and projectTypeFromPrompt for consistency, though not directly used by default config path
     // No selectedSnapInTemplateName in silent mode, it will use default
+    // Add default env var names for silent mode
     return {
       ...createDefaultAirdropConfig(),
       projectName: 'default-project',
-      projectTypeFromPrompt: 'airdrop'
+      projectTypeFromPrompt: 'airdrop',
+      devrevPatEnvVarName: "DEVREV_PAT", // Default for silent/yes
+      devrevOrgEnvVarName: "DEVREV_ORG",  // Default for silent/yes
     };
   }
 
@@ -580,13 +585,31 @@ async function gatherAirdropConfiguration(
     hint: "- Space to select. Enter to submit."
   });
 
+  // Add prompts for DevRev PAT and Org Slug environment variable names
+  promptsList.push(
+    {
+      type: "text",
+      name: "devrevPatEnvVarName",
+      message: "Environment variable name for DevRev PAT Token (e.g., DEVREV_PAT):",
+      initial: "DEVREV_PAT",
+    },
+    {
+      type: "text",
+      name: "devrevOrgEnvVarName",
+      message: "Environment variable name for DevRev Organization Slug (e.g., DEVREV_ORG):",
+      initial: "DEVREV_ORG",
+    }
+  );
+
   const responses = await prompts(promptsList);
    // Handle cases where prompts might be skipped (e.g. user presses Ctrl+C during promptsList)
   if (Object.keys(responses).length === 0 && promptsList.length > 0 && !options.yes && !options.silent) {
     // This condition might indicate that prompts were exited early (e.g. Ctrl+C)
-    // For `devrevObjects` specifically, if it's the only one and cancelled, responses.devrevObjects would be undefined
-    if (promptsList.some(p => p.name === 'devrevObjects') && typeof responses.devrevObjects === 'undefined') {
-        logger.error("Project configuration was not completed. Aborting.");
+    // Check some key expected responses
+    if (typeof responses.devrevObjects === 'undefined' ||
+        typeof responses.devrevPatEnvVarName === 'undefined' ||
+        typeof responses.devrevOrgEnvVarName === 'undefined') {
+        logger.error("Project configuration was not completed (essential prompts skipped). Aborting.");
         process.exit(0);
     }
     // If needsExternalSystem was true, but essential responses like externalSystemName are missing
@@ -594,6 +617,11 @@ async function gatherAirdropConfiguration(
         logger.error("External system configuration was not completed. Aborting.");
         process.exit(0);
     }
+  }
+  // Specific check for cancellation of new prompts if they were the only ones left (e.g. if promptsList was short)
+  if (typeof responses.devrevPatEnvVarName === 'undefined' || typeof responses.devrevOrgEnvVarName === 'undefined') {
+    logger.error("DevRev PAT or Organization Slug environment variable names were not provided. Aborting.");
+    process.exit(0);
   }
 
 
@@ -631,6 +659,7 @@ async function gatherAirdropConfiguration(
       }
       connectionDetails = {
         type: "secret", id: `${responses.externalSystemSlug}-secret-connection`,
+        tokenEnvVarName: secretResponses.tokenEnvVar, // Store the ENV VAR NAME here
         isSubdomain: secretResponses.isSubdomain, secretTransform: ".token",
         tokenVerification: { url: responses.testEndpoint, method: "GET" },
         fields: [{ id: "token", name: "API Token/Secret", description: `Your ${responses.externalSystemName} API Token/Secret` }],
@@ -658,6 +687,8 @@ async function gatherAirdropConfiguration(
         }
       : undefined,
     connection: needsExternalSystem && connectionDetails ? connectionDetails : undefined,
+    devrevPatEnvVarName: responses.devrevPatEnvVarName,
+    devrevOrgEnvVarName: responses.devrevOrgEnvVarName,
   };
 }
 
@@ -707,23 +738,35 @@ function createDefaultAirdropConfig(): AirdropProjectConfig {
 function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
   const envVars: Record<string, string> = {};
   
-  // Only proceed if connection and connection.type are defined, and type is oauth2
-  if (config.connection && config.connection.type === "oauth2") {
-    // Ensure clientId and clientSecret are strings before calling .match
-    // And that they exist on the connection object, which they should if type is oauth2 due to Zod schema
-    if (typeof config.connection.clientId === 'string') {
-      const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/);
-      if (clientIdMatch) {
-        envVars[clientIdMatch[1]] = "your-client-id-here";
+  if (config.connection) {
+    if (config.connection.type === "oauth2") {
+      if (typeof config.connection.clientId === 'string') {
+        const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/);
+        if (clientIdMatch) {
+          envVars[clientIdMatch[1]] = "your-client-id-here";
+        }
       }
-    }
-    if (typeof config.connection.clientSecret === 'string') {
-      const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/);
-      if (clientSecretMatch) {
-        envVars[clientSecretMatch[1]] = "your-client-secret-here";
+      if (typeof config.connection.clientSecret === 'string') {
+        const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/);
+        if (clientSecretMatch) {
+          envVars[clientSecretMatch[1]] = "your-client-secret-here";
+        }
+      }
+    } else if (config.connection.type === "secret") {
+      const secretConnection = config.connection as SecretConnection; // Type assertion
+      if (secretConnection.tokenEnvVarName) {
+        envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
       }
     }
   }
+
+  if (config.devrevPatEnvVarName) {
+    envVars[config.devrevPatEnvVarName] = "your-devrev-pat-here";
+  }
+  if (config.devrevOrgEnvVarName) {
+    envVars[config.devrevOrgEnvVarName] = "your-devrev-org-slug-here";
+  }
+
   return envVars;
 }
 
