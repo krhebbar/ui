@@ -1,0 +1,65 @@
+version: '2'
+
+name: Sample Snap-Ins for DevRev Hackathon
+description: Snap In to add Comments for demonstration purpose.
+
+service_account:
+  display_name: "DevRev Bot"
+
+event_sources:
+  organization:
+    - name: devrev-webhook
+      display_name: DevRev
+      type: devrev-webhook
+      config:
+        event_types:
+          - work_created
+
+inputs:
+  organization:
+    - name: input_field_1
+      description: Input field to add comment to the work item.
+      field_type: text
+      default_value: "Message from the input field."
+      ui:
+        display_name: Input Field 1
+
+    - name: input_field_2
+      description: Add extra comment.
+      field_type: bool
+      default_value: true
+      ui:
+        display_name: Should extra comment be added?
+
+    - name: input_field_array
+      description: List of names to add as comment.
+      base_type: text
+      field_type: array
+      default_value: ["name1", "name2"]
+      ui:
+        display_name: List of extra names
+
+functions:
+  - name: function_1
+    description: Function to create a timeline entry comment on a DevRev work item created.
+  - name: function_2
+    description: Function to create a timeline entry comment on a DevRev work item on which comment is added.
+
+automations:
+  - name: convergence_automation_devrev
+    source: devrev-webhook
+    event_types:
+      - work_created
+    function: function_1
+
+commands:
+  - name: comment_here
+    namespace: devrev
+    description: Command to trigger function to add comment to this work item.
+    surfaces:
+      - surface: discussions
+        object_types:
+          - issue
+          - ticket
+    usage_hint: "Command to add comment to this work item."
+    function: function_2

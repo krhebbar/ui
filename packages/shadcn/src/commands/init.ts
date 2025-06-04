@@ -31,6 +31,8 @@ import { getInitConfig, getDefaultSnapInTemplate } from "@/src/utils/init-config
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
 import { cloneTemplate } from "@/src/utils/git";
 import fs from "fs-extra";
+
+const AIRDROP_TEMPLATE_URL = "https://github.com/devrev/airdrop-template";
 import { Command } from "commander"
 import prompts from "prompts"
 import { z } from "zod"
@@ -132,7 +134,15 @@ export async function runInit(
       logger.info(`Project directory determined/created: ${highlighter.info(options.cwd)} (silent/yes mode)`);
       options.isNewProject = true;
 
-      if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+      if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
+        logger.info(`Cloning Airdrop project template...`);
+        const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
+        if (!cloneSuccess) {
+          logger.error("Failed to clone Airdrop project template. Aborting initialization.");
+          process.exit(1);
+        }
+        logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
+      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
         const template = getDefaultSnapInTemplate();
         if (template) {
           const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
@@ -165,7 +175,15 @@ export async function runInit(
         logger.info(`Created project directory: ${highlighter.info(options.cwd)}`);
         options.isNewProject = true; // Mark as new project
 
-        if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+        if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
+          logger.info(`Cloning Airdrop project template...`);
+          const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
+          if (!cloneSuccess) {
+            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
+            process.exit(1);
+          }
+          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
+        } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
           const template = getDefaultSnapInTemplate(); // Or prompt user to select one
           if (template) {
             const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
@@ -391,7 +409,13 @@ async function gatherAirdropConfiguration(
       type: "text",
       name: "externalSystemSlug",
       message: "External system slug (machine-readable, kebab-case):",
-      initial: (prev: any, values: any) => slugify(values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system")),
+      initial: (prev: any, values: any) => {
+        const baseName = values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system");
+        if (projectTypeFromPrompt === 'airdrop') {
+          return `airdrop-${slugify(baseName)}`;
+        }
+        return slugify(baseName);
+      },
       validate: (value: string) => slugify(value).length > 0 ? true : "Slug cannot be empty."
     },
     {
