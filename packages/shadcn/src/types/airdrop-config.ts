@@ -41,6 +41,7 @@ export const secretConnectionSchema = z.object({
       description: z.string(),
     })
   ),
+  tokenEnvVarName: z.string().optional(), // New field
 })
 
 export const connectionSchema = z.union([oAuth2ConnectionSchema, secretConnectionSchema])
@@ -61,7 +62,9 @@ export const airdropConfigSchema = z.object({
   devrevObjects: z.array(z.string()),
   externalSyncUnits: z.array(z.string()).optional(),
   externalSystem: externalSystemSchema.optional(),
-  connection: connectionSchema.optional(),
+  connection: connectionSchema.optional(), // This connectionSchema will now include the updated secretConnectionSchema
+  devrevPatEnvVarName: z.string().optional(), // New field
+  devrevOrgEnvVarName: z.string().optional(), // New field
 })
 
 // Export types

@@ -1,6 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
-import { AirdropProjectConfig } from "@/src/type/airdrop-config"
+import { AirdropProjectConfig } from "@/src/types/airdrop-config" // Updated path
 import { logger } from "@/src/utils/logger"
 import { generateFromOpenAPI, hasOpenAPISpec } from "@/src/utils/openapi-generator"
 
