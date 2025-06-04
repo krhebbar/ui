@@ -1,0 +1,2 @@
+name: Test Project No Tsconfig
+description: A valid manifest but the project code has no tsconfig.json

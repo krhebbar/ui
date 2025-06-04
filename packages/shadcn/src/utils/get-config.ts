@@ -58,14 +58,21 @@ export async function getConfig(cwd: string): Promise<Config | null> {
 
 export async function resolveConfigPaths(cwd: string, config: Omit<Config, 'resolvedPaths'>) {
   // Read tsconfig.json.
-  const tsConfig = await loadConfig(cwd)
+  const tsConfigPath = path.join(cwd, "tsconfig.json");
+  if (!fs.existsSync(tsConfigPath)) {
+    // Match the expected error message format from the test if possible, or ensure it's covered by regex.
+    // The test expects /Failed to load tsconfig.json/
+    throw new Error(`Failed to load tsconfig.json: File not found at ${tsConfigPath}`);
+  }
+
+  const tsConfig = loadConfig(cwd); // loadConfig is synchronous
 
   if (tsConfig.resultType === "failed") {
     throw new Error(
       `Failed to load tsconfig.json. ${
         tsConfig.message ?? ""
       }`.trim()
-    )
+    );
   }
 
   return configSchema.parse({
