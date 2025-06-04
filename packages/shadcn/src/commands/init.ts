@@ -775,66 +775,193 @@ async function updateManifestYaml(
   projectConfig: AirdropProjectConfig,
   airdropConfigResultFromPrompts: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
 ): Promise<void> {
-  const manifestPath = path.join(cwd, 'manifest.yaml');
+  const PLACEHOLDERS_TO_REPLACE = ["Todo", "TODO", "snapin-template-description", "snapin-template-name", "example", "Example"];
+  const placeholderRegex = new RegExp(PLACEHOLDERS_TO_REPLACE.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
+
   const { projectType, externalSystem, connection } = projectConfig;
-  const { snapInBaseName, airdropProjectName, projectName } = airdropConfigResultFromPrompts;
+  const { snapInBaseName, airdropProjectName, projectName: promptProjectNameVariable, selectedSnapInTemplateName } = airdropConfigResultFromPrompts;
+  const initConf = getInitConfig();
+  const selectedTemplate = selectedSnapInTemplateName ? initConf.snapInTemplates.find(t => t.name === selectedSnapInTemplateName) : undefined;
 
-  let name = '';
-  let description = '';
-  let slug = '';
-  let manifestType = '';
-
+  let manifestName = '';
   if (projectType === 'snap-in') {
-    name = snapInBaseName || projectName || 'My Snap-in';
-    description = snapInBaseName || name;
-    if (externalSystem) {
-      manifestType = 'snap-in.external-system';
-      slug = externalSystem.slug || slugify(name);
-      name = externalSystem.name || name;
-      description = externalSystem.name || description;
-    } else {
-      manifestType = 'snap-in.native';
-      slug = slugify(name);
-    }
+    manifestName = snapInBaseName || promptProjectNameVariable || 'My Snap-in';
   } else { // airdrop
-    manifestType = 'airdrop';
-    // For airdrop, externalSystem and connection should always exist based on current prompting logic
-    name = externalSystem?.name || airdropProjectName || projectName || 'My Airdrop';
-    description = externalSystem?.name || name;
-    slug = externalSystem?.slug || slugify(name);
+    manifestName = externalSystem?.name || airdropProjectName || promptProjectNameVariable || 'My Airdrop';
   }
 
-  const newManifestContent: any = {
-    name,
-    description,
-    type: manifestType,
-    slug,
-  };
+  let manifestDescriptionPlaceholderTarget = externalSystem?.name || manifestName;
+  const serviceAccountBotName = `${manifestDescriptionPlaceholderTarget} Bot`;
 
-  if (connection) {
-    newManifestContent.connection = {
-      type: connection.type,
-      id: connection.id,
-      // Note: Only adding type and id for now as per example.
-      // More fields from connection (like oauth details) might be needed depending on manifest spec.
-    };
+  let projectSlugForManifest = '';
+  if (projectType === 'snap-in') {
+      projectSlugForManifest = slugify(snapInBaseName || manifestName);
+  } else { // airdrop
+      projectSlugForManifest = externalSystem?.slug || slugify(manifestName.replace(/^airdrop-/i, ''));
   }
 
-  let existingManifestData: any = {};
+  let connectionTypeForManifest: string | undefined = undefined;
+  let connectionIdForManifest: string | undefined = undefined;
+  let tokenVerificationUrlForManifest: string | undefined = undefined;
+
+  if (connection && externalSystem) {
+    connectionTypeForManifest = connection.type;
+    connectionIdForManifest = connection.id;
+
+    if (connection.type === 'secret') {
+      const secretConnection = connection as SecretConnection;
+      if (secretConnection.tokenVerification) {
+        tokenVerificationUrlForManifest = secretConnection.tokenVerification.url;
+      }
+    } else if (connection.type === 'oauth2') {
+      tokenVerificationUrlForManifest = externalSystem.testEndpoint;
+    }
+  }
+
+  const externalSystemSlugForManifestKeyring = externalSystem?.slug;
+
+  const manifestPath = path.join(cwd, 'manifest.yaml');
+  let yamlData: any = {};
   try {
     if (await fs.pathExists(manifestPath)) {
       const fileContents = await fs.readFile(manifestPath, 'utf8');
-      existingManifestData = yaml.load(fileContents) as object || {};
+      yamlData = yaml.load(fileContents) as object || {};
+    } else {
+      logger.warn(`manifest.yaml not found at ${manifestPath}. A new one will be created with default values if applicable, or this step might be skipped if template doesn't include it.`);
+      // Initialize yamlData if file doesn't exist to avoid errors on property access
+      // This allows creation of a new manifest if a template didn't provide one.
     }
   } catch (e: any) {
-    logger.warn(`Could not read or parse existing manifest.yaml: ${e.message}. A new one will be created if it doesn't exist, or overwritten if it's malformed.`);
-    existingManifestData = {}; // Reset if parsing failed
+    logger.error(`Could not read or parse existing manifest.yaml: ${e.message}. Update attempt will proceed with minimal data or fail.`);
+    // Depending on strictness, could return or throw here. For now, allow potential overwrite/creation.
+    yamlData = {}; // Reset if parsing failed to avoid further errors
   }
 
-  const finalManifestData = { ...existingManifestData, ...newManifestContent };
+  // Root level updates
+  yamlData.name = manifestName;
+  if (typeof yamlData.description === 'string') {
+    yamlData.description = yamlData.description.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+  } else if (!yamlData.description && selectedTemplate?.description) { // If no description, use template's
+    yamlData.description = selectedTemplate.description.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+  } else { // Fallback if no description from template or existing manifest
+    yamlData.description = manifestDescriptionPlaceholderTarget;
+  }
+
+  // These fields are explicitly set or omitted based on new config, so remove old ones.
+  delete yamlData.type;
+  delete yamlData.connection;
+
+  // Define the core new structure based on gathered config
+  const newCoreManifestValues: any = {
+    name: manifestName,
+    description: yamlData.description, // Use the (potentially placeholder-replaced) description
+    type: projectType === 'snap-in'
+            ? (externalSystem ? 'snap-in.external-system' : 'snap-in.native')
+            : 'airdrop',
+    slug: projectSlugForManifest, // This is the main slug for the snap-in/airdrop itself
+  };
+
+  if (connection && externalSystem) { // Only add connection if it's configured
+    newCoreManifestValues.connection = {
+      type: connectionTypeForManifest,
+      id: connectionIdForManifest,
+    };
+  }
+
+  // Merge existing yamlData with newCoreManifestValues, then specific deeper updates
+  yamlData = { ...yamlData, ...newCoreManifestValues };
+
+
+  // Service account update
+  if (yamlData.service_account && typeof yamlData.service_account.display_name === 'string') {
+    yamlData.service_account.display_name = serviceAccountBotName;
+  } else if (yamlData.service_account) { // if service_account object exists but no display_name
+     yamlData.service_account.display_name = serviceAccountBotName;
+  }
+
+
+  // Functions update
+  if (Array.isArray(yamlData.functions)) {
+    yamlData.functions.forEach((func: any) => {
+      if (func && typeof func.description === 'string') {
+        func.description = func.description.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+      }
+    });
+  }
+
+  // Keyring_types update
+  if (projectConfig.connection && externalSystem && Array.isArray(yamlData.keyring_types)) {
+    if (yamlData.keyring_types.length > 0) {
+      const keyringEntry = yamlData.keyring_types[0];
+      if (keyringEntry) {
+        keyringEntry.id = connectionIdForManifest;
+        if (typeof keyringEntry.name === 'string') {
+          keyringEntry.name = keyringEntry.name.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+        } else {
+          keyringEntry.name = manifestDescriptionPlaceholderTarget; // Set if not present
+        }
+        if (typeof keyringEntry.description === 'string') {
+          keyringEntry.description = keyringEntry.description.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+        } else {
+           keyringEntry.description = `Keyring for ${manifestDescriptionPlaceholderTarget}`; // Set if not present
+        }
+        keyringEntry.external_system_name = manifestDescriptionPlaceholderTarget;
+        keyringEntry.slug = externalSystemSlugForManifestKeyring;
+        keyringEntry.kind = connectionTypeForManifest;
+
+        if (connectionTypeForManifest === 'secret' && tokenVerificationUrlForManifest) {
+           if (!keyringEntry.token_verification) keyringEntry.token_verification = {};
+           keyringEntry.token_verification.url = tokenVerificationUrlForManifest;
+        } else if (connectionTypeForManifest === 'oauth2' && tokenVerificationUrlForManifest) {
+           // For OAuth2, token_verification might not be standard, but if template has it:
+           if (keyringEntry.token_verification) { // Only update if block exists
+             keyringEntry.token_verification.url = tokenVerificationUrlForManifest;
+           }
+        }
+      }
+    } else if (connectionIdForManifest) { // keyring_types is empty array, but we have connection info
+        yamlData.keyring_types.push({
+            id: connectionIdForManifest,
+            name: manifestDescriptionPlaceholderTarget,
+            description: `Keyring for ${manifestDescriptionPlaceholderTarget}`,
+            external_system_name: manifestDescriptionPlaceholderTarget,
+            slug: externalSystemSlugForManifestKeyring,
+            kind: connectionTypeForManifest,
+            token_verification: tokenVerificationUrlForManifest ? { url: tokenVerificationUrlForManifest } : undefined,
+        });
+    }
+  } else if (!projectConfig.connection && Array.isArray(yamlData.keyring_types)) {
+    // No connection defined in snapin.config.mjs, ensure keyring_types is empty or removed
+    yamlData.keyring_types = [];
+  }
+
+
+  // Imports update
+  if (Array.isArray(yamlData.imports)) {
+    yamlData.imports.forEach((imp: any) => {
+      if (imp) {
+        imp.slug = projectSlugForManifest; // Use the main project slug here
+        if (typeof imp.display_name === 'string') {
+          imp.display_name = imp.display_name.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+        } else {
+          imp.display_name = manifestDescriptionPlaceholderTarget; // Set if not present
+        }
+        if (typeof imp.description === 'string') {
+          imp.description = imp.description.replace(placeholderRegex, manifestDescriptionPlaceholderTarget);
+        } else {
+          imp.description = `Import for ${manifestDescriptionPlaceholderTarget}`; // Set if not present
+        }
+        if (projectConfig.connection && connectionIdForManifest) {
+          imp.allowed_connection_types = [connectionIdForManifest];
+        } else {
+          imp.allowed_connection_types = [];
+        }
+      }
+    });
+  }
 
   try {
-    await fs.writeFile(manifestPath, yaml.dump(finalManifestData), 'utf8');
+    await fs.writeFile(manifestPath, yaml.dump(yamlData), 'utf8');
     logger.info(`manifest.yaml updated successfully at ${manifestPath}`);
   } catch (e: any) {
     logger.error(`Failed to write manifest.yaml: ${e.message}`);
