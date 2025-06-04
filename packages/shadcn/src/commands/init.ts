@@ -40,13 +40,14 @@ import { z } from "zod"
 // Helper function to get the original AirdropProjectConfig part from the augmented one.
 // This is important because writeAirdropConfig and other utilities expect AirdropProjectConfig.
 function extractCoreAirdropConfig(
-  augmentedConfig: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string }
+  augmentedConfig: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
 ): AirdropProjectConfig {
   const {
     projectName,
     projectTypeFromPrompt,
     airdropProjectName,
     snapInBaseName,
+    selectedSnapInTemplateName, // Added selectedSnapInTemplateName
     ...coreConfig
   } = augmentedConfig;
   return coreConfig;
@@ -105,7 +106,7 @@ export async function runInit(
   }
 ) {
   let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo
-  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string };
+  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }; // Added selectedSnapInTemplateName
 
   // Handling for new projects in silent (-s) or yes (-y) mode
   // Check if manifest.yml or manifest.yaml exists to determine if it's truly a new project setup area
@@ -136,24 +137,48 @@ export async function runInit(
 
       if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
         logger.info(`Cloning Airdrop project template...`);
-        const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
-        if (!cloneSuccess) {
-          logger.error("Failed to clone Airdrop project template. Aborting initialization.");
-          process.exit(1);
-        }
-        logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
-      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
-        const template = getDefaultSnapInTemplate();
-        if (template) {
-          const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
+        const initConf = getInitConfig();
+        const airdropTemplateToUse = initConf.airdropTemplates && initConf.airdropTemplates.length > 0
+                                     ? initConf.airdropTemplates[0]
+                                     : undefined;
+        if (airdropTemplateToUse) {
+          logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
+          const cloneSuccess = await cloneTemplate({
+            repoUrl: airdropTemplateToUse.url,
+            targetPath: options.cwd,
+            branch: airdropTemplateToUse.branch,
+            path: airdropTemplateToUse.path
+          });
           if (!cloneSuccess) {
-            logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
+            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
             process.exit(1);
           }
-          logger.info(`Snap-in template cloned (silent/yes mode).`);
+          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
         } else {
-           logger.warn("Default Snap-in template not found. Skipping cloning (silent/yes mode).");
+          logger.error("No Airdrop templates found in configuration. Cannot proceed with cloning. Please define airdrop templates in init-config.ts.");
+          process.exit(1);
         }
+      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+        const initConf = getInitConfig();
+        // For silent/yes mode, still use default Snap-in template
+        const templateToUse = initConf.snapInTemplates.find(t => t.name === initConf.defaultSnapInTemplateName);
+        if (!templateToUse) {
+            logger.error(`Default Snap-in template '${initConf.defaultSnapInTemplateName}' not found. Aborting.`);
+            process.exit(1);
+        }
+        logger.info(`Using default Snap-in template: ${templateToUse.name} (silent/yes mode)`);
+        // Clone logic using templateToUse
+        const cloneSuccess = await cloneTemplate({
+          repoUrl: templateToUse.url,
+          targetPath: options.cwd,
+          branch: templateToUse.branch,
+          path: templateToUse.path
+        });
+        if (!cloneSuccess) {
+          logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
+          process.exit(1);
+        }
+        logger.info(`Snap-in template cloned (silent/yes mode).`);
       }
   }
 
@@ -177,24 +202,58 @@ export async function runInit(
 
         if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
           logger.info(`Cloning Airdrop project template...`);
-          const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
-          if (!cloneSuccess) {
-            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
-            process.exit(1);
-          }
-          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
-        } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
-          const template = getDefaultSnapInTemplate(); // Or prompt user to select one
-          if (template) {
-            const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
+          const initConf = getInitConfig();
+          const airdropTemplateToUse = initConf.airdropTemplates && initConf.airdropTemplates.length > 0
+                                       ? initConf.airdropTemplates[0]
+                                       : undefined;
+          if (airdropTemplateToUse) {
+            logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
+            const cloneSuccess = await cloneTemplate({
+              repoUrl: airdropTemplateToUse.url,
+              targetPath: options.cwd,
+              branch: airdropTemplateToUse.branch,
+              path: airdropTemplateToUse.path
+            });
             if (!cloneSuccess) {
-              logger.error("Failed to clone Snap-in template. Aborting initialization.");
+              logger.error("Failed to clone Airdrop project template. Aborting initialization.");
               process.exit(1);
             }
-            logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
+            logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
           } else {
-            logger.warn("Default Snap-in template not found. Skipping template cloning.");
+            logger.error("No Airdrop templates found in configuration. Cannot proceed with cloning. Please define airdrop templates in init-config.ts.");
+            process.exit(1);
           }
+        } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+          const initConf = getInitConfig();
+          let templateToUse;
+          // Use selectedSnapInTemplateName from airdropConfigResult for interactive mode
+          if (airdropConfigResult.selectedSnapInTemplateName) {
+            templateToUse = initConf.snapInTemplates.find(t => t.name === airdropConfigResult.selectedSnapInTemplateName);
+            if (!templateToUse) {
+                logger.error(`Selected Snap-in template '${airdropConfigResult.selectedSnapInTemplateName}' not found. Aborting.`);
+                process.exit(1);
+            }
+            logger.info(`Using selected Snap-in template: ${templateToUse.name}`);
+          } else {
+            // This else block should ideally not be reached if prompts are correctly handled for interactive snap-in selection.
+            // It serves as a fallback or indicates an unexpected state if selectedSnapInTemplateName is missing in interactive mode for a snap-in.
+            // (Silent/yes mode is handled earlier and does not rely on selectedSnapInTemplateName)
+            logger.error("No Snap-in template selected or found (selectedSnapInTemplateName missing). Aborting.");
+            process.exit(1);
+          }
+
+          // The rest of the cloning logic remains the same, using templateToUse:
+          const cloneSuccess = await cloneTemplate({
+            repoUrl: templateToUse.url,
+            targetPath: options.cwd,
+            branch: templateToUse.branch,
+            path: templateToUse.path
+          });
+          if (!cloneSuccess) {
+            logger.error("Failed to clone Snap-in template. Aborting initialization.");
+            process.exit(1);
+          }
+          logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
         }
       } else {
         // Directory is not empty, or it's a forced/silent operation on an existing dir.
@@ -316,10 +375,11 @@ export async function runInit(
  */
 async function gatherAirdropConfiguration(
   options: z.infer<typeof initOptionsSchema>
-): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string }> {
+): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }> {
   if (options.silent || options.yes) {
     // Return default configuration for silent mode
     // Add projectName and projectTypeFromPrompt for consistency, though not directly used by default config path
+    // No selectedSnapInTemplateName in silent mode, it will use default
     return {
       ...createDefaultAirdropConfig(),
       projectName: 'default-project',
@@ -348,6 +408,7 @@ async function gatherAirdropConfiguration(
   let projectName: string | undefined;
   let airdropProjectName: string | undefined;
   let snapInBaseName: string | undefined;
+  let selectedSnapInTemplateName: string | undefined; // Added to store the name
 
   if (projectTypeFromPrompt === "airdrop") {
     const nameResponse = await prompts({
@@ -380,6 +441,35 @@ async function gatherAirdropConfiguration(
     });
     snapInBaseName = nameResponse.snapInBaseName;
     projectName = generateAirdropSnapInFolderName(snapInBaseName); // This will be the folder name
+
+    // Snap-in template selection
+    const initConf = getInitConfig(); // Re-fetch or ensure it's in scope
+    const availableSnapInTemplates = initConf.snapInTemplates;
+
+    if (!availableSnapInTemplates || availableSnapInTemplates.length === 0) {
+      logger.error("No Snap-in templates are defined in the configuration. Cannot proceed.");
+      process.exit(1);
+    }
+
+    const templateChoices = availableSnapInTemplates.map(template => ({
+      title: `${template.name} (${template.description})`,
+      value: template.name, // Store the name, as it's unique
+    }));
+
+    const templateResponse = await prompts({
+      type: "select",
+      name: "selectedSnapInTemplateName",
+      message: "Select a Snap-in template:",
+      choices: templateChoices,
+      initial: 0, // Default to the first template
+    });
+
+    selectedSnapInTemplateName = templateResponse.selectedSnapInTemplateName;
+    // Handle potential cancellation of prompt (e.g., user presses Ctrl+C)
+    if (typeof selectedSnapInTemplateName === 'undefined') {
+        logger.error("Snap-in template selection was cancelled or skipped. Aborting.");
+        process.exit(0); // Exit gracefully
+    }
   }
 
   // Core configuration prompts
@@ -559,6 +649,7 @@ async function gatherAirdropConfiguration(
     projectTypeFromPrompt,
     airdropProjectName, // Specific name for airdrop project type
     snapInBaseName,   // Base name used to generate snap-in folder
+    selectedSnapInTemplateName, // Name of the chosen Snap-in template, undefined for airdrop
 
     projectType: projectTypeFromPrompt, // This field is part of AirdropProjectConfig
     syncDirection: projectTypeFromPrompt === 'airdrop' ? syncDirection : undefined, // Only for airdrop

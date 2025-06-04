@@ -8,10 +8,12 @@ interface CloneOptions {
   repoUrl: string;
   targetPath: string;
   depth?: number;
+  branch?: string;
+  path?: string;
 }
 
 export async function cloneTemplate(options: CloneOptions): Promise<boolean> {
-  const { repoUrl, targetPath, depth = 1 } = options;
+  const { repoUrl, targetPath, depth = 1, branch, path: repoPath } = options; // Renamed path to repoPath to avoid conflict with 'path' module
 
   const cloningSpinner = spinner(`Cloning template from ${repoUrl}...`).start();
 
@@ -29,7 +31,11 @@ export async function cloneTemplate(options: CloneOptions): Promise<boolean> {
       await fs.ensureDir(targetPath);
     }
 
-    const gitArgs = ["clone", "--depth", depth.toString(), repoUrl, targetPath];
+    const gitArgs = ["clone", "--depth", depth.toString()];
+    if (branch) {
+      gitArgs.push("--branch", branch);
+    }
+    gitArgs.push(repoUrl, targetPath);
     logger.info(`Executing: git ${gitArgs.join(" ")}`); // Log the command
 
     const result = await execa("git", gitArgs);
@@ -38,6 +44,37 @@ export async function cloneTemplate(options: CloneOptions): Promise<boolean> {
       cloningSpinner.fail(`Failed to clone template from ${repoUrl}. Exit code: ${result.exitCode}`);
       logger.error(`Git clone stderr: ${result.stderr}`);
       return false;
+    }
+
+    if (repoPath && repoPath.trim() !== "" && repoPath.trim() !== ".") {
+      const sourcePath = path.join(targetPath, repoPath); // Use 'path' module alias
+      // Check if sourcePath actually exists and is a directory
+      if (await fs.pathExists(sourcePath) && (await fs.stat(sourcePath)).isDirectory()) {
+        logger.info(`Moving contents from ${sourcePath} to ${targetPath}`);
+        const tempPath = path.join(targetPath, `__temp_clone_path_${Date.now()}`);
+        await fs.ensureDir(tempPath); // Create a temporary directory
+
+        // Move contents of sourcePath to tempPath
+        const itemsToMove = await fs.readdir(sourcePath);
+        for (const item of itemsToMove) {
+          await fs.move(path.join(sourcePath, item), path.join(tempPath, item), { overwrite: true });
+        }
+
+        // Remove the now empty original sourcePath directory
+        await fs.remove(sourcePath);
+
+        // Move contents from tempPath to targetPath
+        const tempItemsToMove = await fs.readdir(tempPath);
+        for (const item of tempItemsToMove) {
+            await fs.move(path.join(tempPath, item), path.join(targetPath, item), { overwrite: true });
+        }
+
+        // Remove the temporary directory
+        await fs.remove(tempPath);
+        logger.info(`Successfully moved contents from ${repoPath} to project root.`);
+      } else {
+        logger.warn(`Specified path '${repoPath}' does not exist or is not a directory within the cloned repository. Skipping move operation.`);
+      }
     }
 
     // Remove the .git directory after cloning to make it a fresh project
