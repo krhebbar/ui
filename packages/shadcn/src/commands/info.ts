@@ -1,29 +1,32 @@
 import path from "path"
 import { getProjectInfo } from "@/src/utils/get-project-info"
-import { getAirdropConfig } from "@/src/utils/airdrop-config"
+// Removed getAirdropConfig, added hasSnapInConfig and getSnapInConfig
+import { hasSnapInConfig, getSnapInConfig } from "@/src/utils/airdrop-config";
 import { logger } from "@/src/utils/logger"
 import { Command } from "commander"
 
 export const info = new Command()
   .name("info")
-  .description("get information about your airdrop project")
+  .description("get information about your project") // Updated description
   .option(
     "-c, --cwd <cwd>",
     "the working directory. defaults to the current directory.",
     process.cwd()
   )
   .action(async (opts) => {
-    logger.info("> airdrop project info")
+    logger.info("> Project info") // Updated message
     console.log(await getProjectInfo(opts.cwd))
     logger.break()
     
-    logger.info("> airdrop project configuration")
-    try {
-      // Try to read the raw config first, then validate
-      const configPath = path.join(opts.cwd, "airdrop.config.mjs")
-      const configModule = await import(configPath)
-      console.log(configModule.default)
-    } catch (error) {
-      logger.warn("No airdrop.config.mjs found. Run 'shadcn init' to create one.")
+    logger.info("> Project configuration (snapin.config.mjs)") // Updated message
+    if (await hasSnapInConfig(opts.cwd)) {
+      const config = await getSnapInConfig(opts.cwd);
+      if (config) {
+        console.log(config);
+      } else {
+        logger.error("Could not load snapin.config.mjs.");
+      }
+    } else {
+      logger.warn("No snapin.config.mjs found. Run 'init' to create one.");
     }
   })

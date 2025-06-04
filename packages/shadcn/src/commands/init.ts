@@ -31,6 +31,7 @@ import { getInitConfig, getDefaultSnapInTemplate, airdropTemplates } from "@/src
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
 import { cloneTemplate } from "@/src/utils/git";
 import fs from "fs-extra";
+import yaml from 'js-yaml'; // Added import
 
 const AIRDROP_TEMPLATE_URL = "https://github.com/devrev/airdrop-template";
 import { Command } from "commander"
@@ -351,6 +352,9 @@ export async function runInit(
   await copyConfigTypes(options.cwd);
   await generateTypeDefinitions(options.cwd, coreConfig); // Use updated coreConfig variable
   configSpinner.succeed(`Project configuration created successfully in ${highlighter.info(options.cwd)}.`); // Updated message
+
+  // Update manifest.yaml
+  await updateManifestYaml(options.cwd, coreConfig, airdropConfigResult);
 
   if (options.components?.length) {
     // Re-fetch config after writing, to ensure components are added based on the *new* configuration
@@ -716,4 +720,76 @@ function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, 
   }
   
   return envVars
+}
+
+async function updateManifestYaml(
+  cwd: string,
+  projectConfig: AirdropProjectConfig,
+  airdropConfigResultFromPrompts: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
+): Promise<void> {
+  const manifestPath = path.join(cwd, 'manifest.yaml');
+  const { projectType, externalSystem, connection } = projectConfig;
+  const { snapInBaseName, airdropProjectName, projectName } = airdropConfigResultFromPrompts;
+
+  let name = '';
+  let description = '';
+  let slug = '';
+  let manifestType = '';
+
+  if (projectType === 'snap-in') {
+    name = snapInBaseName || projectName || 'My Snap-in';
+    description = snapInBaseName || name;
+    if (externalSystem) {
+      manifestType = 'snap-in.external-system';
+      slug = externalSystem.slug || slugify(name);
+      name = externalSystem.name || name;
+      description = externalSystem.name || description;
+    } else {
+      manifestType = 'snap-in.native';
+      slug = slugify(name);
+    }
+  } else { // airdrop
+    manifestType = 'airdrop';
+    // For airdrop, externalSystem and connection should always exist based on current prompting logic
+    name = externalSystem?.name || airdropProjectName || projectName || 'My Airdrop';
+    description = externalSystem?.name || name;
+    slug = externalSystem?.slug || slugify(name);
+  }
+
+  const newManifestContent: any = {
+    name,
+    description,
+    type: manifestType,
+    slug,
+  };
+
+  if (connection) {
+    newManifestContent.connection = {
+      type: connection.type,
+      id: connection.id,
+      // Note: Only adding type and id for now as per example.
+      // More fields from connection (like oauth details) might be needed depending on manifest spec.
+    };
+  }
+
+  let existingManifestData: any = {};
+  try {
+    if (await fs.pathExists(manifestPath)) {
+      const fileContents = await fs.readFile(manifestPath, 'utf8');
+      existingManifestData = yaml.load(fileContents) as object || {};
+    }
+  } catch (e: any) {
+    logger.warn(`Could not read or parse existing manifest.yaml: ${e.message}. A new one will be created if it doesn't exist, or overwritten if it's malformed.`);
+    existingManifestData = {}; // Reset if parsing failed
+  }
+
+  const finalManifestData = { ...existingManifestData, ...newManifestContent };
+
+  try {
+    await fs.writeFile(manifestPath, yaml.dump(finalManifestData), 'utf8');
+    logger.info(`manifest.yaml updated successfully at ${manifestPath}`);
+  } catch (e: any) {
+    logger.error(`Failed to write manifest.yaml: ${e.message}`);
+    // Consider if this should be a fatal error that stops the init process
+  }
 }
