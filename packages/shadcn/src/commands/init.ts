@@ -15,9 +15,9 @@ import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
 import { 
-  writeAirdropConfig, 
+  writeSnapInConfig, // Renamed
   updateEnvFile, 
-  hasAirdropConfig 
+  hasSnapInConfig // Renamed
 } from "@/src/utils/airdrop-config"
 import { 
   generateTypeDefinitions, 
@@ -27,10 +27,11 @@ import {
   AirdropProjectConfig, 
   SUPPORTED_DEVREV_OBJECTS
 } from "@/src/type/airdrop-config"
-import { getInitConfig, getDefaultSnapInTemplate } from "@/src/utils/init-config";
+import { getInitConfig, getDefaultSnapInTemplate, airdropTemplates } from "@/src/utils/init-config";
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
 import { cloneTemplate } from "@/src/utils/git";
 import fs from "fs-extra";
+import yaml from 'js-yaml'; // Added import
 
 const AIRDROP_TEMPLATE_URL = "https://github.com/devrev/airdrop-template";
 import { Command } from "commander"
@@ -38,15 +39,16 @@ import prompts from "prompts"
 import { z } from "zod"
 
 // Helper function to get the original AirdropProjectConfig part from the augmented one.
-// This is important because writeAirdropConfig and other utilities expect AirdropProjectConfig.
-function extractCoreAirdropConfig(
-  augmentedConfig: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string }
+// This is important because writeSnapInConfig and other utilities expect AirdropProjectConfig.
+function extractCoreConfigForGeneration( // Renamed
+  augmentedConfig: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
 ): AirdropProjectConfig {
   const {
     projectName,
     projectTypeFromPrompt,
     airdropProjectName,
     snapInBaseName,
+    selectedSnapInTemplateName, // Added selectedSnapInTemplateName
     ...coreConfig
   } = augmentedConfig;
   return coreConfig;
@@ -105,7 +107,7 @@ export async function runInit(
   }
 ) {
   let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo
-  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string };
+  let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }; // Added selectedSnapInTemplateName
 
   // Handling for new projects in silent (-s) or yes (-y) mode
   // Check if manifest.yml or manifest.yaml exists to determine if it's truly a new project setup area
@@ -136,24 +138,47 @@ export async function runInit(
 
       if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
         logger.info(`Cloning Airdrop project template...`);
-        const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
-        if (!cloneSuccess) {
-          logger.error("Failed to clone Airdrop project template. Aborting initialization.");
-          process.exit(1);
-        }
-        logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
-      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
-        const template = getDefaultSnapInTemplate();
-        if (template) {
-          const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
+        const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
+                                     ? airdropTemplates[0]
+                                     : undefined;
+        if (airdropTemplateToUse) {
+          logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
+          const cloneSuccess = await cloneTemplate({
+            repoUrl: airdropTemplateToUse.url,
+            targetPath: options.cwd,
+            branch: airdropTemplateToUse.branch,
+            path: airdropTemplateToUse.path
+          });
           if (!cloneSuccess) {
-            logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
+            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
             process.exit(1);
           }
-          logger.info(`Snap-in template cloned (silent/yes mode).`);
+          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
         } else {
-           logger.warn("Default Snap-in template not found. Skipping cloning (silent/yes mode).");
+          logger.error("No Airdrop templates found in configuration. Cannot proceed with cloning. Please define airdrop templates in init-config.ts.");
+          process.exit(1);
         }
+      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+        const initConf = getInitConfig();
+        // For silent/yes mode, still use default Snap-in template
+        const templateToUse = initConf.snapInTemplates.find(t => t.name === initConf.defaultSnapInTemplateName);
+        if (!templateToUse) {
+            logger.error(`Default Snap-in template '${initConf.defaultSnapInTemplateName}' not found. Aborting.`);
+            process.exit(1);
+        }
+        logger.info(`Using default Snap-in template: ${templateToUse.name} (silent/yes mode)`);
+        // Clone logic using templateToUse
+        const cloneSuccess = await cloneTemplate({
+          repoUrl: templateToUse.url,
+          targetPath: options.cwd,
+          branch: templateToUse.branch,
+          path: templateToUse.path
+        });
+        if (!cloneSuccess) {
+          logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
+          process.exit(1);
+        }
+        logger.info(`Snap-in template cloned (silent/yes mode).`);
       }
   }
 
@@ -177,24 +202,57 @@ export async function runInit(
 
         if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
           logger.info(`Cloning Airdrop project template...`);
-          const cloneSuccess = await cloneTemplate({ repoUrl: AIRDROP_TEMPLATE_URL, targetPath: options.cwd });
-          if (!cloneSuccess) {
-            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
-            process.exit(1);
-          }
-          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
-        } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
-          const template = getDefaultSnapInTemplate(); // Or prompt user to select one
-          if (template) {
-            const cloneSuccess = await cloneTemplate({ repoUrl: template.url, targetPath: options.cwd });
+          const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
+                                       ? airdropTemplates[0]
+                                       : undefined;
+          if (airdropTemplateToUse) {
+            logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
+            const cloneSuccess = await cloneTemplate({
+              repoUrl: airdropTemplateToUse.url,
+              targetPath: options.cwd,
+              branch: airdropTemplateToUse.branch,
+              path: airdropTemplateToUse.path
+            });
             if (!cloneSuccess) {
-              logger.error("Failed to clone Snap-in template. Aborting initialization.");
+              logger.error("Failed to clone Airdrop project template. Aborting initialization.");
               process.exit(1);
             }
-            logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
+            logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
           } else {
-            logger.warn("Default Snap-in template not found. Skipping template cloning.");
+            logger.error("No Airdrop templates found in configuration. Cannot proceed with cloning. Please define airdrop templates in init-config.ts.");
+            process.exit(1);
           }
+        } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+          const initConf = getInitConfig();
+          let templateToUse;
+          // Use selectedSnapInTemplateName from airdropConfigResult for interactive mode
+          if (airdropConfigResult.selectedSnapInTemplateName) {
+            templateToUse = initConf.snapInTemplates.find(t => t.name === airdropConfigResult.selectedSnapInTemplateName);
+            if (!templateToUse) {
+                logger.error(`Selected Snap-in template '${airdropConfigResult.selectedSnapInTemplateName}' not found. Aborting.`);
+                process.exit(1);
+            }
+            logger.info(`Using selected Snap-in template: ${templateToUse.name}`);
+          } else {
+            // This else block should ideally not be reached if prompts are correctly handled for interactive snap-in selection.
+            // It serves as a fallback or indicates an unexpected state if selectedSnapInTemplateName is missing in interactive mode for a snap-in.
+            // (Silent/yes mode is handled earlier and does not rely on selectedSnapInTemplateName)
+            logger.error("No Snap-in template selected or found (selectedSnapInTemplateName missing). Aborting.");
+            process.exit(1);
+          }
+
+          // The rest of the cloning logic remains the same, using templateToUse:
+          const cloneSuccess = await cloneTemplate({
+            repoUrl: templateToUse.url,
+            targetPath: options.cwd,
+            branch: templateToUse.branch,
+            path: templateToUse.path
+          });
+          if (!cloneSuccess) {
+            logger.error("Failed to clone Snap-in template. Aborting initialization.");
+            process.exit(1);
+          }
+          logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
         }
       } else {
         // Directory is not empty, or it's a forced/silent operation on an existing dir.
@@ -235,18 +293,18 @@ export async function runInit(
   }
 
 
-  // Check for existing airdrop.config.mjs in the final options.cwd
-  const hasExistingAirdropConfig = await hasAirdropConfig(options.cwd);
-  if (hasExistingAirdropConfig && !options.force && !options.isNewProject) { // Don't ask to overwrite if it's a new project
+  // Check for existing snapin.config.mjs in the final options.cwd
+  const hasExistingSnapInConfig = await hasSnapInConfig(options.cwd); // Renamed
+  if (hasExistingSnapInConfig && !options.force && !options.isNewProject) { // Don't ask to overwrite if it's a new project
     if (!options.yes) {
       const { overwrite } = await prompts({
         type: "confirm",
         name: "overwrite",
-        message: `Airdrop configuration (airdrop.config.mjs) in ${highlighter.info(options.cwd)} already exists. Overwrite?`,
+        message: `Project configuration (snapin.config.mjs) in ${highlighter.info(options.cwd)} already exists. Overwrite?`, // Updated message
         initial: false,
       });
       if (!overwrite) {
-        logger.info("Skipping airdrop.config.mjs creation.");
+        logger.info("Skipping snapin.config.mjs creation."); // Updated message
         // If components were specified, we might still want to add them with the existing config.
         if (options.components?.length && configFromManifest) {
              await addComponents(options.components, configFromManifest, {
@@ -258,7 +316,7 @@ export async function runInit(
         return configFromManifest; // Return the existing manifest config
       }
     } else if (!options.force) { // If --yes but not --force, don't overwrite
-        logger.info("Airdrop configuration (airdrop.config.mjs) already exists. Skipping overwrite due to --yes without --force.");
+        logger.info("Project configuration (snapin.config.mjs) already exists. Skipping overwrite due to --yes without --force."); // Updated message
         if (options.components?.length && configFromManifest) {
             await addComponents(options.components, configFromManifest, {
                 overwrite: true, silent: options.silent, isNewProject: false,
@@ -273,7 +331,7 @@ export async function runInit(
     const { proceed } = await prompts({
       type: "confirm",
       name: "proceed",
-      message: `Initialize/Update airdrop project configuration in ${highlighter.info(options.cwd)}. Proceed?`,
+      message: `Initialize/Update project configuration in ${highlighter.info(options.cwd)}. Proceed?`, // Updated message
       initial: true,
     });
     if (!proceed) {
@@ -281,19 +339,22 @@ export async function runInit(
     }
   }
   
-  const coreAirdropConfig = extractCoreAirdropConfig(airdropConfigResult);
+  const coreConfig = extractCoreConfigForGeneration(airdropConfigResult); // Renamed function call
 
-  const configSpinner = spinner(`Creating airdrop project configuration (airdrop.config.mjs)...`).start();
-  await writeAirdropConfig(options.cwd, coreAirdropConfig);
+  const configSpinner = spinner(`Creating project configuration (snapin.config.mjs)...`).start(); // Updated message
+  await writeSnapInConfig(options.cwd, coreConfig); // Renamed function call
   
-  const envVars = extractEnvVarsFromConfig(coreAirdropConfig);
+  const envVars = extractEnvVarsFromConfig(coreConfig); // Use updated coreConfig variable
   if (Object.keys(envVars).length > 0) {
     await updateEnvFile(options.cwd, envVars);
   }
   
   await copyConfigTypes(options.cwd);
-  await generateTypeDefinitions(options.cwd, coreAirdropConfig);
-  configSpinner.succeed(`Airdrop project configuration created successfully in ${highlighter.info(options.cwd)}.`);
+  await generateTypeDefinitions(options.cwd, coreConfig); // Use updated coreConfig variable
+  configSpinner.succeed(`Project configuration created successfully in ${highlighter.info(options.cwd)}.`); // Updated message
+
+  // Update manifest.yaml
+  await updateManifestYaml(options.cwd, coreConfig, airdropConfigResult);
 
   if (options.components?.length) {
     // Re-fetch config after writing, to ensure components are added based on the *new* configuration
@@ -316,10 +377,11 @@ export async function runInit(
  */
 async function gatherAirdropConfiguration(
   options: z.infer<typeof initOptionsSchema>
-): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string }> {
+): Promise<AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }> {
   if (options.silent || options.yes) {
     // Return default configuration for silent mode
     // Add projectName and projectTypeFromPrompt for consistency, though not directly used by default config path
+    // No selectedSnapInTemplateName in silent mode, it will use default
     return {
       ...createDefaultAirdropConfig(),
       projectName: 'default-project',
@@ -348,6 +410,7 @@ async function gatherAirdropConfiguration(
   let projectName: string | undefined;
   let airdropProjectName: string | undefined;
   let snapInBaseName: string | undefined;
+  let selectedSnapInTemplateName: string | undefined; // Added to store the name
 
   if (projectTypeFromPrompt === "airdrop") {
     const nameResponse = await prompts({
@@ -380,198 +443,221 @@ async function gatherAirdropConfiguration(
     });
     snapInBaseName = nameResponse.snapInBaseName;
     projectName = generateAirdropSnapInFolderName(snapInBaseName); // This will be the folder name
+
+    // Snap-in template selection
+    const initConf = getInitConfig(); // Re-fetch or ensure it's in scope
+    const availableSnapInTemplates = initConf.snapInTemplates;
+
+    if (!availableSnapInTemplates || availableSnapInTemplates.length === 0) {
+      logger.error("No Snap-in templates are defined in the configuration. Cannot proceed.");
+      process.exit(1);
+    }
+
+    const templateChoices = availableSnapInTemplates.map(template => ({
+      title: `${template.name} (${template.description})`,
+      value: template.name, // Store the name, as it's unique
+    }));
+
+    const templateResponse = await prompts({
+      type: "select",
+      name: "selectedSnapInTemplateName",
+      message: "Select a Snap-in template:",
+      choices: templateChoices,
+      initial: 0, // Default to the first template
+    });
+
+    selectedSnapInTemplateName = templateResponse.selectedSnapInTemplateName;
+    // Handle potential cancellation of prompt (e.g., user presses Ctrl+C)
+    if (typeof selectedSnapInTemplateName === 'undefined') {
+        logger.error("Snap-in template selection was cancelled or skipped. Aborting.");
+        process.exit(0); // Exit gracefully
+    }
   }
 
-  // Core configuration prompts
-  const promptsList: prompts.PromptObject<string>[] = [
-    // Sync direction - conditional
-    ...(projectTypeFromPrompt === "airdrop"
-      ? [
-          {
-            type: "select" as prompts.PromptType, // Cast to ensure type correctness
-            name: "syncDirection",
-            message: "What sync direction do you need for this Airdrop project?",
-            choices: [
-              { title: "Two-way sync", value: "two-way" },
-              { title: "One-way sync", value: "one-way" },
-            ],
-            initial: 0,
-          },
-        ]
-      : []),
-    {
-      type: "text",
-      name: "externalSystemName",
-      message: "What is the name of your external system (e.g., Notion, Jira)?",
-      initial: projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "My External System",
-    },
-    {
-      type: "text",
-      name: "externalSystemSlug",
-      message: "External system slug (machine-readable, kebab-case):",
-      initial: (prev: any, values: any) => {
-        const baseName = values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system");
-        if (projectTypeFromPrompt === 'airdrop') {
-          return `airdrop-${slugify(baseName)}`;
-        }
-        return slugify(baseName);
-      },
-      validate: (value: string) => slugify(value).length > 0 ? true : "Slug cannot be empty."
-    },
-    {
-      type: "text",
-      name: "apiBaseUrl",
-      message: "API base URL for the external system:",
-      initial: initSettings.defaultApiBaseUrl,
-    },
-    {
-      type: "text",
-      name: "testEndpoint",
-      message: "Test endpoint for connection verification (relative to API base URL or absolute):",
-      initial: (prev: any, values: any) => {
-        // Check if defaultTestEndpoint is a full URL or a path
-        if (initSettings.defaultTestEndpoint.startsWith('http://') || initSettings.defaultTestEndpoint.startsWith('https://')) {
-          return initSettings.defaultTestEndpoint;
-        }
-        // If it's a path, append it to the apiBaseUrl
-        const baseUrl = values.apiBaseUrl || initSettings.defaultApiBaseUrl;
-        // Ensure no double slashes
-        return `${baseUrl.replace(/\/$/, '')}/${initSettings.defaultTestEndpoint.replace(/^\//, '')}`;
+  let needsExternalSystem = projectTypeFromPrompt === 'airdrop'; // Airdrop projects always need external system details
+  if (projectTypeFromPrompt === "snap-in") {
+      const externalSystemResponse = await prompts({
+        type: "confirm",
+        name: "needsExternalSystemValue",
+        message: "Will this Snap-in connect to an external system?",
+        initial: true,
+      });
+      needsExternalSystem = externalSystemResponse.needsExternalSystemValue;
+
+      if (typeof needsExternalSystem === 'undefined') {
+          logger.error("Snap-in external system choice was not provided. Aborting.");
+          process.exit(1);
       }
-    },
-    {
-      type: "multiselect",
-      name: "devrevObjects",
-      message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
-      choices: SUPPORTED_DEVREV_OBJECTS.map((obj: string) => ({ // Ensure SUPPORTED_DEVREV_OBJECTS is available
-        title: obj,
-        value: obj,
-        // No pre-selection here to ensure user choice is captured, unless specified by requirements for defaults
-      })),
-      min: projectTypeFromPrompt === "airdrop" ? 1 : 0, // Require at least one for Airdrop, optional for Snap-in
-      hint: "- Space to select. Enter to submit."
-    },
-    {
-      type: "list",
-      name: "externalSyncUnits",
-      message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
-      initial: "tickets,conversations", // Default, user can change
-      separator: ",",
-    },
-    {
-      type: "select",
-      name: "connectionType",
-      message: "What type of connection will the snap-in use?",
+  }
+
+  // Dynamically build promptsList
+  const promptsList: prompts.PromptObject<string>[] = [];
+
+  if (projectTypeFromPrompt === "airdrop") {
+    promptsList.push({
+      type: "select" as prompts.PromptType,
+      name: "syncDirection",
+      message: "What sync direction do you need for this Airdrop project?",
       choices: [
-        { title: "OAuth2", value: "oauth2" },
-        { title: "Secret/API Key", value: "secret" },
+        { title: "Two-way sync", value: "two-way" },
+        { title: "One-way sync", value: "one-way" },
       ],
       initial: 0,
-    },
-  ];
-
-  const responses = await prompts(promptsList);
-
-  // Handle cases where prompts might be skipped (e.g. conditional syncDirection)
-  const syncDirection = projectTypeFromPrompt === 'airdrop' ? responses.syncDirection : undefined;
-
-  // Ensure devrevObjects is always an array, even if empty (e.g. for Snap-ins if not selected)
-  const devrevObjects = Array.isArray(responses.devrevObjects) ? responses.devrevObjects : [];
-
-
-  let connectionDetails: any; // Define more specific type later if possible
-  if (responses.connectionType === "oauth2") {
-    const oauthResponses = await prompts([
-      // OAuth prompts remain largely the same, but use the generated slug for initials
-      {
-        type: "text",
-        name: "clientIdEnvVar",
-        message: "Environment variable name for OAuth client ID:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_ID`,
-      },
-      {
-        type: "text",
-        name: "clientSecretEnvVar",
-        message: "Environment variable name for OAuth client secret:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_SECRET`,
-      },
-      {
-        type: "text",
-        name: "authorizeUrl",
-        message: "OAuth authorization URL:",
-        initial: `${responses.apiBaseUrl}/oauth/authorize`, // Use entered apiBaseUrl
-      },
-      {
-        type: "text",
-        name: "tokenUrl",
-        message: "OAuth token URL:",
-        initial: `${responses.apiBaseUrl}/oauth/token`, // Use entered apiBaseUrl
-      },
-      {
-        type: "text",
-        name: "scope",
-        message: "OAuth scope (space-separated):",
-        initial: "read write api", // Example scope
-      },
-    ]);
-    connectionDetails = {
-      type: "oauth2",
-      id: `${responses.externalSystemSlug}-oauth-connection`,
-      clientId: `process.env.${oauthResponses.clientIdEnvVar}`,
-      clientSecret: `process.env.${oauthResponses.clientSecretEnvVar}`,
-      authorize: {
-        url: oauthResponses.authorizeUrl,
-        tokenUrl: oauthResponses.tokenUrl,
-        grantType: "authorization_code",
-        scope: oauthResponses.scope,
-        scopeDelimiter: " ",
-      },
-      refresh: { url: oauthResponses.tokenUrl, method: "POST" },
-      revoke: { url: `${responses.apiBaseUrl}/oauth/revoke`, method: "POST" },
-    };
-  } else { // Secret-based
-    const secretResponses = await prompts([
-      {
-        type: "text",
-        name: "tokenEnvVar",
-        message: "Environment variable name for API token/secret:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_TOKEN`,
-      },
-      {
-        type: "confirm",
-        name: "isSubdomain",
-        message: "Does this API connection involve a customer-specific subdomain?",
-        initial: false,
-      },
-    ]);
-    connectionDetails = {
-      type: "secret",
-      id: `${responses.externalSystemSlug}-secret-connection`,
-      isSubdomain: secretResponses.isSubdomain,
-      secretTransform: ".token", // Example, might need more sophisticated handling
-      tokenVerification: { url: responses.testEndpoint, method: "GET" },
-      fields: [{ id: "token", name: "API Token/Secret", description: `Your ${responses.externalSystemName} API Token/Secret` }],
-    };
+    });
   }
 
-  return {
-    projectName, // This is the folder name
-    projectTypeFromPrompt,
-    airdropProjectName, // Specific name for airdrop project type
-    snapInBaseName,   // Base name used to generate snap-in folder
+  if (needsExternalSystem) {
+    promptsList.push(
+      {
+        type: "text",
+        name: "externalSystemName",
+        message: "What is the name of your external system (e.g., Notion, Jira)?",
+        initial: projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "My External System",
+      },
+      {
+        type: "text",
+        name: "externalSystemSlug",
+        message: projectTypeFromPrompt === 'snap-in'
+                   ? "Snap-in slug (machine-readable, kebab-case, for identification):"
+                   : "External system slug (machine-readable, kebab-case):",
+        initial: (prev: any, values: any) => {
+          const baseName = values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system");
+          if (projectTypeFromPrompt === 'airdrop') {
+            return `airdrop-${slugify(baseName)}`;
+          }
+          return slugify(baseName);
+        },
+        validate: (value: string) => slugify(value).length > 0 ? true : "Slug cannot be empty."
+      },
+      {
+        type: "text",
+        name: "apiBaseUrl",
+        message: "API base URL for the external system:",
+        initial: initSettings.defaultApiBaseUrl,
+      },
+      {
+        type: "text",
+        name: "testEndpoint",
+        message: "Test endpoint for connection verification (relative to API base URL or absolute):",
+        initial: (prev: any, values: any) => {
+          if (initSettings.defaultTestEndpoint.startsWith('http://') || initSettings.defaultTestEndpoint.startsWith('https://')) {
+            return initSettings.defaultTestEndpoint;
+          }
+          const baseUrl = values.apiBaseUrl || initSettings.defaultApiBaseUrl;
+          return `${baseUrl.replace(/\/$/, '')}/${initSettings.defaultTestEndpoint.replace(/^\//, '')}`;
+        }
+      },
+      {
+        type: "list",
+        name: "externalSyncUnits",
+        message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
+        initial: "tickets,conversations",
+        separator: ",",
+      },
+      {
+        type: "select",
+        name: "connectionType",
+        message: "What type of connection will the snap-in use?",
+        choices: [
+          { title: "OAuth2", value: "oauth2" },
+          { title: "Secret/API Key", value: "secret" },
+        ],
+        initial: 0,
+      }
+    );
+  }
 
-    projectType: projectTypeFromPrompt, // This field is part of AirdropProjectConfig
-    syncDirection: projectTypeFromPrompt === 'airdrop' ? syncDirection : undefined, // Only for airdrop
-    devrevObjects: devrevObjects, // User selected, should not be overridden by defaults now
-    externalSyncUnits: Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean),
-    externalSystem: {
-      name: responses.externalSystemName,
-      slug: slugify(responses.externalSystemSlug), // Ensure slug is consistently slugified
-      apiBaseUrl: responses.apiBaseUrl,
-      testEndpoint: responses.testEndpoint,
-      supportedObjects: Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean),
-    },
-    connection: connectionDetails,
+  // DevRev objects prompt is always relevant
+  promptsList.push({
+    type: "multiselect",
+    name: "devrevObjects",
+    message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
+    choices: SUPPORTED_DEVREV_OBJECTS.map((obj: string) => ({
+      title: obj,
+      value: obj,
+    })),
+    min: projectTypeFromPrompt === "airdrop" ? 1 : 0,
+    hint: "- Space to select. Enter to submit."
+  });
+
+  const responses = await prompts(promptsList);
+   // Handle cases where prompts might be skipped (e.g. user presses Ctrl+C during promptsList)
+  if (Object.keys(responses).length === 0 && promptsList.length > 0 && !options.yes && !options.silent) {
+    // This condition might indicate that prompts were exited early (e.g. Ctrl+C)
+    // For `devrevObjects` specifically, if it's the only one and cancelled, responses.devrevObjects would be undefined
+    if (promptsList.some(p => p.name === 'devrevObjects') && typeof responses.devrevObjects === 'undefined') {
+        logger.error("Project configuration was not completed. Aborting.");
+        process.exit(0);
+    }
+    // If needsExternalSystem was true, but essential responses like externalSystemName are missing
+    if (needsExternalSystem && typeof responses.externalSystemName === 'undefined') {
+        logger.error("External system configuration was not completed. Aborting.");
+        process.exit(0);
+    }
+  }
+
+
+  const syncDirection = projectTypeFromPrompt === 'airdrop' ? responses.syncDirection : undefined;
+  const devrevObjects = Array.isArray(responses.devrevObjects) ? responses.devrevObjects : [];
+
+  let connectionDetails: any;
+  if (needsExternalSystem && responses.connectionType) { // Ensure connectionType was prompted and answered
+    if (responses.connectionType === "oauth2") {
+      const oauthResponses = await prompts([
+        { type: "text", name: "clientIdEnvVar", message: "Environment variable name for OAuth client ID:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_ID` },
+        { type: "text", name: "clientSecretEnvVar", message: "Environment variable name for OAuth client secret:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_SECRET` },
+        { type: "text", name: "authorizeUrl", message: "OAuth authorization URL:", initial: `${responses.apiBaseUrl}/oauth/authorize` },
+        { type: "text", name: "tokenUrl", message: "OAuth token URL:", initial: `${responses.apiBaseUrl}/oauth/token` },
+        { type: "text", name: "scope", message: "OAuth scope (space-separated):", initial: "read write api" },
+      ]);
+      if (typeof oauthResponses.clientIdEnvVar === 'undefined') { // Check if OAuth prompts were cancelled
+        logger.error("OAuth2 configuration was not completed. Aborting.");
+        process.exit(0);
+      }
+      connectionDetails = {
+        type: "oauth2", id: `${responses.externalSystemSlug}-oauth-connection`,
+        clientId: `process.env.${oauthResponses.clientIdEnvVar}`, clientSecret: `process.env.${oauthResponses.clientSecretEnvVar}`,
+        authorize: { url: oauthResponses.authorizeUrl, tokenUrl: oauthResponses.tokenUrl, grantType: "authorization_code", scope: oauthResponses.scope, scopeDelimiter: " " },
+        refresh: { url: oauthResponses.tokenUrl, method: "POST" }, revoke: { url: `${responses.apiBaseUrl}/oauth/revoke`, method: "POST" },
+      };
+    } else { // Secret-based
+      const secretResponses = await prompts([
+        { type: "text", name: "tokenEnvVar", message: "Environment variable name for API token/secret:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_TOKEN` },
+        { type: "confirm", name: "isSubdomain", message: "Does this API connection involve a customer-specific subdomain?", initial: false },
+      ]);
+      if (typeof secretResponses.tokenEnvVar === 'undefined') { // Check if Secret prompts were cancelled
+        logger.error("Secret-based connection configuration was not completed. Aborting.");
+        process.exit(0);
+      }
+      connectionDetails = {
+        type: "secret", id: `${responses.externalSystemSlug}-secret-connection`,
+        isSubdomain: secretResponses.isSubdomain, secretTransform: ".token",
+        tokenVerification: { url: responses.testEndpoint, method: "GET" },
+        fields: [{ id: "token", name: "API Token/Secret", description: `Your ${responses.externalSystemName} API Token/Secret` }],
+      };
+    }
+  }
+
+  const externalSyncUnitsList = (needsExternalSystem && responses.externalSyncUnits)
+                               ? (Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean))
+                               : undefined;
+
+  return {
+    projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName,
+    projectType: projectTypeFromPrompt,
+    syncDirection: syncDirection,
+    devrevObjects: devrevObjects,
+    externalSyncUnits: externalSyncUnitsList,
+    externalSystem: needsExternalSystem && responses.externalSystemName // ensure responses.externalSystemName is present
+      ? {
+          name: responses.externalSystemName,
+          slug: slugify(responses.externalSystemSlug),
+          apiBaseUrl: responses.apiBaseUrl,
+          testEndpoint: responses.testEndpoint,
+          supportedObjects: externalSyncUnitsList || [], // Default to empty array if externalSyncUnitsList is undefined
+        }
+      : undefined,
+    connection: needsExternalSystem && connectionDetails ? connectionDetails : undefined,
   };
 }
 
@@ -619,19 +705,96 @@ function createDefaultAirdropConfig(): AirdropProjectConfig {
  * Extract environment variable placeholders from config
  */
 function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
-  const envVars: Record<string, string> = {}
+  const envVars: Record<string, string> = {};
   
-  if (config.connection.type === "oauth2") {
-    const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/)
-    const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/)
-    
-    if (clientIdMatch) {
-      envVars[clientIdMatch[1]] = "your-client-id-here"
+  // Only proceed if connection and connection.type are defined, and type is oauth2
+  if (config.connection && config.connection.type === "oauth2") {
+    // Ensure clientId and clientSecret are strings before calling .match
+    // And that they exist on the connection object, which they should if type is oauth2 due to Zod schema
+    if (typeof config.connection.clientId === 'string') {
+      const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/);
+      if (clientIdMatch) {
+        envVars[clientIdMatch[1]] = "your-client-id-here";
+      }
     }
-    if (clientSecretMatch) {
-      envVars[clientSecretMatch[1]] = "your-client-secret-here"
+    if (typeof config.connection.clientSecret === 'string') {
+      const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/);
+      if (clientSecretMatch) {
+        envVars[clientSecretMatch[1]] = "your-client-secret-here";
+      }
     }
   }
-  
-  return envVars
+  return envVars;
+}
+
+async function updateManifestYaml(
+  cwd: string,
+  projectConfig: AirdropProjectConfig,
+  airdropConfigResultFromPrompts: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
+): Promise<void> {
+  const manifestPath = path.join(cwd, 'manifest.yaml');
+  const { projectType, externalSystem, connection } = projectConfig;
+  const { snapInBaseName, airdropProjectName, projectName } = airdropConfigResultFromPrompts;
+
+  let name = '';
+  let description = '';
+  let slug = '';
+  let manifestType = '';
+
+  if (projectType === 'snap-in') {
+    name = snapInBaseName || projectName || 'My Snap-in';
+    description = snapInBaseName || name;
+    if (externalSystem) {
+      manifestType = 'snap-in.external-system';
+      slug = externalSystem.slug || slugify(name);
+      name = externalSystem.name || name;
+      description = externalSystem.name || description;
+    } else {
+      manifestType = 'snap-in.native';
+      slug = slugify(name);
+    }
+  } else { // airdrop
+    manifestType = 'airdrop';
+    // For airdrop, externalSystem and connection should always exist based on current prompting logic
+    name = externalSystem?.name || airdropProjectName || projectName || 'My Airdrop';
+    description = externalSystem?.name || name;
+    slug = externalSystem?.slug || slugify(name);
+  }
+
+  const newManifestContent: any = {
+    name,
+    description,
+    type: manifestType,
+    slug,
+  };
+
+  if (connection) {
+    newManifestContent.connection = {
+      type: connection.type,
+      id: connection.id,
+      // Note: Only adding type and id for now as per example.
+      // More fields from connection (like oauth details) might be needed depending on manifest spec.
+    };
+  }
+
+  let existingManifestData: any = {};
+  try {
+    if (await fs.pathExists(manifestPath)) {
+      const fileContents = await fs.readFile(manifestPath, 'utf8');
+      existingManifestData = yaml.load(fileContents) as object || {};
+    }
+  } catch (e: any) {
+    logger.warn(`Could not read or parse existing manifest.yaml: ${e.message}. A new one will be created if it doesn't exist, or overwritten if it's malformed.`);
+    existingManifestData = {}; // Reset if parsing failed
+  }
+
+  const finalManifestData = { ...existingManifestData, ...newManifestContent };
+
+  try {
+    await fs.writeFile(manifestPath, yaml.dump(finalManifestData), 'utf8');
+    logger.info(`manifest.yaml updated successfully at ${manifestPath}`);
+  } catch (e: any) {
+    logger.error(`Failed to write manifest.yaml: ${e.message}`);
+    // Consider if this should be a fatal error that stops the init process
+  }
 }

@@ -1,13 +1,14 @@
 import path from "path"
 import {
-  getAirdropConfig,
-  hasAirdropConfig,
-  addDevRevObjects,
-  addExternalSyncUnits,
-  updateAirdropConfig,
+  getSnapInConfig, // Renamed
+  hasSnapInConfig, // Renamed
+  addDevRevObjectsToSnapInConfig, // Renamed
+  addExternalSyncUnitsToSnapInConfig, // Renamed
+  updateSnapInConfig, // Renamed
 } from "@/src/utils/airdrop-config"
 import { generateTypeDefinitions } from "@/src/utils/type-generator"
-import { SUPPORTED_DEVREV_OBJECTS } from "@/src/type/airdrop-config"
+import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/type/airdrop-config" // AirdropProjectConfig might be needed for type hints
+import { ZodError } from "zod"; // Added ZodError import
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
@@ -24,7 +25,7 @@ const configOptionsSchema = z.object({
 
 export const config = new Command()
   .name("config")
-  .description("manage airdrop project configuration")
+  .description("manage project configuration") // Updated description
 
 // Add DevRev objects subcommand
 config
@@ -45,9 +46,9 @@ config
         ...opts,
       })
 
-      // Check if airdrop config exists
-      if (!(await hasAirdropConfig(options.cwd))) {
-        logger.error("No airdrop configuration found. Run 'init' first.")
+      // Check if project config exists
+      if (!(await hasSnapInConfig(options.cwd))) { // Renamed
+        logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
@@ -85,12 +86,15 @@ config
       }
 
       const configSpinner = spinner("Adding DevRev objects...").start()
-      await addDevRevObjects(options.cwd, objectsToAdd)
+      await addDevRevObjectsToSnapInConfig(options.cwd, objectsToAdd) // Renamed
       
       // Regenerate types
-      const config = await getAirdropConfig(options.cwd)
+      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
+      } else {
+        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
       }
       
       configSpinner.succeed()
@@ -123,9 +127,9 @@ config
         ...opts,
       })
 
-      // Check if airdrop config exists
-      if (!(await hasAirdropConfig(options.cwd))) {
-        logger.error("No airdrop configuration found. Run 'init' first.")
+      // Check if project config exists
+      if (!(await hasSnapInConfig(options.cwd))) { // Renamed
+        logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
@@ -153,12 +157,15 @@ config
       }
 
       const configSpinner = spinner("Adding external sync units...").start()
-      await addExternalSyncUnits(options.cwd, unitsToAdd)
+      await addExternalSyncUnitsToSnapInConfig(options.cwd, unitsToAdd) // Renamed
       
       // Regenerate types
-      const config = await getAirdropConfig(options.cwd)
+      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
+      } else {
+        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
       }
       
       configSpinner.succeed()
@@ -175,7 +182,7 @@ config
 // Show current configuration
 config
   .command("show")
-  .description("show current airdrop configuration")
+  .description("show current project configuration") // Updated description
   .option(
     "-c, --cwd <cwd>",
     "the working directory. defaults to the current directory.",
@@ -185,30 +192,59 @@ config
     try {
       const cwd = path.resolve(opts.cwd)
 
-      // Check if airdrop config exists
-      if (!(await hasAirdropConfig(cwd))) {
-        logger.error("No airdrop configuration found. Run 'init' first.")
+      // Check if project config exists
+      if (!(await hasSnapInConfig(cwd))) { // Renamed
+        logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
-      const config = await getAirdropConfig(cwd)
+      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
+
       if (!config) {
-        logger.error("Failed to load airdrop configuration.")
+        // If validation failed but rawConfig exists, show rawConfig as in info.ts
+        if (configResult.rawConfig && configResult.error) {
+          logger.warn("Could not fully validate snapin.config.mjs. This might be due to unset environment variables or schema mismatches.");
+          logger.warn("Displaying raw configuration as loaded from the file:");
+          console.log(configResult.rawConfig);
+          if (configResult.error instanceof ZodError) {
+            logger.warn("Validation issues summary:");
+            configResult.error.errors.forEach(err => {
+              logger.warn(`  - Path: ${err.path.join('.') || '.'}, Issue: ${err.message}`);
+            });
+          } else {
+             logger.warn(`Error details: ${configResult.error.message}`);
+          }
+        } else if (configResult.error) {
+            logger.error(`Failed to load snapin.config.mjs: ${configResult.error.message}`);
+        } else {
+            logger.error("Failed to load project configuration. No configuration found.");
+        }
         process.exit(1)
       }
 
-      logger.info("Current Airdrop Configuration:")
+      logger.info("Current Project Configuration:") // Updated message
       logger.break()
       
       logger.info(`${highlighter.info("Project Type:")} ${config.projectType}`)
-      logger.info(`${highlighter.info("Sync Direction:")} ${config.syncDirection}`)
-      logger.info(`${highlighter.info("External System:")} ${config.externalSystem.name} (${config.externalSystem.slug})`)
-      logger.info(`${highlighter.info("API Base URL:")} ${config.externalSystem.apiBaseUrl}`)
-      logger.info(`${highlighter.info("Connection Type:")} ${config.connection.type}`)
+      if (config.syncDirection) {
+        logger.info(`${highlighter.info("Sync Direction:")} ${config.syncDirection}`)
+      }
+      if (config.externalSystem) {
+        logger.info(`${highlighter.info("External System:")} ${config.externalSystem.name} (${config.externalSystem.slug})`)
+        logger.info(`${highlighter.info("API Base URL:")} ${config.externalSystem.apiBaseUrl}`)
+      }
+      if (config.connection) {
+        logger.info(`${highlighter.info("Connection Type:")} ${config.connection.type}`)
+      }
       
       logger.break()
-      logger.info(`${highlighter.info("DevRev Objects:")} ${config.devrevObjects.join(", ")}`)
-      logger.info(`${highlighter.info("External Sync Units:")} ${config.externalSyncUnits.join(", ")}`)
+      logger.info(`${highlighter.info("DevRev Objects:")} ${(config.devrevObjects || []).join(", ")}`)
+      if (config.externalSyncUnits && config.externalSyncUnits.length > 0) {
+        logger.info(`${highlighter.info("External Sync Units:")} ${config.externalSyncUnits.join(", ")}`)
+      } else {
+        logger.info(`${highlighter.info("External Sync Units:")} (none)`)
+      }
       
     } catch (error) {
       logger.break()
@@ -229,15 +265,16 @@ config
     try {
       const cwd = path.resolve(opts.cwd)
 
-      // Check if airdrop config exists
-      if (!(await hasAirdropConfig(cwd))) {
-        logger.error("No airdrop configuration found. Run 'init' first.")
+      // Check if project config exists
+      if (!(await hasSnapInConfig(cwd))) { // Renamed
+        logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
-      const config = await getAirdropConfig(cwd)
+      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (!config) {
-        logger.error("Failed to load airdrop configuration.")
+        logger.error(`Failed to load project configuration. Cannot regenerate types. Error: ${configResult.error?.message}`) // Updated message
         process.exit(1)
       }
 
@@ -255,12 +292,14 @@ config
 async function promptForDevRevObjects(
   options: z.infer<typeof configOptionsSchema>
 ): Promise<string[]> {
-  const config = await getAirdropConfig(options.cwd)
+  const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+  const config = configResult.validatedConfig; // Extract validatedConfig
   if (!config) {
+    logger.warn(`Could not load project configuration to suggest DevRev objects. Error: ${configResult.error?.message}`);
     return []
   }
 
-  const existingObjects = new Set(config.devrevObjects)
+  const existingObjects = new Set(config.devrevObjects || []) // Added fallback for optional array
   const availableObjects = SUPPORTED_DEVREV_OBJECTS.filter(
     obj => !existingObjects.has(obj)
   )

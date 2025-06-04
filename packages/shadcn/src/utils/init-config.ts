@@ -2,6 +2,16 @@ export interface SnapInTemplate {
   name: string;
   description: string;
   url: string;
+  branch?: string;
+  path?: string;
+}
+
+export interface AirdropTemplate {
+  name: string;
+  description: string;
+  url: string;
+  branch?: string;
+  path?: string;
 }
 
 export interface InitConfig {
@@ -20,15 +30,27 @@ const initConfig: InitConfig = {
       name: "default-snapin-template",
       description: "Default Snap-in template",
       url: "https://github.com/krhebbar/snapin-template.git", // Example URL
+      branch: "main",
     },
     // Future templates can be added here
     {
       name: "custom-webhook-snapin-template",
       description: "Custom Webhook Snap-in template",
       url: "https://github.com/krhebbar/snapin-custom-webhook-template.git",
+      branch: "main",
+      path: "custom-webhook",
     },
   ],
 };
+
+export const airdropTemplates: AirdropTemplate[] = [
+  {
+    name: "default-airdrop-template",
+    description: "Default Airdrop project template",
+    url: "https://github.com/devrev/airdrop-template",
+    branch: "main",
+  },
+];
 
 export function getInitConfig(): InitConfig {
   // In the future, this could read from a user-level config file
