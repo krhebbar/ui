@@ -21,7 +21,7 @@ export function isValidAirdropProjectName(name: string): boolean {
 
 export function generateAirdropSnapInFolderName(baseName: string): string {
   const slugifiedBase = slugify(baseName);
-  return `airdrop-${slugifiedBase}-snap-in`;
+  return `${slugifiedBase}-snap-in`; // Removed "airdrop-" prefix
 }
 
 // Other case conversions that might be useful

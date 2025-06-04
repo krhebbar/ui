@@ -705,21 +705,26 @@ function createDefaultAirdropConfig(): AirdropProjectConfig {
  * Extract environment variable placeholders from config
  */
 function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
-  const envVars: Record<string, string> = {}
+  const envVars: Record<string, string> = {};
   
-  if (config.connection.type === "oauth2") {
-    const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/)
-    const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/)
-    
-    if (clientIdMatch) {
-      envVars[clientIdMatch[1]] = "your-client-id-here"
+  // Only proceed if connection and connection.type are defined, and type is oauth2
+  if (config.connection && config.connection.type === "oauth2") {
+    // Ensure clientId and clientSecret are strings before calling .match
+    // And that they exist on the connection object, which they should if type is oauth2 due to Zod schema
+    if (typeof config.connection.clientId === 'string') {
+      const clientIdMatch = config.connection.clientId.match(/process\.env\.([A-Z_]+)/);
+      if (clientIdMatch) {
+        envVars[clientIdMatch[1]] = "your-client-id-here";
+      }
     }
-    if (clientSecretMatch) {
-      envVars[clientSecretMatch[1]] = "your-client-secret-here"
+    if (typeof config.connection.clientSecret === 'string') {
+      const clientSecretMatch = config.connection.clientSecret.match(/process\.env\.([A-Z_]+)/);
+      if (clientSecretMatch) {
+        envVars[clientSecretMatch[1]] = "your-client-secret-here";
+      }
     }
   }
-  
-  return envVars
+  return envVars;
 }
 
 async function updateManifestYaml(
