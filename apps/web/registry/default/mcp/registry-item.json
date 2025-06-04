@@ -1,0 +1,16 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "mcp",
+  "type": "registry:file",
+  "title": "MCP for Airdrop",
+  "description": "MCP for Airdrop Inita mapping and shadcn registry",
+  "registryDependencies": [],
+  "dependencies": [],
+  "files": [
+    {
+      "path": "registry/default/mcp/mcp.json",
+      "type": "registry:file",
+      "target": "~/.cursor/mcp.json"
+    }
+  ]
+}

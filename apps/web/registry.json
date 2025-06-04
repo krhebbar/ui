@@ -1,0 +1,93 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "Supabase UI Library",
+  "homepage": "https://supabase.com/ui",
+  "items": [
+    {
+      "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+      "name": "ai-editor-rules",
+      "type": "registry:file",
+      "title": "Prompt rules for AI Editors",
+      "description": "Prompts for working with Supabase using AI-powered IDE tools",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/default/ai-editor-rules/create-db-functions.mdc",
+          "type": "registry:file",
+          "target": "~/.cursor/rules/create-db-functions.mdc"
+        },
+        {
+          "path": "registry/default/ai-editor-rules/create-migration.mdc",
+          "type": "registry:file",
+          "target": "~/.cursor/rules/create-migration.mdc"
+        },
+        {
+          "path": "registry/default/ai-editor-rules/create-rls-policies.mdc",
+          "type": "registry:file",
+          "target": "~/.cursor/rules/create-rls-policies.mdc"
+        },
+        {
+          "path": "registry/default/ai-editor-rules/postgres-sql-style-guide.mdc",
+          "type": "registry:file",
+          "target": "~/.cursor/rules/postgres-sql-style-guide.mdc"
+        },
+        {
+          "path": "registry/default/ai-editor-rules/writing-supabase-edge-functions.mdc",
+          "type": "registry:file",
+          "target": "~/.cursor/rules/writing-supabase-edge-functions.mdc"
+        }
+      ]
+    },
+    {
+      "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+      "name": "airdrop-connection-secret",
+      "type": "registry:file",
+      "title": "Secret Connection Airdrop",
+      "description": "Airdrop configuration for secret-based authentication connections",
+      "registryDependencies": [],
+      "dependencies": [],
+      "docs": "Next steps, Generate keyrings for secret connections using the `snapin keyrings` command.",
+      "files": [
+        {
+          "path": "registry/default/airdrop/connection/secret/manifest.yaml",
+          "type": "registry:file",
+          "target": "~/manifest.yaml"
+        }
+      ]
+    },
+    {
+      "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+      "name": "airdrop-connection-oauth2",
+      "type": "registry:file",
+      "title": "OAuth2 Connection Airdrop",
+      "description": "Airdrop configuration for OAuth2-based authentication connections",
+      "registryDependencies": [],
+      "dependencies": [],
+      "docs": "Next steps, Generate keyrings for OAuth2 connections using the `snapin keyrings` command.",
+      "files": [
+        {
+          "path": "registry/default/airdrop/connection/oauth2/manifest.yaml",
+          "type": "registry:file",
+          "target": "~/manifest.yaml"
+        }
+      ]
+    },
+    {
+      "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+      "name": "mcp",
+      "type": "registry:file",
+      "title": "MCP for Airdrop",
+      "description": "MCP for Airdrop Inita mapping and shadcn registry",
+      "registryDependencies": [],
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/default/mcp/mcp.json",
+          "type": "registry:file",
+          "target": "~/.cursor/mcp.json"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
-import { getConfig } from "@/src/utils/get-config"
+import path from "path"
 import { getProjectInfo } from "@/src/utils/get-project-info"
+import { getAirdropConfig } from "@/src/utils/airdrop-config"
 import { logger } from "@/src/utils/logger"
 import { Command } from "commander"
 
@@ -15,6 +16,14 @@ export const info = new Command()
     logger.info("> airdrop project info")
     console.log(await getProjectInfo(opts.cwd))
     logger.break()
+    
     logger.info("> airdrop project configuration")
-    console.log(await getConfig(opts.cwd))
+    try {
+      // Try to read the raw config first, then validate
+      const configPath = path.join(opts.cwd, "airdrop.config.mjs")
+      const configModule = await import(configPath)
+      console.log(configModule.default)
+    } catch (error) {
+      logger.warn("No airdrop.config.mjs found. Run 'shadcn init' to create one.")
+    }
   })

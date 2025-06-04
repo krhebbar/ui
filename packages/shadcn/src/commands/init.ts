@@ -163,17 +163,19 @@ export async function runInit(
   configSpinner.succeed()
 
   // Add components if specified
-  const fullConfig = await resolveConfigPaths(options.cwd, config)
   if (options.components?.length) {
-    await addComponents(options.components, fullConfig, {
-      // Init will always overwrite files.
-      overwrite: true,
-      silent: options.silent,
-      isNewProject: options.isNewProject,
-    })
+    const fullConfig = await getConfig(options.cwd)
+    if (fullConfig) {
+      await addComponents(options.components, fullConfig, {
+        // Init will always overwrite files.
+        overwrite: true,
+        silent: options.silent,
+        isNewProject: options.isNewProject,
+      })
+    }
   }
 
-  return fullConfig
+  return null
 }
 
 /**

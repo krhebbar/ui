@@ -143,13 +143,13 @@ export async function getTsConfigAliasPrefix(cwd: string) {
 }
 
 export async function isTypeScriptProject(cwd: string) {
-  const tsConfigPath = path.resolve(cwd, "code/tsconfig.json")
+  const tsConfigPath = path.resolve(cwd, "tsconfig.json")
   return fs.existsSync(tsConfigPath)
 }
 
 export async function getTsConfig(cwd: string) {
   for (const fallback of [
-    "code/tsconfig.json"
+    "tsconfig.json"
   ]) {
     const filePath = path.resolve(cwd, fallback)
     if (!(await fs.pathExists(filePath))) {

@@ -3,6 +3,7 @@ import { getProjectInfo } from "@/src/utils/get-project-info"
 import { resolveImport } from "@/src/utils/resolve-import"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
+import fs from "fs-extra"
 
 export const DEFAULT_STYLE = "new-york"
 export const DEFAULT_COMPONENTS = "@/functions"
@@ -40,18 +41,13 @@ export async function getConfig(cwd: string): Promise<Config | null> {
     return null
   }
 
-  // Generate configuration directly from manifest.yaml data
+  // Minimal CLI configuration for path resolution only
   const config = {
-    $schema: "https://airdrop.dev/schema.json",
-    rsc: false, // Airdrop projects are backend functions, not React Server Components
+    style: DEFAULT_STYLE,
+    rsc: false,
     tsx: projectInfo.isTsx,
-    style: DEFAULT_STYLE, // Default style for airdrop projects
-    iconLibrary: "lucide",
     aliases: {
       components: `${projectInfo.aliasPrefix}/functions`,
-      ui: `${projectInfo.aliasPrefix}/functions`,
-      hooks: `${projectInfo.aliasPrefix}/hooks`,
-      lib: `${projectInfo.aliasPrefix}/lib`,
       utils: `${projectInfo.aliasPrefix}/lib/utils`,
     },
   }
@@ -66,7 +62,7 @@ export async function resolveConfigPaths(cwd: string, config: Omit<Config, 'reso
 
   if (tsConfig.resultType === "failed") {
     throw new Error(
-      `Failed to load ${config.tsx ? "tsconfig" : "jsconfig"}.json. ${
+      `Failed to load tsconfig.json. ${
         tsConfig.message ?? ""
       }`.trim()
     )

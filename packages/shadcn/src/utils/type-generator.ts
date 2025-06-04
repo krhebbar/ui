@@ -201,18 +201,11 @@ export async function copyConfigTypes(cwd: string): Promise<void> {
   const typesDir = path.join(cwd, "types")
   await fs.mkdir(typesDir, { recursive: true })
 
-  // Read the airdrop-config.ts from the CLI package
-  const sourceConfigPath = path.join(__dirname, "..", "type", "airdrop-config.ts")
+  // Generate airdrop configuration types directly
   const targetConfigPath = path.join(typesDir, "airdrop-config.ts")
-
-  try {
-    const configContent = await fs.readFile(sourceConfigPath, "utf8")
-    await fs.writeFile(targetConfigPath, configContent, "utf8")
-  } catch (error) {
-    logger.warn(`Could not copy airdrop-config.ts types: ${error}`)
-    
-    // Generate a minimal version if source file is not available
-    const minimalConfigTypes = `// Minimal airdrop configuration types
+  
+  // Generate a complete airdrop configuration types file
+  const configTypes = `// Airdrop configuration types
 export interface AirdropProjectConfig {
   projectType: "airdrop" | "snap-in"
   syncDirection: "one-way" | "two-way"
@@ -232,6 +225,5 @@ export interface AirdropProjectConfig {
   }
 }
 `
-    await fs.writeFile(targetConfigPath, minimalConfigTypes, "utf8")
-  }
+  await fs.writeFile(targetConfigPath, configTypes, "utf8")
 } 
