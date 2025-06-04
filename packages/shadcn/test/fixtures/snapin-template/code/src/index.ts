@@ -1,5 +1,2 @@
-/*
- * Copyright (c) 2023 DevRev, Inc. All rights reserved.
- */
-
-export * from './function-factory';
+// packages/shadcn/test/fixtures/snapin-template/code/src/index.ts
+export * from './main';

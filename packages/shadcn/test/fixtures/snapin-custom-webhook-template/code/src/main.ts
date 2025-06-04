@@ -1,28 +1,17 @@
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import { FunctionFactoryType } from './function-factory';
-import { testRunner } from './test-runner/test-runner';
+// packages/shadcn/test/fixtures/snapin-custom-webhook-template/code/src/main.ts
+import { session, Session } from '@devrev/typescript-sdk';
+import { functionFactory } from './function-factory';
 
-(async () => {
-  const argv = await yargs(hideBin(process.argv)).options({
-    fixturePath: {
-      type: 'string',
-      require: true,
-    },
-    functionName: {
-      type: 'string',
-      require: true,
-    },
-  }).argv;
-
-  if (!argv.fixturePath || !argv.functionName) {
-    console.error(
-      'Please make sure you have passed fixturePath & functionName'
-    );
+export const run = async (events: any[]) => {
+  for (const event of events) {
+    const devrevSDK = session(event);
+    const functionName = event.context.function_name;
+    const functionToRun = functionFactory.createFunction(functionName);
+    if (functionToRun) {
+      await functionToRun.run(event, devrevSDK as Session);
+    } else {
+      console.error(`Function ${functionName} not found`);
+    }
   }
-
-  await testRunner({
-    fixturePath: argv.fixturePath,
-    functionName: argv.functionName as FunctionFactoryType,
-  });
-})();
+};
+export default run;
