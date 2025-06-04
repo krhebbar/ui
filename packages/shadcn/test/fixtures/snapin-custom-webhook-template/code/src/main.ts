@@ -1,4 +1,4 @@
-// packages/shadcn/test/fixtures/airdrop-template/code/src/main.ts
+// packages/shadcn/test/fixtures/snapin-custom-webhook-template/code/src/main.ts
 import { session, Session } from '@devrev/typescript-sdk';
 import { functionFactory } from './function-factory';
 
@@ -14,5 +14,4 @@ export const run = async (events: any[]) => {
     }
   }
 };
-
 export default run;

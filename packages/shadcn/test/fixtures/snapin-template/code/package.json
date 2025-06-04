@@ -1,7 +1,7 @@
 {
-  "name": "adaas-connector",
-  "version": "1.1.6",
-  "description": "DevRev ADaaS (Airdrop-as-a-service) Connector",
+  "name": "devrev-snaps-typescript-template",
+  "version": "1.0.0",
+  "description": "",
   "main": "./dist/index.js",
   "scripts": {
     "build": "rimraf ./dist && tsc",
@@ -11,10 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@devrev/ts-adaas": "1.4.2",
-    "axios": "^1.9.0",
+    "@devrev/typescript-sdk": "^1.1.17",
+    "axios": "1.9.0",
     "dotenv": "^16.0.3",
-    "js-jsonl": "^1.1.1",
     "yargs": "^17.6.2"
   }
 }

@@ -1,0 +1,22 @@
+version: '2'
+name: Minimal SnapIn
+description: Minimal snap-in fixture for general testing.
+service_account:
+  display_name: "DevRev Bot"
+event_sources:
+  organization:
+    - name: minimal-devrev-webhook
+      display_name: Minimal DevRev Webhook
+      type: devrev-webhook
+      config:
+        event_types:
+          - work_created
+functions:
+  - name: function_1
+    description: Minimal function 1
+automations:
+  - name: minimal_automation
+    source: minimal-devrev-webhook
+    event_types:
+      - work_created
+    function: function_1

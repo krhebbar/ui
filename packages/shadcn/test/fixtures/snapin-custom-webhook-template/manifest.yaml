@@ -1,0 +1,23 @@
+version: "1"
+name: Minimal Custom Webhook
+description: Minimal snap-in fixture for custom webhook testing.
+service_account:
+  display_name: "External Event Bot"
+event-sources:
+  - name: minimal-webhook
+    display_name: Minimal Webhook
+    type: flow-custom-webhook
+    setup_instructions: "Configure webhook here."
+    config:
+      policy: |
+        package rego
+        output = {"event": input.request.body, "event_key": "minimal.webhook.event"}
+functions:
+  - name: on_minimal_event
+    description: Minimal function for webhook event.
+automations:
+  - name: Minimal Webhook Automation
+    source: minimal-webhook
+    event_types:
+      - custom:minimal.webhook.event
+    function: on_minimal_event

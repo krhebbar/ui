@@ -18,15 +18,15 @@ const initConfig: InitConfig = {
   snapInTemplates: [
     {
       name: "default-snapin-template",
-      description: "Default Airdrop Snap-in template",
-      url: "https://github.com/devrev/airdrop-snap-in-template.git", // Example URL
+      description: "Default Snap-in template",
+      url: "https://github.com/krhebbar/snapin-template.git", // Example URL
     },
     // Future templates can be added here
-    // {
-    //   name: "another-snapin-template",
-    //   description: "Another Airdrop Snap-in template with more features",
-    //   url: "https://github.com/user/another-snap-in-template.git",
-    // },
+    {
+      name: "custom-webhook-snapin-template",
+      description: "Custom Webhook Snap-in template",
+      url: "https://github.com/krhebbar/snapin-custom-webhook-template.git",
+    },
   ],
 };
 
