@@ -7,7 +7,8 @@ import {
   updateSnapInConfig, // Renamed
 } from "@/src/utils/airdrop-config"
 import { generateTypeDefinitions } from "@/src/utils/type-generator"
-import { SUPPORTED_DEVREV_OBJECTS } from "@/src/type/airdrop-config"
+import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/type/airdrop-config" // AirdropProjectConfig might be needed for type hints
+import { ZodError } from "zod"; // Added ZodError import
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
@@ -88,9 +89,12 @@ config
       await addDevRevObjectsToSnapInConfig(options.cwd, objectsToAdd) // Renamed
       
       // Regenerate types
-      const config = await getSnapInConfig(options.cwd) // Renamed
+      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
+      } else {
+        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
       }
       
       configSpinner.succeed()
@@ -156,9 +160,12 @@ config
       await addExternalSyncUnitsToSnapInConfig(options.cwd, unitsToAdd) // Renamed
       
       // Regenerate types
-      const config = await getSnapInConfig(options.cwd) // Renamed
+      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
+      } else {
+        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
       }
       
       configSpinner.succeed()
@@ -191,9 +198,28 @@ config
         process.exit(1)
       }
 
-      const config = await getSnapInConfig(cwd) // Renamed
+      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
+
       if (!config) {
-        logger.error("Failed to load project configuration.") // Updated message
+        // If validation failed but rawConfig exists, show rawConfig as in info.ts
+        if (configResult.rawConfig && configResult.error) {
+          logger.warn("Could not fully validate snapin.config.mjs. This might be due to unset environment variables or schema mismatches.");
+          logger.warn("Displaying raw configuration as loaded from the file:");
+          console.log(configResult.rawConfig);
+          if (configResult.error instanceof ZodError) {
+            logger.warn("Validation issues summary:");
+            configResult.error.errors.forEach(err => {
+              logger.warn(`  - Path: ${err.path.join('.') || '.'}, Issue: ${err.message}`);
+            });
+          } else {
+             logger.warn(`Error details: ${configResult.error.message}`);
+          }
+        } else if (configResult.error) {
+            logger.error(`Failed to load snapin.config.mjs: ${configResult.error.message}`);
+        } else {
+            logger.error("Failed to load project configuration. No configuration found.");
+        }
         process.exit(1)
       }
 
@@ -245,9 +271,10 @@ config
         process.exit(1)
       }
 
-      const config = await getSnapInConfig(cwd) // Renamed
+      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const config = configResult.validatedConfig; // Extract validatedConfig
       if (!config) {
-        logger.error("Failed to load project configuration.") // Updated message
+        logger.error(`Failed to load project configuration. Cannot regenerate types. Error: ${configResult.error?.message}`) // Updated message
         process.exit(1)
       }
 
@@ -265,8 +292,10 @@ config
 async function promptForDevRevObjects(
   options: z.infer<typeof configOptionsSchema>
 ): Promise<string[]> {
-  const config = await getSnapInConfig(options.cwd) // Renamed
+  const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+  const config = configResult.validatedConfig; // Extract validatedConfig
   if (!config) {
+    logger.warn(`Could not load project configuration to suggest DevRev objects. Error: ${configResult.error?.message}`);
     return []
   }
 

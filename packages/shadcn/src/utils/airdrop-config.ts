@@ -1,6 +1,7 @@
 import fs from "fs/promises"
 import path from "path"
 import { AirdropProjectConfig, airdropConfigSchema } from "@/src/type/airdrop-config"
+import { ZodError } from "zod"; // Added ZodError import
 import { logger } from "@/src/utils/logger"
 
 const CONFIG_FILENAME = "snapin.config.mjs" // Renamed
@@ -9,27 +10,34 @@ const ENV_FILENAME = ".env"
 /**
  * Get the snap-in configuration for a project
  */
-export async function getSnapInConfig(cwd: string): Promise<AirdropProjectConfig | null> { // Renamed
+export async function getSnapInConfig(cwd: string): Promise<{ validatedConfig: AirdropProjectConfig | null; rawConfig: any | null; error?: ZodError | Error }> {
   try {
-    const configPath = path.join(cwd, CONFIG_FILENAME)
-    
-    // Check if config file exists
+    const configPath = path.join(cwd, CONFIG_FILENAME);
     try {
-      await fs.access(configPath)
-    } catch {
-      return null
+      await fs.access(configPath);
+    } catch (accessError) {
+      return { validatedConfig: null, rawConfig: null, error: new Error("snapin.config.mjs not found.") };
     }
 
-    // Dynamically import the config file
-    const configModule = await import(configPath)
-    const config = configModule.default
+    // Using a dynamic import with a cache-busting query parameter
+    // This helps ensure a fresh import if the file content changes during the CLI's lifecycle (though less common for this specific use case)
+    const configModule = await import(`${configPath}?update=${Date.now()}`);
+    const rawConfig = configModule.default;
 
-    // Validate the config against the schema
-    const validatedConfig = airdropConfigSchema.parse(config)
-    return validatedConfig
-  } catch (error) {
-    logger.error(`Failed to read snap-in config: ${error}`) // Log updated
-    return null
+    if (!rawConfig) {
+      return { validatedConfig: null, rawConfig: null, error: new Error("snapin.config.mjs does not have a default export.") };
+    }
+
+    try {
+      const validatedConfig = airdropConfigSchema.parse(rawConfig);
+      return { validatedConfig, rawConfig, error: undefined };
+    } catch (validationError) {
+      // logger.error(`Zod validation failed: ${validationError}`); // Optional: log verbose error here
+      return { validatedConfig: null, rawConfig, error: validationError as ZodError };
+    }
+  } catch (generalError: any) {
+    logger.error(`Failed to read or import snapin.config.mjs: ${generalError.message}`);
+    return { validatedConfig: null, rawConfig: null, error: generalError };
   }
 }
 
@@ -40,9 +48,12 @@ export async function updateSnapInConfig( // Renamed
   cwd: string,
   patch: Partial<AirdropProjectConfig>
 ): Promise<void> {
-  const currentConfig = await getSnapInConfig(cwd) // Use renamed function
+  const configResult = await getSnapInConfig(cwd); // Use renamed function
+  const currentConfig = configResult.validatedConfig;
   if (!currentConfig) {
-    throw new Error("No existing snap-in configuration found") // Message updated
+    // Include more error context if available
+    const errorDetail = configResult.error ? `: ${configResult.error.message}` : '';
+    throw new Error(`No existing or valid snap-in configuration found${errorDetail}`); // Message updated
   }
 
   const updatedConfig = { ...currentConfig, ...patch }
@@ -141,9 +152,11 @@ export async function addDevRevObjectsToSnapInConfig( // Renamed
   cwd: string,
   objects: string[]
 ): Promise<void> {
-  const config = await getSnapInConfig(cwd) // Use renamed function
+  const configResult = await getSnapInConfig(cwd); // Use renamed function
+  const config = configResult.validatedConfig;
   if (!config) {
-    throw new Error("No snap-in configuration found") // Message updated
+    const errorDetail = configResult.error ? `: ${configResult.error.message}` : '';
+    throw new Error(`No valid snap-in configuration found to add DevRev objects${errorDetail}`); // Message updated
   }
 
   const existingObjects = new Set(config.devrevObjects || []) // Handle if devrevObjects is undefined
@@ -164,9 +177,11 @@ export async function addExternalSyncUnitsToSnapInConfig( // Renamed
   cwd: string,
   units: string[]
 ): Promise<void> {
-  const config = await getSnapInConfig(cwd) // Use renamed function
+  const configResult = await getSnapInConfig(cwd); // Use renamed function
+  const config = configResult.validatedConfig;
   if (!config) {
-    throw new Error("No snap-in configuration found") // Message updated
+    const errorDetail = configResult.error ? `: ${configResult.error.message}` : '';
+    throw new Error(`No valid snap-in configuration found to add external sync units${errorDetail}`); // Message updated
   }
 
   const existingUnits = new Set(config.externalSyncUnits || []) // Handle if externalSyncUnits is undefined
