@@ -1,6 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
-import { AirdropProjectConfig, airdropConfigSchema } from "@/src/type/airdrop-config"
+import { AirdropProjectConfig, airdropConfigSchema } from "@/src/types/airdrop-config" // Updated path
 import { ZodError } from "zod"; // Added ZodError import
 import { logger } from "@/src/utils/logger"
 

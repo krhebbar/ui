@@ -1,13 +1,13 @@
-import { kebabCase, pascalCase, camelCase, snakeCase } from "change-case";
+import { paramCase, pascalCase, camelCase, snakeCase } from "change-case";
 
 // Kebab-case conversion
 export function toKebabCase(str: string): string {
-  return kebabCase(str);
+  return paramCase(str);
 }
 
 // Slugification from a name (similar to kebab-case but often implies more URL-friendliness)
 export function slugify(str: string): string {
-  return kebabCase(str)
+  return paramCase(str)
     .toLowerCase() // Ensure lowercase
     .replace(/[^a-z0-9-]/g, ""); // Remove any non-alphanumeric (except hyphens)
 }

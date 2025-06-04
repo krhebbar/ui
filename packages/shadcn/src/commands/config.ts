@@ -7,7 +7,7 @@ import {
   updateSnapInConfig, // Renamed
 } from "@/src/utils/airdrop-config"
 import { generateTypeDefinitions } from "@/src/utils/type-generator"
-import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/type/airdrop-config" // AirdropProjectConfig might be needed for type hints
+import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/types/airdrop-config" // Updated path
 import { ZodError } from "zod"; // Added ZodError import
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"

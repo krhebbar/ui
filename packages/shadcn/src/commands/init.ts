@@ -26,7 +26,7 @@ import {
 import { 
   AirdropProjectConfig, 
   SUPPORTED_DEVREV_OBJECTS
-} from "@/src/type/airdrop-config"
+} from "@/src/types/airdrop-config" // Updated path
 import { getInitConfig, getDefaultSnapInTemplate, airdropTemplates } from "@/src/utils/init-config";
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
 import { cloneTemplate } from "@/src/utils/git";
