@@ -27,7 +27,7 @@ import {
   AirdropProjectConfig, 
   SUPPORTED_DEVREV_OBJECTS
 } from "@/src/type/airdrop-config"
-import { getInitConfig, getDefaultSnapInTemplate } from "@/src/utils/init-config";
+import { getInitConfig, getDefaultSnapInTemplate, airdropTemplates } from "@/src/utils/init-config";
 import { slugify, isValidAirdropProjectName, generateAirdropSnapInFolderName, toKebabCase } from "@/src/utils/naming";
 import { cloneTemplate } from "@/src/utils/git";
 import fs from "fs-extra";
@@ -137,9 +137,8 @@ export async function runInit(
 
       if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
         logger.info(`Cloning Airdrop project template...`);
-        const initConf = getInitConfig();
-        const airdropTemplateToUse = initConf.airdropTemplates && initConf.airdropTemplates.length > 0
-                                     ? initConf.airdropTemplates[0]
+        const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
+                                     ? airdropTemplates[0]
                                      : undefined;
         if (airdropTemplateToUse) {
           logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
@@ -202,9 +201,8 @@ export async function runInit(
 
         if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
           logger.info(`Cloning Airdrop project template...`);
-          const initConf = getInitConfig();
-          const airdropTemplateToUse = initConf.airdropTemplates && initConf.airdropTemplates.length > 0
-                                       ? initConf.airdropTemplates[0]
+          const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
+                                       ? airdropTemplates[0]
                                        : undefined;
           if (airdropTemplateToUse) {
             logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
@@ -472,197 +470,190 @@ async function gatherAirdropConfiguration(
     }
   }
 
-  // Core configuration prompts
-  const promptsList: prompts.PromptObject<string>[] = [
-    // Sync direction - conditional
-    ...(projectTypeFromPrompt === "airdrop"
-      ? [
-          {
-            type: "select" as prompts.PromptType, // Cast to ensure type correctness
-            name: "syncDirection",
-            message: "What sync direction do you need for this Airdrop project?",
-            choices: [
-              { title: "Two-way sync", value: "two-way" },
-              { title: "One-way sync", value: "one-way" },
-            ],
-            initial: 0,
-          },
-        ]
-      : []),
-    {
-      type: "text",
-      name: "externalSystemName",
-      message: "What is the name of your external system (e.g., Notion, Jira)?",
-      initial: projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "My External System",
-    },
-    {
-      type: "text",
-      name: "externalSystemSlug",
-      message: "External system slug (machine-readable, kebab-case):",
-      initial: (prev: any, values: any) => {
-        const baseName = values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system");
-        if (projectTypeFromPrompt === 'airdrop') {
-          return `airdrop-${slugify(baseName)}`;
-        }
-        return slugify(baseName);
-      },
-      validate: (value: string) => slugify(value).length > 0 ? true : "Slug cannot be empty."
-    },
-    {
-      type: "text",
-      name: "apiBaseUrl",
-      message: "API base URL for the external system:",
-      initial: initSettings.defaultApiBaseUrl,
-    },
-    {
-      type: "text",
-      name: "testEndpoint",
-      message: "Test endpoint for connection verification (relative to API base URL or absolute):",
-      initial: (prev: any, values: any) => {
-        // Check if defaultTestEndpoint is a full URL or a path
-        if (initSettings.defaultTestEndpoint.startsWith('http://') || initSettings.defaultTestEndpoint.startsWith('https://')) {
-          return initSettings.defaultTestEndpoint;
-        }
-        // If it's a path, append it to the apiBaseUrl
-        const baseUrl = values.apiBaseUrl || initSettings.defaultApiBaseUrl;
-        // Ensure no double slashes
-        return `${baseUrl.replace(/\/$/, '')}/${initSettings.defaultTestEndpoint.replace(/^\//, '')}`;
-      }
-    },
-    {
-      type: "multiselect",
-      name: "devrevObjects",
-      message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
-      choices: SUPPORTED_DEVREV_OBJECTS.map((obj: string) => ({ // Ensure SUPPORTED_DEVREV_OBJECTS is available
-        title: obj,
-        value: obj,
-        // No pre-selection here to ensure user choice is captured, unless specified by requirements for defaults
-      })),
-      min: projectTypeFromPrompt === "airdrop" ? 1 : 0, // Require at least one for Airdrop, optional for Snap-in
-      hint: "- Space to select. Enter to submit."
-    },
-    {
-      type: "list",
-      name: "externalSyncUnits",
-      message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
-      initial: "tickets,conversations", // Default, user can change
-      separator: ",",
-    },
-    {
-      type: "select",
-      name: "connectionType",
-      message: "What type of connection will the snap-in use?",
-      choices: [
-        { title: "OAuth2", value: "oauth2" },
-        { title: "Secret/API Key", value: "secret" },
-      ],
-      initial: 0,
-    },
-  ];
-
-  const responses = await prompts(promptsList);
-
-  // Handle cases where prompts might be skipped (e.g. conditional syncDirection)
-  const syncDirection = projectTypeFromPrompt === 'airdrop' ? responses.syncDirection : undefined;
-
-  // Ensure devrevObjects is always an array, even if empty (e.g. for Snap-ins if not selected)
-  const devrevObjects = Array.isArray(responses.devrevObjects) ? responses.devrevObjects : [];
-
-
-  let connectionDetails: any; // Define more specific type later if possible
-  if (responses.connectionType === "oauth2") {
-    const oauthResponses = await prompts([
-      // OAuth prompts remain largely the same, but use the generated slug for initials
-      {
-        type: "text",
-        name: "clientIdEnvVar",
-        message: "Environment variable name for OAuth client ID:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_ID`,
-      },
-      {
-        type: "text",
-        name: "clientSecretEnvVar",
-        message: "Environment variable name for OAuth client secret:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_SECRET`,
-      },
-      {
-        type: "text",
-        name: "authorizeUrl",
-        message: "OAuth authorization URL:",
-        initial: `${responses.apiBaseUrl}/oauth/authorize`, // Use entered apiBaseUrl
-      },
-      {
-        type: "text",
-        name: "tokenUrl",
-        message: "OAuth token URL:",
-        initial: `${responses.apiBaseUrl}/oauth/token`, // Use entered apiBaseUrl
-      },
-      {
-        type: "text",
-        name: "scope",
-        message: "OAuth scope (space-separated):",
-        initial: "read write api", // Example scope
-      },
-    ]);
-    connectionDetails = {
-      type: "oauth2",
-      id: `${responses.externalSystemSlug}-oauth-connection`,
-      clientId: `process.env.${oauthResponses.clientIdEnvVar}`,
-      clientSecret: `process.env.${oauthResponses.clientSecretEnvVar}`,
-      authorize: {
-        url: oauthResponses.authorizeUrl,
-        tokenUrl: oauthResponses.tokenUrl,
-        grantType: "authorization_code",
-        scope: oauthResponses.scope,
-        scopeDelimiter: " ",
-      },
-      refresh: { url: oauthResponses.tokenUrl, method: "POST" },
-      revoke: { url: `${responses.apiBaseUrl}/oauth/revoke`, method: "POST" },
-    };
-  } else { // Secret-based
-    const secretResponses = await prompts([
-      {
-        type: "text",
-        name: "tokenEnvVar",
-        message: "Environment variable name for API token/secret:",
-        initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_TOKEN`,
-      },
-      {
+  let needsExternalSystem = projectTypeFromPrompt === 'airdrop'; // Airdrop projects always need external system details
+  if (projectTypeFromPrompt === "snap-in") {
+      const externalSystemResponse = await prompts({
         type: "confirm",
-        name: "isSubdomain",
-        message: "Does this API connection involve a customer-specific subdomain?",
-        initial: false,
-      },
-    ]);
-    connectionDetails = {
-      type: "secret",
-      id: `${responses.externalSystemSlug}-secret-connection`,
-      isSubdomain: secretResponses.isSubdomain,
-      secretTransform: ".token", // Example, might need more sophisticated handling
-      tokenVerification: { url: responses.testEndpoint, method: "GET" },
-      fields: [{ id: "token", name: "API Token/Secret", description: `Your ${responses.externalSystemName} API Token/Secret` }],
-    };
+        name: "needsExternalSystemValue",
+        message: "Will this Snap-in connect to an external system?",
+        initial: true,
+      });
+      needsExternalSystem = externalSystemResponse.needsExternalSystemValue;
+
+      if (typeof needsExternalSystem === 'undefined') {
+          logger.error("Snap-in external system choice was not provided. Aborting.");
+          process.exit(1);
+      }
   }
 
-  return {
-    projectName, // This is the folder name
-    projectTypeFromPrompt,
-    airdropProjectName, // Specific name for airdrop project type
-    snapInBaseName,   // Base name used to generate snap-in folder
-    selectedSnapInTemplateName, // Name of the chosen Snap-in template, undefined for airdrop
+  // Dynamically build promptsList
+  const promptsList: prompts.PromptObject<string>[] = [];
 
-    projectType: projectTypeFromPrompt, // This field is part of AirdropProjectConfig
-    syncDirection: projectTypeFromPrompt === 'airdrop' ? syncDirection : undefined, // Only for airdrop
-    devrevObjects: devrevObjects, // User selected, should not be overridden by defaults now
-    externalSyncUnits: Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean),
-    externalSystem: {
-      name: responses.externalSystemName,
-      slug: slugify(responses.externalSystemSlug), // Ensure slug is consistently slugified
-      apiBaseUrl: responses.apiBaseUrl,
-      testEndpoint: responses.testEndpoint,
-      supportedObjects: Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean),
-    },
-    connection: connectionDetails,
+  if (projectTypeFromPrompt === "airdrop") {
+    promptsList.push({
+      type: "select" as prompts.PromptType,
+      name: "syncDirection",
+      message: "What sync direction do you need for this Airdrop project?",
+      choices: [
+        { title: "Two-way sync", value: "two-way" },
+        { title: "One-way sync", value: "one-way" },
+      ],
+      initial: 0,
+    });
+  }
+
+  if (needsExternalSystem) {
+    promptsList.push(
+      {
+        type: "text",
+        name: "externalSystemName",
+        message: "What is the name of your external system (e.g., Notion, Jira)?",
+        initial: projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "My External System",
+      },
+      {
+        type: "text",
+        name: "externalSystemSlug",
+        message: projectTypeFromPrompt === 'snap-in'
+                   ? "Snap-in slug (machine-readable, kebab-case, for identification):"
+                   : "External system slug (machine-readable, kebab-case):",
+        initial: (prev: any, values: any) => {
+          const baseName = values.externalSystemName || (projectTypeFromPrompt === 'snap-in' && snapInBaseName ? snapInBaseName : "external-system");
+          if (projectTypeFromPrompt === 'airdrop') {
+            return `airdrop-${slugify(baseName)}`;
+          }
+          return slugify(baseName);
+        },
+        validate: (value: string) => slugify(value).length > 0 ? true : "Slug cannot be empty."
+      },
+      {
+        type: "text",
+        name: "apiBaseUrl",
+        message: "API base URL for the external system:",
+        initial: initSettings.defaultApiBaseUrl,
+      },
+      {
+        type: "text",
+        name: "testEndpoint",
+        message: "Test endpoint for connection verification (relative to API base URL or absolute):",
+        initial: (prev: any, values: any) => {
+          if (initSettings.defaultTestEndpoint.startsWith('http://') || initSettings.defaultTestEndpoint.startsWith('https://')) {
+            return initSettings.defaultTestEndpoint;
+          }
+          const baseUrl = values.apiBaseUrl || initSettings.defaultApiBaseUrl;
+          return `${baseUrl.replace(/\/$/, '')}/${initSettings.defaultTestEndpoint.replace(/^\//, '')}`;
+        }
+      },
+      {
+        type: "list",
+        name: "externalSyncUnits",
+        message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
+        initial: "tickets,conversations",
+        separator: ",",
+      },
+      {
+        type: "select",
+        name: "connectionType",
+        message: "What type of connection will the snap-in use?",
+        choices: [
+          { title: "OAuth2", value: "oauth2" },
+          { title: "Secret/API Key", value: "secret" },
+        ],
+        initial: 0,
+      }
+    );
+  }
+
+  // DevRev objects prompt is always relevant
+  promptsList.push({
+    type: "multiselect",
+    name: "devrevObjects",
+    message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
+    choices: SUPPORTED_DEVREV_OBJECTS.map((obj: string) => ({
+      title: obj,
+      value: obj,
+    })),
+    min: projectTypeFromPrompt === "airdrop" ? 1 : 0,
+    hint: "- Space to select. Enter to submit."
+  });
+
+  const responses = await prompts(promptsList);
+   // Handle cases where prompts might be skipped (e.g. user presses Ctrl+C during promptsList)
+  if (Object.keys(responses).length === 0 && promptsList.length > 0 && !options.yes && !options.silent) {
+    // This condition might indicate that prompts were exited early (e.g. Ctrl+C)
+    // For `devrevObjects` specifically, if it's the only one and cancelled, responses.devrevObjects would be undefined
+    if (promptsList.some(p => p.name === 'devrevObjects') && typeof responses.devrevObjects === 'undefined') {
+        logger.error("Project configuration was not completed. Aborting.");
+        process.exit(0);
+    }
+    // If needsExternalSystem was true, but essential responses like externalSystemName are missing
+    if (needsExternalSystem && typeof responses.externalSystemName === 'undefined') {
+        logger.error("External system configuration was not completed. Aborting.");
+        process.exit(0);
+    }
+  }
+
+
+  const syncDirection = projectTypeFromPrompt === 'airdrop' ? responses.syncDirection : undefined;
+  const devrevObjects = Array.isArray(responses.devrevObjects) ? responses.devrevObjects : [];
+
+  let connectionDetails: any;
+  if (needsExternalSystem && responses.connectionType) { // Ensure connectionType was prompted and answered
+    if (responses.connectionType === "oauth2") {
+      const oauthResponses = await prompts([
+        { type: "text", name: "clientIdEnvVar", message: "Environment variable name for OAuth client ID:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_ID` },
+        { type: "text", name: "clientSecretEnvVar", message: "Environment variable name for OAuth client secret:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_CLIENT_SECRET` },
+        { type: "text", name: "authorizeUrl", message: "OAuth authorization URL:", initial: `${responses.apiBaseUrl}/oauth/authorize` },
+        { type: "text", name: "tokenUrl", message: "OAuth token URL:", initial: `${responses.apiBaseUrl}/oauth/token` },
+        { type: "text", name: "scope", message: "OAuth scope (space-separated):", initial: "read write api" },
+      ]);
+      if (typeof oauthResponses.clientIdEnvVar === 'undefined') { // Check if OAuth prompts were cancelled
+        logger.error("OAuth2 configuration was not completed. Aborting.");
+        process.exit(0);
+      }
+      connectionDetails = {
+        type: "oauth2", id: `${responses.externalSystemSlug}-oauth-connection`,
+        clientId: `process.env.${oauthResponses.clientIdEnvVar}`, clientSecret: `process.env.${oauthResponses.clientSecretEnvVar}`,
+        authorize: { url: oauthResponses.authorizeUrl, tokenUrl: oauthResponses.tokenUrl, grantType: "authorization_code", scope: oauthResponses.scope, scopeDelimiter: " " },
+        refresh: { url: oauthResponses.tokenUrl, method: "POST" }, revoke: { url: `${responses.apiBaseUrl}/oauth/revoke`, method: "POST" },
+      };
+    } else { // Secret-based
+      const secretResponses = await prompts([
+        { type: "text", name: "tokenEnvVar", message: "Environment variable name for API token/secret:", initial: `${slugify(responses.externalSystemSlug).toUpperCase().replace(/-/g, '_')}_TOKEN` },
+        { type: "confirm", name: "isSubdomain", message: "Does this API connection involve a customer-specific subdomain?", initial: false },
+      ]);
+      if (typeof secretResponses.tokenEnvVar === 'undefined') { // Check if Secret prompts were cancelled
+        logger.error("Secret-based connection configuration was not completed. Aborting.");
+        process.exit(0);
+      }
+      connectionDetails = {
+        type: "secret", id: `${responses.externalSystemSlug}-secret-connection`,
+        isSubdomain: secretResponses.isSubdomain, secretTransform: ".token",
+        tokenVerification: { url: responses.testEndpoint, method: "GET" },
+        fields: [{ id: "token", name: "API Token/Secret", description: `Your ${responses.externalSystemName} API Token/Secret` }],
+      };
+    }
+  }
+
+  const externalSyncUnitsList = (needsExternalSystem && responses.externalSyncUnits)
+                               ? (Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean))
+                               : undefined;
+
+  return {
+    projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName,
+    projectType: projectTypeFromPrompt,
+    syncDirection: syncDirection,
+    devrevObjects: devrevObjects,
+    externalSyncUnits: externalSyncUnitsList,
+    externalSystem: needsExternalSystem && responses.externalSystemName // ensure responses.externalSystemName is present
+      ? {
+          name: responses.externalSystemName,
+          slug: slugify(responses.externalSystemSlug),
+          apiBaseUrl: responses.apiBaseUrl,
+          testEndpoint: responses.testEndpoint,
+          supportedObjects: externalSyncUnitsList || [], // Default to empty array if externalSyncUnitsList is undefined
+        }
+      : undefined,
+    connection: needsExternalSystem && connectionDetails ? connectionDetails : undefined,
   };
 }
 

@@ -57,11 +57,11 @@ export const externalSystemSchema = z.object({
 // Main airdrop config schema
 export const airdropConfigSchema = z.object({
   projectType: z.enum(["airdrop", "snap-in"]),
-  syncDirection: z.enum(["one-way", "two-way"]),
+  syncDirection: z.enum(["one-way", "two-way"]).optional(),
   devrevObjects: z.array(z.string()),
-  externalSyncUnits: z.array(z.string()),
-  externalSystem: externalSystemSchema,
-  connection: connectionSchema,
+  externalSyncUnits: z.array(z.string()).optional(),
+  externalSystem: externalSystemSchema.optional(),
+  connection: connectionSchema.optional(),
 })
 
 // Export types
