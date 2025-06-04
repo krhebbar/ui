@@ -3,13 +3,13 @@ import path from "path"
 import { AirdropProjectConfig, airdropConfigSchema } from "@/src/type/airdrop-config"
 import { logger } from "@/src/utils/logger"
 
-const CONFIG_FILENAME = "airdrop.config.mjs"
+const CONFIG_FILENAME = "snapin.config.mjs" // Renamed
 const ENV_FILENAME = ".env"
 
 /**
- * Get the airdrop configuration for a project
+ * Get the snap-in configuration for a project
  */
-export async function getAirdropConfig(cwd: string): Promise<AirdropProjectConfig | null> {
+export async function getSnapInConfig(cwd: string): Promise<AirdropProjectConfig | null> { // Renamed
   try {
     const configPath = path.join(cwd, CONFIG_FILENAME)
     
@@ -28,21 +28,21 @@ export async function getAirdropConfig(cwd: string): Promise<AirdropProjectConfi
     const validatedConfig = airdropConfigSchema.parse(config)
     return validatedConfig
   } catch (error) {
-    logger.error(`Failed to read airdrop config: ${error}`)
+    logger.error(`Failed to read snap-in config: ${error}`) // Log updated
     return null
   }
 }
 
 /**
- * Update the airdrop configuration with a partial patch
+ * Update the snap-in configuration with a partial patch
  */
-export async function updateAirdropConfig(
+export async function updateSnapInConfig( // Renamed
   cwd: string,
   patch: Partial<AirdropProjectConfig>
 ): Promise<void> {
-  const currentConfig = await getAirdropConfig(cwd)
+  const currentConfig = await getSnapInConfig(cwd) // Use renamed function
   if (!currentConfig) {
-    throw new Error("No existing airdrop configuration found")
+    throw new Error("No existing snap-in configuration found") // Message updated
   }
 
   const updatedConfig = { ...currentConfig, ...patch }
@@ -50,13 +50,13 @@ export async function updateAirdropConfig(
   // Validate the updated config
   const validatedConfig = airdropConfigSchema.parse(updatedConfig)
   
-  await writeAirdropConfig(cwd, validatedConfig)
+  await writeSnapInConfig(cwd, validatedConfig) // Use renamed function
 }
 
 /**
- * Write the airdrop configuration to file
+ * Write the snap-in configuration to file
  */
-export async function writeAirdropConfig(
+export async function writeSnapInConfig( // Renamed
   cwd: string,
   config: AirdropProjectConfig
 ): Promise<void> {
@@ -65,14 +65,14 @@ export async function writeAirdropConfig(
   const configContent = generateConfigFileContent(config)
   
   await fs.writeFile(configPath, configContent, "utf8")
-  logger.info(`Airdrop configuration written to ${configPath}`)
+  logger.info(`Snap-in configuration written to ${configPath}`) // Log updated
 }
 
 /**
- * Generate the content for the airdrop.config.mjs file
+ * Generate the content for the snapin.config.mjs file
  */
-function generateConfigFileContent(config: AirdropProjectConfig): string {
-  return `/** @type {import('./types/airdrop-config').AirdropProjectConfig} */
+function generateConfigFileContent(config: AirdropProjectConfig): string { // Log updated in comment
+  return `/** @type {import('./types/snapin-config').AirdropProjectConfig} */
 export default ${JSON.stringify(config, null, 2).replace(
     /"(process\.env\.[A-Z_]+)"/g,
     "$1"
@@ -122,9 +122,9 @@ export async function updateEnvFile(
 }
 
 /**
- * Check if an airdrop configuration exists
+ * Check if a snap-in configuration exists
  */
-export async function hasAirdropConfig(cwd: string): Promise<boolean> {
+export async function hasSnapInConfig(cwd: string): Promise<boolean> { // Renamed
   try {
     const configPath = path.join(cwd, CONFIG_FILENAME)
     await fs.access(configPath)
@@ -135,46 +135,46 @@ export async function hasAirdropConfig(cwd: string): Promise<boolean> {
 }
 
 /**
- * Add DevRev objects to the configuration
+ * Add DevRev objects to the snap-in configuration
  */
-export async function addDevRevObjects(
+export async function addDevRevObjectsToSnapInConfig( // Renamed
   cwd: string,
   objects: string[]
 ): Promise<void> {
-  const config = await getAirdropConfig(cwd)
+  const config = await getSnapInConfig(cwd) // Use renamed function
   if (!config) {
-    throw new Error("No airdrop configuration found")
+    throw new Error("No snap-in configuration found") // Message updated
   }
 
-  const existingObjects = new Set(config.devrevObjects)
+  const existingObjects = new Set(config.devrevObjects || []) // Handle if devrevObjects is undefined
   const newObjects = objects.filter(obj => !existingObjects.has(obj))
   
   if (newObjects.length > 0) {
-    await updateAirdropConfig(cwd, {
-      devrevObjects: [...config.devrevObjects, ...newObjects]
+    await updateSnapInConfig(cwd, { // Use renamed function
+      devrevObjects: [...(config.devrevObjects || []), ...newObjects]
     })
     logger.info(`Added DevRev objects: ${newObjects.join(", ")}`)
   }
 }
 
 /**
- * Add external sync units to the configuration
+ * Add external sync units to the snap-in configuration
  */
-export async function addExternalSyncUnits(
+export async function addExternalSyncUnitsToSnapInConfig( // Renamed
   cwd: string,
   units: string[]
 ): Promise<void> {
-  const config = await getAirdropConfig(cwd)
+  const config = await getSnapInConfig(cwd) // Use renamed function
   if (!config) {
-    throw new Error("No airdrop configuration found")
+    throw new Error("No snap-in configuration found") // Message updated
   }
 
-  const existingUnits = new Set(config.externalSyncUnits)
+  const existingUnits = new Set(config.externalSyncUnits || []) // Handle if externalSyncUnits is undefined
   const newUnits = units.filter(unit => !existingUnits.has(unit))
   
   if (newUnits.length > 0) {
-    await updateAirdropConfig(cwd, {
-      externalSyncUnits: [...config.externalSyncUnits, ...newUnits]
+    await updateSnapInConfig(cwd, { // Use renamed function
+      externalSyncUnits: [...(config.externalSyncUnits || []), ...newUnits]
     })
     logger.info(`Added external sync units: ${newUnits.join(", ")}`)
   }

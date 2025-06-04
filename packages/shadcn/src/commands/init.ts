@@ -15,9 +15,9 @@ import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
 import { 
-  writeAirdropConfig, 
+  writeSnapInConfig, // Renamed
   updateEnvFile, 
-  hasAirdropConfig 
+  hasSnapInConfig // Renamed
 } from "@/src/utils/airdrop-config"
 import { 
   generateTypeDefinitions, 
@@ -38,8 +38,8 @@ import prompts from "prompts"
 import { z } from "zod"
 
 // Helper function to get the original AirdropProjectConfig part from the augmented one.
-// This is important because writeAirdropConfig and other utilities expect AirdropProjectConfig.
-function extractCoreAirdropConfig(
+// This is important because writeSnapInConfig and other utilities expect AirdropProjectConfig.
+function extractCoreConfigForGeneration( // Renamed
   augmentedConfig: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
 ): AirdropProjectConfig {
   const {
@@ -292,18 +292,18 @@ export async function runInit(
   }
 
 
-  // Check for existing airdrop.config.mjs in the final options.cwd
-  const hasExistingAirdropConfig = await hasAirdropConfig(options.cwd);
-  if (hasExistingAirdropConfig && !options.force && !options.isNewProject) { // Don't ask to overwrite if it's a new project
+  // Check for existing snapin.config.mjs in the final options.cwd
+  const hasExistingSnapInConfig = await hasSnapInConfig(options.cwd); // Renamed
+  if (hasExistingSnapInConfig && !options.force && !options.isNewProject) { // Don't ask to overwrite if it's a new project
     if (!options.yes) {
       const { overwrite } = await prompts({
         type: "confirm",
         name: "overwrite",
-        message: `Airdrop configuration (airdrop.config.mjs) in ${highlighter.info(options.cwd)} already exists. Overwrite?`,
+        message: `Project configuration (snapin.config.mjs) in ${highlighter.info(options.cwd)} already exists. Overwrite?`, // Updated message
         initial: false,
       });
       if (!overwrite) {
-        logger.info("Skipping airdrop.config.mjs creation.");
+        logger.info("Skipping snapin.config.mjs creation."); // Updated message
         // If components were specified, we might still want to add them with the existing config.
         if (options.components?.length && configFromManifest) {
              await addComponents(options.components, configFromManifest, {
@@ -315,7 +315,7 @@ export async function runInit(
         return configFromManifest; // Return the existing manifest config
       }
     } else if (!options.force) { // If --yes but not --force, don't overwrite
-        logger.info("Airdrop configuration (airdrop.config.mjs) already exists. Skipping overwrite due to --yes without --force.");
+        logger.info("Project configuration (snapin.config.mjs) already exists. Skipping overwrite due to --yes without --force."); // Updated message
         if (options.components?.length && configFromManifest) {
             await addComponents(options.components, configFromManifest, {
                 overwrite: true, silent: options.silent, isNewProject: false,
@@ -330,7 +330,7 @@ export async function runInit(
     const { proceed } = await prompts({
       type: "confirm",
       name: "proceed",
-      message: `Initialize/Update airdrop project configuration in ${highlighter.info(options.cwd)}. Proceed?`,
+      message: `Initialize/Update project configuration in ${highlighter.info(options.cwd)}. Proceed?`, // Updated message
       initial: true,
     });
     if (!proceed) {
@@ -338,19 +338,19 @@ export async function runInit(
     }
   }
   
-  const coreAirdropConfig = extractCoreAirdropConfig(airdropConfigResult);
+  const coreConfig = extractCoreConfigForGeneration(airdropConfigResult); // Renamed function call
 
-  const configSpinner = spinner(`Creating airdrop project configuration (airdrop.config.mjs)...`).start();
-  await writeAirdropConfig(options.cwd, coreAirdropConfig);
+  const configSpinner = spinner(`Creating project configuration (snapin.config.mjs)...`).start(); // Updated message
+  await writeSnapInConfig(options.cwd, coreConfig); // Renamed function call
   
-  const envVars = extractEnvVarsFromConfig(coreAirdropConfig);
+  const envVars = extractEnvVarsFromConfig(coreConfig); // Use updated coreConfig variable
   if (Object.keys(envVars).length > 0) {
     await updateEnvFile(options.cwd, envVars);
   }
   
   await copyConfigTypes(options.cwd);
-  await generateTypeDefinitions(options.cwd, coreAirdropConfig);
-  configSpinner.succeed(`Airdrop project configuration created successfully in ${highlighter.info(options.cwd)}.`);
+  await generateTypeDefinitions(options.cwd, coreConfig); // Use updated coreConfig variable
+  configSpinner.succeed(`Project configuration created successfully in ${highlighter.info(options.cwd)}.`); // Updated message
 
   if (options.components?.length) {
     // Re-fetch config after writing, to ensure components are added based on the *new* configuration
