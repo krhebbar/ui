@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 import { add } from "@/src/commands/add"
-import { build } from "@/src/commands/build"
-import { diff } from "@/src/commands/diff"
+import { config } from "@/src/commands/config"
 import { info } from "@/src/commands/info"
 import { init } from "@/src/commands/init"
-import { migrate } from "@/src/commands/migrate"
-import { build as registryBuild } from "@/src/commands/registry/build"
 import { mcp as registryMcp } from "@/src/commands/registry/mcp"
 import { Command } from "commander"
+
+// New command imports
+import { doctor } from "@/src/commands/doctor";
+import { dev } from "@/src/commands/dev";
+import { build } from "@/src/commands/build";
+import { release } from "@/src/commands/release";
+import { logs } from "@/src/commands/logs";
 
 import packageJson from "../package.json"
 
@@ -16,24 +20,28 @@ process.on("SIGTERM", () => process.exit(0))
 
 async function main() {
   const program = new Command()
-    .name("shadcn")
-    .description("add components and dependencies to your project")
+    .name("shadcn") // Consider using CLI_NAME from constants here
+    .description("add components and dependencies to your project. Also includes Airdrop/Snap-in lifecycle commands.") // Updated description
     .version(
-      packageJson.version || "1.0.0",
+      packageJson.version || "1.0.0", // Or CLI_VERSION from constants
       "-v, --version",
       "display the version number"
-    )
+    );
 
   program
     .addCommand(init)
     .addCommand(add)
-    .addCommand(diff)
-    .addCommand(migrate)
+    .addCommand(config)
     .addCommand(info)
+    // Register new commands
+    .addCommand(doctor)
+    .addCommand(dev)
     .addCommand(build)
+    .addCommand(release)
+    .addCommand(logs);
 
   // Registry commands
-  program.addCommand(registryBuild).addCommand(registryMcp)
+  program.addCommand(registryMcp);
 
   program.parse()
 }

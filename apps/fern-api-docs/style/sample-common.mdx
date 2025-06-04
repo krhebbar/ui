@@ -1,0 +1,47 @@
+# DataDog Snap-in
+
+This integration links Datadog's monitoring system with Devrev's incident management, simplifying the process of managing RevOrg incidents triggered by Datadog alerts e.g. system failures etc. It automatically generates new incidents and updates existing incidents in DevRev using data from Datadog, allowing your organisation to address issues efficiently without manual tracking.
+
+### System Features
+
+- Automated Incident Creation: When an incident is triggered in Datadog, the snap-in will automatically create a corresponding incident in DevRev.
+- Automated Incident Updation: When an incident is updated in Datadog, the changes are reflected in DevRev.
+- Real-time Synchronization: The snap-in ensures that incidents are created or updated in real-time, reducing delays between detection and resolution. DevRev captures the necessary incident details from the Datadog payload, allowing teams to address and mitigate issues.
+- Seamless integration: The snap-in is built to streamline workflows, minimizing the need for manual intervention.
+
+### Installing the Snap-in
+
+1. Open the DevRev marketplace and install the **Datadog** snap-in.
+2. Select the dev org where you want to install the snap-in, confirm your
+selection, and click **Deploy snap-in**.
+3. In DevRev app, setup the connection in **Settings** > **Snap-ins** >
+**Connections** on top.
+    - Search and choose an existing connection or create a new one by clicking
+    **+ Connection**.
+    - Select **Datadog** from the dropdown list.
+    - Give it a connection name and paste your Datadog **API Key**, **Application
+    Key** and **Environment**(prod/dev) in their respective fields.
+
+### Configuration
+
+1. Navigate to **Snap-ins** > **All Snap-ins** > **Datadog** > **Configure**.
+2. Select the connection that you created in the **Connections** tab.
+    
+    This connection is necessary if you wish to bring stage and custom fields to DevRev.
+    
+3. The default owner, part, and default severity value for incidents must be included.
+4. Include the desired stage mapping from Datadog to DevRev.
+5. Click **Save**
+6. Click **Install**.
+7. Copy the webhook URL and follow the below steps to connect it to Datadog via webhook integration.
+    1. Add the following payload in the **Payload** section.
+        - `"aggreg_key": "$AGGREG_KEY"`.
+        - `"alert_metric": "$ALERT_METRIC"`.
+        - `"alert_query": "$ALERT_QUERY"`.
+    2. Click **Install Integration** or **Update Configuration**.
+
+### References
+
+- [DataDog Devrev snap-in marketplace listing](https://marketplace.devrev.ai/datadog-snapin)
+- [DataDog DevRev snapin documentation](https://devrev.ai/docs/integrations/datadog)
+- [DataDog API](https://docs.datadoghq.com/api/latest/)

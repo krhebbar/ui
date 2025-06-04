@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "airdrop-connection-oauth2",
+  "type": "registry:file",
+  "title": "OAuth2 Connection Airdrop",
+  "description": "Airdrop configuration for OAuth2-based authentication connections",
+  "registryDependencies": [],
+  "dependencies": [],
+  "docs": "Next steps, Generate keyrings for OAuth2 connections using the `snapin keyrings` command.",
+  "files": [
+    {
+      "path": "registry/default/airdrop/connection/oauth2/manifest.yaml",
+      "type": "registry:file",
+      "target": "~/manifest.yaml"
+    }
+  ]
+}

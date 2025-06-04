@@ -1,0 +1,919 @@
+# Features
+
+## Identification
+
+To access certain features of the DevRev SDK, user identification is required.
+
+The identification function should be placed appropriately in your app after the user logs in. If you have the user information available at app launch, call the function after the `DevRev.configure(context, appID)` method.
+
+<Callout intent="note">
+The `Identity` structure allows for custom fields in the user, organization, and account traits. These fields must be configured through the DevRev app before they can be utilized. For more information, refer to [Object customization](https://devrev.ai/docs/product/object-customization).
+</Callout>
+
+### Anonymous identification
+
+The anonymous identification method allows you to create an anonymous user with an optional user identifier, ensuring that no other data is stored or associated with the user.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.identifyAnonymousUser(
+       userId: String
+   )
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.identifyAnonymousUser(
+       String userId
+   );
+   ```
+  </Tab>
+</Tabs>
+
+### Unverified identification
+
+The unverified identification method identifies users with a unique identifier, but it does not verify their identity with the DevRev backend.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.identifyUnverifiedUser(
+       identity: Identity
+   )
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.identifyUnverifiedUser(
+       Identity identity
+   );
+   ```   
+  </Tab>
+</Tabs>
+
+The function accepts the `DevRev.Identity` structure, with the user identifier (`userID`) as the only required property, all other properties are optional.
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   // Identify an unverified user using their email address as the user identifier.
+   DevRev.identifyUnverifiedUser(Identity(userId = "user@example.org"))
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   // Identify an unverified user using their email address as the user identifier.
+   DevRev.identifyUnverifiedUser(
+           new Identity("user@example.org", null, null, null, null, null)
+   );
+   ```
+  </Tab>
+</Tabs>
+
+
+### Verified identification
+
+The verified identification method is used to identify the user with a unique identifier and verify the user's identity with the DevRev backend.
+
+<Tabs>
+  <Tab title="Kotlin">
+  ```kotlin
+  DevRev.identifyVerifiedUser(userId: String, sessionToken: String)
+  ```
+  </Tab>
+  <Tab title="Java">
+  ```java
+  DevRev.INSTANCE.identifyVerifiedUser(String userId, String sessionToken);
+  ```
+  </Tab>
+</Tabs>
+
+### Updating the user
+
+To update a user's information, use the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+DevRev.updateUser(
+    identity: Identity
+)
+```
+  </Tab>
+  <Tab title="Java">
+  ```java
+DevRev.INSTANCE.updateUser(
+    Identity identity
+);
+```
+  </Tab>
+</Tabs>
+
+The function accepts the `DevRev.Identity` ojbect.
+
+<Callout intent="note">
+The `userID` property cannot be updated.
+</Callout>
+
+### Logout
+
+You can perform a logout of the current user by calling the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+  ```kotlin
+  DevRev.logout(context: Context, deviceId: String)
+  ```
+  </Tab>
+  <Tab title="Java">
+  ```java
+  DevRev.logout(context: Context, deviceId: String)
+  ```
+  </Tab>
+</Tabs>
+
+The user will be logged out by clearing their credentials, as well as unregistering the device from receiving push notifications, and stopping the session recording.
+
+## PLuG support chat
+
+Once user identification is complete, you can start using the chat (conversations) dialog supported by our DevRev SDK. To open the chat dialog, your application should use the `showSupport` API, as shown in the following example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.showSupport(context: Context)
+   ```    
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevExtKt.showSupport(DevRev.INSTANCE, context);
+   ```    
+  </Tab>
+</Tabs>
+
+#### Creating a new conversation
+
+You have the ability to create a new conversation from within your app. The method will show the support chat screen and create a new conversation at the same time.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.createSupportConversation(context: Context)
+   ```    
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.createSupportConversation(context);
+   ```    
+  </Tab>
+</Tabs>
+
+The DevRev SDK also provides a support button, which can be integrated into your application. To include it on the current screen, add the following code to your XML layout:
+
+```xml
+<ai.devrev.sdk.plug.view.PlugFloatingActionButton
+    android:id="@+id/plug_fab"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="24dp"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintEnd_toEndOf="parent" />
+```
+The support button can be customized using default parameters, enabling you to tailor its appearance to your application's design.
+
+```kotlin
+android:src="@your_drawable_here"
+```
+and
+
+```kotlin
+android:backgroundTint="@your_background_color"
+```
+
+At this stage, your app is fully configured to utilize all functionalities of the DevRev SDK. Pressing the support button directs the user to the chat interface, enabling effective interaction and support.
+
+### In-app link handling
+
+The DevRev SDK provides a mechanism to handle links opened from within any screen that is part of the DevRev SDK.
+
+You can fully customize the link handling behavior by setting the specialized in-app link handler. That way you can decide what should happen when a link is opened from within the app.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.setInAppLinkHandler(handler: (String) -> Unit)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.setInAppLinkHandler(Function1<String, Unit> handler);
+   ```
+  </Tab>
+</Tabs>
+
+You can further customize the behavior by setting the `setShouldDismissModalsOnOpenLink` boolean flag. This flag controls whether the DevRev SDK should dismiss the top-most modal screen when a link is opened.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.setShouldDismissModalsOnOpenLink(value: boolean)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.setShouldDismissModalsOnOpenLink(boolean value)
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.setInAppLinkHandler { link ->
+      // Do something here
+   }
+
+   DevRev.setShouldDismissModalsOnOpenLink(false)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.setInAppLinkHandler(link -> {
+      // Do something here
+      return kotlin.Unit.INSTANCE;
+   });
+
+   DevRev.INSTANCE.setShouldDismissModalsOnOpenLink(false);
+   ```
+  </Tab>
+</Tabs>
+
+## Analytics
+
+The DevRev SDK allows you to send custom analytic events by using a name and a string dictionary. You can track these events using the following function:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.trackEvent(name: String, properties: HashMap<String, String>)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevAnalyticsExtKt.trackEvent(DevRev instance, String name, HashMap<String, String> properties);
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.trackEvent(name = "open-message-screen", properties = {"id": "message-1337"})
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevAnalyticsExtKt.trackEvent(DevRev.INSTANCE, "open-message-screen", new HashMap<>().put("id", "message-1337"));
+   ```
+  </Tab>
+</Tabs>
+
+## Session analytics
+
+The DevRev SDK provides observability features to help you understand how your users are interacting with your app.
+
+### Opt in or out
+
+Session analytics features are opted-in by default, enabling them from the start. However, you can opt-out using the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.stopAllMonitoring()
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.stopAllMonitoring(DevRev.INSTANCE);
+   ```
+  </Tab>
+</Tabs>
+
+To opt back in, use the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.resumeAllMonitoring()
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.resumeAllMonitoring(DevRev.INSTANCE);
+   ```
+  </Tab>
+</Tabs>
+
+You can check whether session monitoring has been enabled by using this property:
+
+If session recording was disabled for the user using the `stopAllMonitoring()` method, you can enable recording at runtime with this method.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.isMonitoringEnabled
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.isMonitoringEnabled(DevRev.INSTANCE);
+   ```
+  </Tab>
+</Tabs>
+
+If the user was disabled for session recording by using the stopAllMonitoring() method, you can use this method to enable recording at runtime.
+
+<Callout intent="note">
+This feature will only store a monitoring permission flag, it will **not** provide any UI or dialog.
+</Callout>
+
+### Session recording
+
+You can enable session recording to capture user interactions with your app.
+
+<Callout intent="note">
+The session recording feature is opt-out and is enabled by default.
+</Callout>
+
+Here are the available methods to help you control the session recording feature:
+
+|Action   |Kotlin (`DevRev`)    |Java (`DevRevObservabilityExtKt`)   |
+|---|---|---|
+|Starts the session recording.   |startRecording()   |startRecording(DevRev.INSTANCE, context);   |
+|Ends the session recording and uploads it to the portal.   |stopRecording()   |stopRecording(DevRev.INSTANCE);    |
+|Pauses the ongoing session recording.   |pauseRecording()   |pauseRecording(DevRev.INSTANCE);    |
+|Resumes a paused session recording.   |resumeRecording()   |resumeRecording(DevRev.INSTANCE);   |
+
+Using this property will return the status of the session recording:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.isRecording
+   ```    
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.isRecording(DevRev.INSTANCE);
+   ```    
+  </Tab>
+</Tabs>
+
+To check if on-demand sessions are enabled, use:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.areOnDemandSessionsEnabled
+   ```    
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.areOnDemandSessionsEnabled(DevRev.INSTANCE);
+   ```    
+  </Tab>
+</Tabs>
+
+### Session properties
+
+You can add custom properties to the session recording to help you understand the context of the session. The properties are defined as a dictionary of string values.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.addSessionProperties(properties: HashMap<String, Any>)
+   ```    
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.addSessionProperties(DevRev.INSTANCE, HashMap<String, Object> properties);
+   ```    
+  </Tab>
+</Tabs>
+
+To clear the session properties in scenarios such as user logout or when the session ends, use the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.clearSessionProperties()
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.clearSessionProperties(DevRev.INSTANCE);
+   ```
+  </Tab>
+</Tabs>
+
+### Masking sensitive data
+
+To protect sensitive data, the DevRev SDK provides an auto-masking feature that masks data before sending to the server. Input views such as text fields, text views, and web views are automatically masked.
+
+While the auto-masking feature may be sufficient for most situations, you can manually mark/unmark additional views as sensitive.
+
+#### Mask
+
+##### Using tag
+
+<Callout intent="note">
+Use Tag method only when you don't have any other tag already applied to your UI element.
+</Callout>
+
+```xml
+android:tag="devrev-mask"
+```
+
+For example:
+
+```xml
+<WebView
+    android:id="@+id/webview2"
+    android:layout_width="fill_parent"
+    android:layout_height="200dp"
+    android:background="@android:color/transparent"
+    android:tag="devrev-mask"/>
+```
+
+You can also set the tag programmatically:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val anyView: View = findViewById(R.id.anyView)
+   anyView.tag = "devrev-mask"
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   View anyView = findViewById(R.id.anyView);
+   anyView.setTag("devrev-mask");
+   ```
+  </Tab>
+</Tabs>
+
+
+##### Using API
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.markSensitiveViews(sensitiveViews: List<View>)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.markSensitiveViews(DevRev.INSTANCE, List<View> sensitiveViews);
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val view1 = findViewById(R.id.view1)
+   val view2 = findViewById(R.id.view2)
+
+   DevRev.markSensitiveViews(listOf(view1, view2))
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   View view1 = findViewById(R.id.view1);
+   View view2 = findViewById(R.id.view2);
+
+   List<View> sensitiveViewsList = new ArrayList<>();
+   sensitiveViewsList.add(view1);
+   sensitiveViewsList.add(view2);
+
+   DevRevObservabilityExtKt.markSensitiveViews(DevRev.INSTANCE, sensitiveViewsList);
+   ```
+  </Tab>
+</Tabs>
+
+#### Unmask
+
+##### Using tag
+
+<Callout intent="note">
+Use Tag method only when you don't have any other tag already applied to your UI element.
+</Callout>
+
+```xml
+android:tag="devrev-unmask"
+```
+
+For example:
+
+```xml
+<WebView
+    android:id="@+id/webview2"
+    android:layout_width="fill_parent"
+    android:layout_height="200dp"
+    android:background="@android:color/transparent"
+    android:tag="devrev-unmask"/>
+```
+
+You can also set the tag programmatically:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val anyView: View = findViewById(R.id.anyView)
+   anyView.tag = "devrev-unmask"
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   View anyView = findViewById(R.id.anyView);
+   anyView.setTag("devrev-unmask");
+   ```
+  </Tab>
+</Tabs>
+
+##### Using API
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.unmarkSensitiveViews(sensitiveViews: List<View>)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.unmarkSensitiveViews(DevRev.INSTANCE, List<View> sensitiveViews);
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val view1 = findViewById(R.id.view1)
+   val view2 = findViewById(R.id.view2)
+
+   DevRev.unmarkSensitiveViews(listOf(view1, view2))
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   View view1 = findViewById(R.id.view1);
+   View view2 = findViewById(R.id.view2);
+
+   List<View> sensitiveViewsList = new ArrayList<>();
+   sensitiveViewsList.add(view1);
+   sensitiveViewsList.add(view2);
+
+   DevRevObservabilityExtKt.unmarkSensitiveViews(DevRev.INSTANCE, sensitiveViewsList);
+   ```
+  </Tab>
+</Tabs>
+
+#### Mask jetpack compose views
+
+If you want to mask any Jetpack Compose UI element(s) or view(s), you can apply a mask on it using a modifier.
+
+```kotlin
+modifier = Modifier.markAsMaskedLocation("Name or ID of the Compose View")
+```
+
+For example:
+
+```kotlin
+TextField(
+       modifier = Modifier
+             .markAsMaskedLocation("myTextField")
+             .padding(horizontal = 20.dp)
+             .onGloballyPositioned { coordinates = it },
+       value = input,
+       onValueChange = { input = it }
+)
+```
+
+#### Mask webView elements
+
+If you wish to mask any WebView element on a Web page explicitly, you can mask it by using class 'devrev-mask'
+
+For example:
+
+```html
+<label class="devrev-mask">OTP: 12345</label>
+```
+
+#### Unmask webView elements
+If you wish to explicitly un-mask any manually masked WebView element, you can un-mask it by using class 'devrev-unmask'
+
+For example:
+
+```html
+<input type="text" placeholder="Enter Username" name="username" required class="devrev-unmask">
+```
+
+### Timers
+
+The DevRev SDK offers a timer mechanism to measure the time spent on specific tasks, allowing you to track events such as response time, loading time, or any other duration-based metrics.
+
+The mechanism works using balanced start and stop methods that both accept a timer name and an optional dictionary of properties.
+
+To start a timer, use the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+    ```kotlin
+   DevRev.startTimer(name: String, properties: HashMap<String, String>)
+   ```  
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.startTimer(DevRev.INSTANCE, String name, HashMap<String, String> properties);
+   ```    
+  </Tab>
+</Tabs>
+
+To stop a timer, use the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+    ```kotlin
+   DevRev.endTimer(name: String, properties: HashMap<String, String>)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.endTimer(DevRev.INSTANCE, String name, HashMap<String, String> properties);
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.startTimer("response-time", properties: {"id": "task-1337"})
+   
+   // Perform the task that you want to measure.
+   
+   DevRev.endTimer("response-time", properties: {"id": "task-1337"})
+   ``` 
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.startTimer(DevRev.INSTANCE, "response-time", new HashMap<String, String>().put("id", "task-1337"));
+   
+   // Perform the task that you want to measure.
+           
+   DevRevObservabilityExtKt.endTimer(DevRev.INSTANCE, "response-time", new HashMap<String, String>().put("id", "task-1337"));
+   ```
+  </Tab>
+</Tabs>
+
+### Screen tracking
+
+The DevRev SDK offers automatic screen tracking to help you understand how users navigate through your app. Although view controllers are automatically tracked, you can manually track screens using the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.trackScreenName(screenName: String)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.trackScreenName(DevRev.INSTANCE, String screenName);
+   ```
+  </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.trackScreenName("profile-screen")
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.trackScreenName(DevRev.INSTANCE, "profile-screen");
+   ```
+  </Tab>
+</Tabs>
+
+## Screen transition management
+
+The DevRev SDK allows tracking of screen transitions to understand user navigation within your app.
+You can check if a screen transition is in progress and manually update the state using the following methods:
+
+### Check if the screen is transitioning
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val isTransitioning = DevRev.isInScreenTransitioning
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   boolean isTransitioning = DevRevObservabilityExtKt.isInScreenTransitioning(DevRev.INSTANCE);
+   ```
+  </Tab>
+</Tabs>
+
+#### Set screen transitioning state
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.setInScreenTransitioning(true) // start transition
+   DevRev.setInScreenTransitioning(false) // stop transition
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRevObservabilityExtKt.setInScreenTransitioning(DevRev.INSTANCE, true) // Start transition
+   DevRevObservabilityExtKt.setInScreenTransitioning(DevRev.INSTANCE, false) //Stop transition
+   ```
+  </Tab>
+</Tabs>
+
+## Push notifications
+
+You can configure your app to receive push notifications from the DevRev SDK. The SDK is designed to handle push notifications and execute actions based on the notification's content.
+
+The DevRev backend sends push notifications to your app to notify users about new messages in the PLuG support chat.
+
+<Callout intent="note">
+To receive push notifications, you need to configure your DevRev organization by following the instructions in the [push notifications](../push-notification) section.
+
+You need to ensure that your Android app is configured to receive push notifications. To set it up, follow the [Firebase documentation](https://firebase.google.com/docs/cloud-messaging/android/client).
+</Callout>
+
+
+### Register for push notifications
+
+<Callout intent="note">
+Push notifications require that the SDK has been configured and the user has been identified (unverified and anonymous users). The user identification is required to send the push notification to the correct user.
+</Callout>
+
+The DevRev SDK offers a method to register your device for receiving push notifications. You can register for push notifications using the following method:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.registerDeviceToken(
+     context: Context,
+     deviceId: String,
+     deviceToken: String
+   )
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.registerDeviceToken(
+     Context context,
+     String deviceId,
+     String deviceToken
+   );
+   ```
+  </Tab>
+</Tabs>
+
+The method requires a device identifier that persists across device restarts and app launches. This could be a Firebase installation ID, Android ID, or a unique system identifier. To obtain the device token for Firebase Cloud Messaging, follow these steps:
+
+1. Use the `FirebaseMessaging` object.
+2. Call the `firebaseMessaging.token.await()` method.
+
+This method will generate and return the device token.
+
+   ```kotlin
+   val firebaseMessaging = FirebaseMessaging.getInstance()
+   val token = firebaseMessaging.token.await()
+   // Use the token as needed
+   ```
+
+### Unregister from push notifications
+
+If your app no longer needs to receive push notifications, you can unregister the device.
+
+Use the following method to unregister the device:
+
+The method requires the device identifier, which should be the same as the one used when registering the device.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.unregisterDevice(
+     context: Context, 
+     deviceId: String
+   )
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.unregisterDevice(
+     Context context, 
+     String deviceId
+   );
+   ```
+  </Tab>
+</Tabs>
+
+The method requires the device identifier, which should be the same as the one used when registering the device.
+
+### Handle push notifications
+
+The DevRev SDK currently does not support automatic handling of push notifications. To open the PLuG chat and manage navigation internally, you must pass the message payload received in the notification to the SDK.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.processPushNotification(
+       context: Context,
+       userInfo: String
+   )
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.processPushNotification(
+       Context context,
+       String userInfo
+   );
+   ```
+  </Tab>
+</Tabs>
+
+To extract the notification payload, do the following:
+
+1. In Firebase Cloud Messaging (FCM), when a push notification is received, it triggers the `onMessageReceived` function in your `FirebaseMessagingService` class.
+2. This function receives a `RemoteMessage` object as a parameter, which contains the notification data.
+3. The `RemoteMessage` object has a `data` property, which is a map containing key-value pairs of the notification payload.
+4. To extract a specific piece of data from the payload, use the key to access the value in the data map.
+5. To retrieve the "message" from the payload:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   val message = remoteMessage.data["message"]
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   String messageData = remoteMessage.getData().get("message");
+   ```
+ </Tab>
+</Tabs>
+
+For example:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   class MyFirebaseMessagingService: FirebaseMessagingService {
+       // ...
+     
+       override fun onMessageReceived(remoteMessage: RemoteMessage) {
+           // ...
+           val messageData = remoteMessage.data["message"]
+           DevRev.processPushNotification(messageData)
+       }
+   }
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   public class MyFirebaseMessagingService extends FirebaseMessagingService {
+       // ...
+   
+       @Override
+       public void onMessageReceived(RemoteMessage remoteMessage) {
+           // ...
+           String messageData = remoteMessage.getData().get("message");
+           DevRev.processPushNotification(messageData);
+       }
+   }
+   ```
+ </Tab>
+</Tabs>

@@ -1,0 +1,39 @@
+# Developer sample
+
+## Initialize
+
+Place the following code in the `<body>` section of your HTML page.
+
+```html
+<script>
+  window.plugSDK.init({
+    // Please ensure you replace the app_id with your unique app id
+    app_id: "<your_unique_app_id>",
+  });
+</script>
+```
+```jsx
+<script
+  type="text/javascript"
+  src="https://plug-platform.devrev.ai/static/plug.js"
+></script>;
+```
+```jsx
+useEffect(() => {
+  window.plugSDK.init({
+    // Please ensure you replace the app_id with your unique app id
+    app_id: "<your_unique_app_id>",
+  });
+}, []);
+```
+
+## Tracking user events
+
+To track user events through PLuG, employ the `trackEvent` method provided by the PLuG SDK.
+
+**trackEvent**
+
+```
+window.plugSDK.trackEvent(event_name, properties)
+
+```

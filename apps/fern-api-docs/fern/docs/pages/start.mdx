@@ -1,0 +1,184 @@
+In this tutorial, you'll learn to create and deploy a snap-in. Additionally, you'll learn to create a snap-in version, installing from a version, deploying, deleting and upgrading the snap-in.
+
+Snap-ins are collections of objects that extend DevRev's core platform value. These objects include automation, event sources, keyrings, custom types, and vistas. Snap-ins are packaged and installed separately from the DevRev core platform. To create your own snap-in, create a [dev org](https://app.devrev.ai/) where you will be installing your snap-in.
+
+<Steps>
+
+### Before you begin
+
+- Install [DevRev CLI](/snapin-development/references/cli-install)
+- Install [jq](https://stedolan.github.io/jq)
+
+### Log in to DevRev for authentication
+
+To authenticate, run the following command:
+
+```bash
+devrev profiles authenticate -o <dev-org-slug> -u <youremail@yourdomain.com>
+```
+
+### Initialize a snap-in template
+
+To initialize a snap-in template, run the following command:
+
+```bash
+devrev snap_in_version init
+```
+After the command runs, a new folder `devrev-snaps-typescript-template` is
+created in the filesystem.
+
+```
+devrev-snaps-typescript-template/
+├── code
+│   ├── babel.config.js
+│   ├── jest.config.js
+│   ├── nodemon.json
+│   ├── package.json
+│   ├── src
+│   │   ├── fixtures
+│   │   │   └── on_work_created_event.json
+│   │   ├── function-factory.ts
+│   │   ├── functions
+│   │   │   └── on_work_creation
+│   │   │       ├── index.test.ts
+│   │   │       └── index.ts
+│   │   ├── index.ts
+│   │   ├── main.ts
+│   │   └── test-runner
+│   │       ├── example.test.ts
+│   │       └── test-runner.ts
+│   ├── tsconfig.eslint.json
+│   └── tsconfig.json
+├── manifest.yaml
+└── README.md
+```
+
+The command creates a folder `devrev-snaps-typescript-template`. This contains a `manifest.yaml` file and a `code` folder.
+
+- `manifest` file defines the resources to be created on the DevRev platform. For detailed information on the various components of a manifest file, see [Snap-in Manifest](/snapin-development/references/manifest).
+- `code` folder consists of sample starter code for snap-ins. For detailed information on how to get started, see [starter example repo](https://github.com/devrev/snap-in-examples/tree/main/1-starter/code#readme).
+
+### Create a snap-in package
+
+To create a [snap-in package](/snapin-development/concepts), run the following command:
+
+```bash
+devrev snap_in_package create-one --slug my-first-snap-in | jq .
+```
+<Callout intent="note">
+1. The slug is globally unique. If the slug provided is already taken, a conflict error occurs. This can be resolved by provided a different slug.
+2. On successful creation, the CLI automatically stores the package ID in its context corresponding to the slug. For more information, refer to the [Snap-in Context](/snapin-development/references/cli#snap-in-context).
+</Callout>
+
+### Create a snap-in version
+
+To create a [snap-in version](/snapin-development/references/cli#snap-in-version), run the following command:
+
+```bash
+devrev snap_in_version create-one --path ./devrev-snaps-typescript-template
+```
+
+Output:
+
+```json
+{
+    "id":"don:integration:dvrv-us-1:devo/fOFb0IdZ:snap_in_package/972696ef-32cf-4ec0-81da-5a4a7804fa91:snap_in_version/52c058a9-7d68-4538-b70e-46efc7dfcd0d",
+    ...... ,
+    "state":"draft"
+}
+```
+<Callout intent="info">
+ The CLI automatically stores the version ID in its context. Refer to the [Snap-in Context](/snapin-development/references/cli#snap-in-context) section for more information.
+</Callout>
+
+In a package that's not published to the marketplace, you can have only one snap-in version. If you have an existing snap-in version in the package, the following error message is shown:
+
+```json
+{
+  "debug_message": "can't create a new snap_in_version under snap_in_package <ID> because there is already a non-published snap_in_version under it",
+  "message": "Bad Request",
+  "type": "bad_request"
+}
+```
+
+To list snap-in versions under the package, run the following command:
+
+```bash
+devrev snap_in_version list
+```
+
+To delete the snap-in version, run the following command:
+
+```bash
+devrev snap_in_version delete-one
+```
+
+### Install a snap-in from a snap-in version
+
+To create a snap-in from a snap-in version, run the following command:
+
+```bash
+devrev snap_in draft
+```
+
+<Callout intent="note">
+1. To install the snap-in, you must be a member of the **Admins** group in the dev org.
+2. If you get a `snap-in version is not ready` error, check the version state with `devrev snap_in_version show`. The state should be `ready` for installation. If `build_failed`, check the logs for errors.
+</Callout>
+
+<br />
+
+<Callout intent="info">
+The CLI automatically stores the snap-in ID in its context. Refer to the [Snap-in Context](/snapin-development/references/cli#snap-in-context) section for more information.
+</Callout>
+
+### Configure the snap-in
+
+The snap-in is installed in draft state. It may require some configuration before it can be deployed.
+
+You can access snap-in configuration by using the URL generated by the draft command, or by navigating to the snap-ins page in the DevRev app.
+
+Follow the configuration steps for the snap-in to setup keyrings and inputs if any.
+
+<Callout intent="info">
+Private keyrings from other creators aren't listed.
+</Callout>
+
+To make a connection available to other members in your organization, create it with the **visible to dev org** option set to true while creating the connection in the DevRev app.
+
+### Deploy the snap-in
+
+Once you have provided the required configuration, the **Deploy snap-in** button is enabled on the UI. Click on it to deploy the snap-in.
+That's it, the snap-in should now be active and ready to use.
+
+### Check snap-in logs
+
+To check the logs for the snap-in, run the following command:
+
+```bash
+devrev snap_in_package logs | jq
+```
+
+### Delete the snap-in
+
+The snap-in can be deleted from the UI or run the following command:
+
+```bash
+devrev snap_in delete-one [snap-in id]
+```
+
+If any deactivate hook is specified, it's invoked with `is_deletion=true`.
+
+### Upgrade the snap-in
+
+Once you deploy and test your snap-in, you may want to make changes to it. The changes can be done using a single command.
+
+```bash
+devrev snap_in_version upgrade --path ./
+```
+
+The above expects the manifest file to be present in the current directory by the name `manifest.yaml` and the code to be present in the `code` directory.
+
+Refer to [upgrade command](/snapin-development/upgrade-snap-ins) for more information.
+
+</Steps>

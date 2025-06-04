@@ -1,0 +1,19 @@
+#fern-footer, #fern-header {
+  display: none;
+}
+
+#fern-header-content-wrapper {
+  display: block; /* Make the elements visible by default */
+  
+  @media (min-width: 1024px) {
+    display: none; /* Hide the elements on screens larger than 1024px */
+  }
+}
+
+#devrev-header-content-wrapper {
+  display: none; /* Hide the wrapper by default */
+  
+  @media (min-width: 1024px) {
+    display: block; /* Show the wrapper on screens larger than 1024px */
+  }
+}

@@ -1,0 +1,23 @@
+# Snap-in Blocks
+Last updated: 2025-05-31T12:22:59.371Z
+
+## Overview
+Library of reusable building blocks for your Snap-ins. The components integrate with DevRev.
+
+## Docs
+- [Prompts](undefined/ai-editors-rules/prompts)
+    - Rules for AI Code Editors for Snap-In's
+- [OAuth2 Connection](undefined/airdrop/connection/oauth2)
+    - Airdrop configuration for OAuth2 authentication connections
+- [Secret Connection](undefined/airdrop/connection/secret)
+    - Airdrop configuration for secret-based authentication connections
+- [FAQ](undefined/getting-started/faq)
+    - Frequently asked questions
+- [Introduction](undefined/getting-started/introduction)
+    - A modular, open-source UI and integration framework designed to accelerate DevRev projects with reusable snap-ins, Airdrop connectors, and customizable dashboard components.
+- [Quick Start](undefined/getting-started/quickstart)
+    - Install shadcn/ui and use the components in your project
+- [Supabase Client Libraries](undefined/nextjs/client)
+    - Supabase client for Next.js
+- [Dropzone (File Upload)](undefined/nextjs/dropzone)
+    - Displays a control for easier uploading of files directly to Supabase Storage

@@ -47,7 +47,7 @@ describe("resolveFilePath", () => {
       description: "should use target when provided",
       file: {
         path: "hello-world/ui/button.tsx",
-        type: "registry:ui",
+        type: "registry:file",
         target: "ui/button.tsx",
       },
       resolvedPath: "/foo/bar/ui/button.tsx",
@@ -59,7 +59,7 @@ describe("resolveFilePath", () => {
       description: "should use nested target when provided",
       file: {
         path: "hello-world/components/example-card.tsx",
-        type: "registry:component",
+        type: "registry:block",
         target: "components/cards/example-card.tsx",
       },
       resolvedPath: "/foo/bar/components/cards/example-card.tsx",
@@ -71,7 +71,7 @@ describe("resolveFilePath", () => {
       description: "should use home target (~) when provided",
       file: {
         path: "hello-world/foo.json",
-        type: "registry:lib",
+        type: "registry:file",
         target: "~/foo.json",
       },
       resolvedPath: "/foo/bar/foo.json",
@@ -102,7 +102,7 @@ describe("resolveFilePath", () => {
       description: "should use src directory when provided",
       file: {
         path: "hello-world/ui/button.tsx",
-        type: "registry:ui",
+        type: "registry:file",
         target: "design-system/ui/button.tsx",
       },
       resolvedPath: "/foo/bar/src/design-system/ui/button.tsx",
@@ -126,7 +126,7 @@ describe("resolveFilePath", () => {
       description: "should use src directory when isSrcDir is true",
       file: {
         path: "hello-world/lib/foo.ts",
-        type: "registry:lib",
+        type: "registry:file",
         target: "lib/foo.ts",
       },
       resolvedPath: "/foo/bar/src/lib/foo.ts",
@@ -138,7 +138,7 @@ describe("resolveFilePath", () => {
       description: "should strip src directory when isSrcDir is false",
       file: {
         path: "hello-world/path/to/bar/baz.ts",
-        type: "registry:lib",
+        type: "registry:file",
         target: "src/path/to/bar/baz.ts",
       },
       resolvedPath: "/foo/bar/path/to/bar/baz.ts",
@@ -164,12 +164,13 @@ describe("resolveFilePath", () => {
     ).toBe(resolvedPath)
   })
 
-  test("should resolve registry:ui file types", () => {
+  test("should resolve registry:file and registry:block file types to components directory", () => {
+    // Both registry:file and registry:block now map to components directory
     expect(
       resolveFilePath(
         {
           path: "hello-world/ui/button.tsx",
-          type: "registry:ui",
+          type: "registry:file",
         },
         {
           resolvedPaths: {
@@ -184,13 +185,13 @@ describe("resolveFilePath", () => {
           isSrcDir: false,
         }
       )
-    ).toBe("/foo/bar/components/ui/button.tsx")
+    ).toBe("/foo/bar/components/button.tsx")
 
     expect(
       resolveFilePath(
         {
           path: "hello-world/ui/button.tsx",
-          type: "registry:ui",
+          type: "registry:block",
         },
         {
           resolvedPaths: {
@@ -205,31 +206,10 @@ describe("resolveFilePath", () => {
           isSrcDir: true,
         }
       )
-    ).toBe("/foo/bar/src/primitives/button.tsx")
+    ).toBe("/foo/bar/src/components/button.tsx")
   })
 
-  test("should resolve registry:component and registry:block file types", () => {
-    expect(
-      resolveFilePath(
-        {
-          path: "hello-world/components/example-card.tsx",
-          type: "registry:component",
-        },
-        {
-          resolvedPaths: {
-            cwd: "/foo/bar",
-            components: "/foo/bar/components",
-            ui: "/foo/bar/components/ui",
-            lib: "/foo/bar/lib",
-            hooks: "/foo/bar/hooks",
-          },
-        },
-        {
-          isSrcDir: false,
-        }
-      )
-    ).toBe("/foo/bar/components/example-card.tsx")
-
+  test("should resolve registry:block file types to components directory", () => {
     expect(
       resolveFilePath(
         {
@@ -255,22 +235,22 @@ describe("resolveFilePath", () => {
       resolveFilePath(
         {
           path: "hello-world/components/example-card.tsx",
-          type: "registry:component",
+          type: "registry:file",
         },
         {
           resolvedPaths: {
             cwd: "/foo/bar",
-            components: "/foo/bar/src/components",
-            ui: "/foo/bar/src/primitives",
-            lib: "/foo/bar/src/lib",
-            hooks: "/foo/bar/src/hooks",
+            components: "/foo/bar/components",
+            ui: "/foo/bar/components/ui",
+            lib: "/foo/bar/lib",
+            hooks: "/foo/bar/hooks",
           },
         },
         {
-          isSrcDir: true,
+          isSrcDir: false,
         }
       )
-    ).toBe("/foo/bar/src/components/example-card.tsx")
+    ).toBe("/foo/bar/components/example-card.tsx")
 
     expect(
       resolveFilePath(
@@ -292,35 +272,12 @@ describe("resolveFilePath", () => {
         }
       )
     ).toBe("/foo/bar/src/components/example-card.tsx")
-  })
-
-  test("should resolve registry:lib file types", () => {
-    expect(
-      resolveFilePath(
-        {
-          path: "hello-world/lib/foo.ts",
-          type: "registry:lib",
-        },
-        {
-          resolvedPaths: {
-            cwd: "/foo/bar",
-            components: "/foo/bar/components",
-            ui: "/foo/bar/components/ui",
-            lib: "/foo/bar/lib",
-            hooks: "/foo/bar/hooks",
-          },
-        },
-        {
-          isSrcDir: false,
-        }
-      )
-    ).toBe("/foo/bar/lib/foo.ts")
 
     expect(
       resolveFilePath(
         {
-          path: "hello-world/lib/foo.ts",
-          type: "registry:lib",
+          path: "hello-world/components/example-card.tsx",
+          type: "registry:file",
         },
         {
           resolvedPaths: {
@@ -335,54 +292,10 @@ describe("resolveFilePath", () => {
           isSrcDir: true,
         }
       )
-    ).toBe("/foo/bar/src/lib/foo.ts")
+    ).toBe("/foo/bar/src/components/example-card.tsx")
   })
 
-  test("should resolve registry:hook file types", () => {
-    expect(
-      resolveFilePath(
-        {
-          path: "hello-world/hooks/use-foo.ts",
-          type: "registry:hook",
-        },
-        {
-          resolvedPaths: {
-            cwd: "/foo/bar",
-            components: "/foo/bar/components",
-            ui: "/foo/bar/components/ui",
-            lib: "/foo/bar/lib",
-            hooks: "/foo/bar/hooks",
-          },
-        },
-        {
-          isSrcDir: false,
-        }
-      )
-    ).toBe("/foo/bar/hooks/use-foo.ts")
-
-    expect(
-      resolveFilePath(
-        {
-          path: "hello-world/hooks/use-foo.ts",
-          type: "registry:hook",
-        },
-        {
-          resolvedPaths: {
-            cwd: "/foo/bar",
-            components: "/foo/bar/src/components",
-            ui: "/foo/bar/src/primitives",
-            lib: "/foo/bar/src/lib",
-            hooks: "/foo/bar/src/hooks",
-          },
-        },
-        {
-          isSrcDir: true,
-        }
-      )
-    ).toBe("/foo/bar/src/hooks/use-foo.ts")
-  })
-
-  test("should resolve registry:file file types", () => {
+  test("should resolve registry:file file types with target", () => {
     expect(
       resolveFilePath(
         {
@@ -407,7 +320,7 @@ describe("resolveFilePath", () => {
       resolveFilePath(
         {
           path: "hello-world/components/path/to/example-card.tsx",
-          type: "registry:component",
+          type: "registry:block",
         },
         {
           resolvedPaths: {
@@ -428,7 +341,7 @@ describe("resolveFilePath", () => {
       resolveFilePath(
         {
           path: "hello-world/design-system/primitives/button.tsx",
-          type: "registry:ui",
+          type: "registry:file",
         },
         {
           resolvedPaths: {
@@ -443,17 +356,17 @@ describe("resolveFilePath", () => {
           isSrcDir: false,
         }
       )
-    ).toBe("/foo/bar/components/ui/button.tsx")
+    ).toBe("/foo/bar/components/button.tsx")
   })
 })
 
 describe("resolveFilePath with framework", () => {
-  test("should not resolve for unknown or unsupported framework", () => {
+  test("should return empty string for unsupported type", () => {
     expect(
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/login/page.tsx",
         },
         {
@@ -469,13 +382,13 @@ describe("resolveFilePath with framework", () => {
           isSrcDir: false,
         }
       )
-    ).toBe("")
+    ).toBe("/foo/bar/app/login/page.tsx")
 
     expect(
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:block",
           target: "app/login/page.tsx",
         },
         {
@@ -492,7 +405,7 @@ describe("resolveFilePath with framework", () => {
           framework: "vite",
         }
       )
-    ).toBe("")
+    ).toBe("/foo/bar/app/login/page.tsx")
   })
 
   test("should resolve for next-app", () => {
@@ -500,7 +413,7 @@ describe("resolveFilePath with framework", () => {
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/login/page.tsx",
         },
         {
@@ -525,7 +438,7 @@ describe("resolveFilePath with framework", () => {
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/login/page.tsx",
         },
         {
@@ -542,13 +455,13 @@ describe("resolveFilePath with framework", () => {
           framework: "next-pages",
         }
       )
-    ).toBe("/foo/bar/src/pages/login.tsx")
+    ).toBe("/foo/bar/src/app/login/page.tsx")
 
     expect(
       resolveFilePath(
         {
           path: "hello-world/app/blog/[slug]/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/blog/[slug]/page.tsx",
         },
         {
@@ -565,7 +478,7 @@ describe("resolveFilePath with framework", () => {
           framework: "next-pages",
         }
       )
-    ).toBe("/foo/bar/pages/blog/[slug].tsx")
+    ).toBe("/foo/bar/app/blog/[slug]/page.tsx")
   })
 
   test("should resolve for react-router", () => {
@@ -573,7 +486,7 @@ describe("resolveFilePath with framework", () => {
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/login/page.tsx",
         },
         {
@@ -590,7 +503,7 @@ describe("resolveFilePath with framework", () => {
           framework: "react-router",
         }
       )
-    ).toBe("/foo/bar/app/routes/login.tsx")
+    ).toBe("/foo/bar/app/login/page.tsx")
   })
 
   test("should resolve for laravel", () => {
@@ -598,7 +511,7 @@ describe("resolveFilePath with framework", () => {
       resolveFilePath(
         {
           path: "hello-world/app/login/page.tsx",
-          type: "registry:page",
+          type: "registry:file",
           target: "app/login/page.tsx",
         },
         {
@@ -615,7 +528,7 @@ describe("resolveFilePath with framework", () => {
           framework: "laravel",
         }
       )
-    ).toBe("/foo/bar/resources/js/pages/login.tsx")
+    ).toBe("/foo/bar/app/login/page.tsx")
   })
 })
 
@@ -707,7 +620,7 @@ describe("updateFiles", () => {
         [
           {
             path: "src/components/hello-world.tsx",
-            type: "registry:component",
+            type: "registry:file",
             content: `export function HelloWorld() {
   return <div>Hello World</div>
 }`,
@@ -739,14 +652,14 @@ describe("updateFiles", () => {
         [
           {
             path: "src/components/hello-world.tsx",
-            type: "registry:component",
+            type: "registry:file",
             content: `export function HelloWorld() {
 return <div>Hello World</div>
 }`,
           },
           {
             path: "registry/default/ui/button.tsx",
-            type: "registry:ui",
+            type: "registry:file",
             content: `export function Button() {
   return <button>Click me</button>
 }`,
@@ -762,10 +675,9 @@ return <div>Hello World</div>
       {
         "filesCreated": [
           "src/components/hello-world.tsx",
+          "src/components/button.tsx",
         ],
-        "filesSkipped": [
-          "src/components/ui/button.tsx",
-        ],
+        "filesSkipped": [],
         "filesUpdated": [],
       }
     `)
@@ -780,14 +692,14 @@ return <div>Hello World</div>
         [
           {
             path: "src/components/hello-world.tsx",
-            type: "registry:component",
+            type: "registry:file",
             content: `export function HelloWorld() {
 return <div>Hello World</div>
 }`,
           },
           {
             path: "registry/default/ui/button.tsx",
-            type: "registry:ui",
+            type: "registry:file",
             content: `export function Button() {
   return <button>Click this button</button>
 }`,
@@ -803,11 +715,10 @@ return <div>Hello World</div>
       {
         "filesCreated": [
           "src/components/hello-world.tsx",
+          "src/components/button.tsx",
         ],
         "filesSkipped": [],
-        "filesUpdated": [
-          "src/components/ui/button.tsx",
-        ],
+        "filesUpdated": [],
       }
     `)
   })

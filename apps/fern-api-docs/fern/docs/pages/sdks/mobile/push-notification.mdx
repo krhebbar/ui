@@ -1,0 +1,42 @@
+This section describes the process of setting up push notifications within the DevRev SDK. By completing this setup, users of your mobile app's support chat receive notifications whenever a DevRev customer experience engineer responds.
+
+## Configuration
+
+<Info>
+**Prerequisites**
+
+- Apple Developer Program access for iOS apps.
+- Google Developer Account and Firebase project access for iOS apps.
+- Admin access to DevRev PLuG settings.
+- Access to Bundle ID, Team ID, and APNs/FCM keys.
+- Mobile SDK integration with your Android or iOS app.
+</Info>
+
+1. Go to **Settings** > **Support** > **PLuG settings** > **Mobile push notifications**.
+
+2. Click **+ Configure app** and select either **iOS App** or **Android App** based on your target platform.
+
+3. Fill in the configuration form.
+   
+    <AccordionGroup>
+        <Accordion title="iOS configuration">
+
+            - **App name**: Your iOS app's name.
+            - **Bundle ID**: The app's unique identifier in reverse domain notation, such as, `com.example.app`. Refer to [Apple's documentation](https://developer.apple.com/documentation/appstoreconnectapi/bundle_ids) to confirm your bundle ID.
+            - **Apple Team ID**: The 10-character Apple Team ID assigned to your organization. Details are available in [Apple's Team ID documentation](https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/).
+            - **Key ID**: The ID for your APNs auth key. See [Apple's Key ID documentation](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns) for further instructions.
+            - **Upload APNs Auth Key**: The `.p8` APNs auth key file (maximum size: 10 MB).
+            - **Sandbox Environment**: Check this for development environments to enable notifications in debug builds.
+        </Accordion>
+        <Accordion title="Android configuration">
+            - **App name**: Your Android app's name.
+            - **Bundle ID**: Your app's unique identifier in reverse domain notation, such as, `com.example.app`. Refer to [Google’s documentation](https://developer.android.com/studio/build/application-id) to confirm your bundle ID.
+            - **Upload Service Account Key**: A Service Account Key JSON file (up to 10 MB) generated via Google Cloud for Firebase Cloud Messaging (FCM). Create this key following [Google’s documentation](https://firebase.google.com/docs/).
+        </Accordion>
+    </AccordionGroup>
+
+    Click **Save App** to complete the setup.
+
+4. Click **Save and Publish** to activate push notifications in your DevRev SDK.
+
+For additional support or inquiries, refer to the latest [Apple developer documentation](https://developer.apple.com/) and [Android developer documentation](https://developer.android.com/) as guidelines may change.

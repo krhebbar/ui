@@ -1,7 +1,6 @@
 import { existsSync, promises as fs } from "fs"
 import { tmpdir } from "os"
 import path, { basename } from "path"
-import { getRegistryBaseColor } from "@/src/registry/api"
 import { RegistryItem, registryItemFileSchema } from "@/src/registry/schema"
 import { Config } from "@/src/utils/get-config"
 import { ProjectInfo, getProjectInfo } from "@/src/utils/get-project-info"
@@ -10,11 +9,7 @@ import { logger } from "@/src/utils/logger"
 import { resolveImport } from "@/src/utils/resolve-import"
 import { spinner } from "@/src/utils/spinner"
 import { transform } from "@/src/utils/transformers"
-import { transformCssVars } from "@/src/utils/transformers/transform-css-vars"
-import { transformIcons } from "@/src/utils/transformers/transform-icons"
 import { transformImport } from "@/src/utils/transformers/transform-import"
-import { transformRsc } from "@/src/utils/transformers/transform-rsc"
-import { transformTwPrefixes } from "@/src/utils/transformers/transform-tw-prefix"
 import prompts from "prompts"
 import { Project, ScriptKind } from "ts-morph"
 import { loadConfig } from "tsconfig-paths"
@@ -49,10 +44,7 @@ export async function updateFiles(
     silent: options.silent,
   })?.start()
 
-  const [projectInfo, baseColor] = await Promise.all([
-    getProjectInfo(config.resolvedPaths.cwd),
-    getRegistryBaseColor(config.tailwind.baseColor),
-  ])
+  const projectInfo = await getProjectInfo(config.resolvedPaths.cwd)
 
   let filesCreated: string[] = []
   let filesUpdated: string[] = []
@@ -63,14 +55,7 @@ export async function updateFiles(
       continue
     }
 
-    let filePath = resolveFilePath(file, config, {
-      isSrcDir: projectInfo?.isSrcDir,
-      framework: projectInfo?.framework.name,
-      commonRoot: findCommonRoot(
-        files.map((f) => f.path),
-        file.path
-      ),
-    })
+    let filePath = resolveFilePath(file, config, {})
 
     if (!filePath) {
       continue
@@ -93,16 +78,9 @@ export async function updateFiles(
         filename: file.path,
         raw: file.content,
         config,
-        baseColor,
-        transformJsx: !config.tsx,
-        isRemote: options.isRemote,
       },
       [
         transformImport,
-        transformRsc,
-        transformCssVars,
-        transformTwPrefixes,
-        transformIcons,
       ]
     )
 
@@ -238,9 +216,7 @@ export function resolveFilePath(
   file: z.infer<typeof registryItemFileSchema>,
   config: Config,
   options: {
-    isSrcDir?: boolean
     commonRoot?: string
-    framework?: ProjectInfo["framework"]["name"]
   }
 ) {
   if (file.target) {
@@ -250,16 +226,7 @@ export function resolveFilePath(
 
     let target = file.target
 
-    if (file.type === "registry:page") {
-      target = resolvePageTarget(target, options.framework)
-      if (!target) {
-        return ""
-      }
-    }
-
-    return options.isSrcDir
-      ? path.join(config.resolvedPaths.cwd, "src", target.replace("src/", ""))
-      : path.join(config.resolvedPaths.cwd, target.replace("src/", ""))
+    return path.join(config.resolvedPaths.cwd, target.replace("src/", ""))
   }
 
   const targetDir = resolveFileTargetDirectory(file, config)
@@ -272,20 +239,13 @@ function resolveFileTargetDirectory(
   file: z.infer<typeof registryItemFileSchema>,
   config: Config
 ) {
-  if (file.type === "registry:ui") {
-    return config.resolvedPaths.ui
-  }
-
-  if (file.type === "registry:lib") {
-    return config.resolvedPaths.lib
-  }
-
-  if (file.type === "registry:block" || file.type === "registry:component") {
+  // Updated to use only valid schema types
+  if (file.type === "registry:block") {
     return config.resolvedPaths.components
   }
 
-  if (file.type === "registry:hook") {
-    return config.resolvedPaths.hooks
+  if (file.type === "registry:file") {
+    return config.resolvedPaths.components
   }
 
   return config.resolvedPaths.components
@@ -356,7 +316,7 @@ export async function getNormalizedFileContent(content: string) {
 
 export function resolvePageTarget(
   target: string,
-  framework?: ProjectInfo["framework"]["name"]
+  framework?: string
 ) {
   if (!framework) {
     return ""
@@ -412,7 +372,7 @@ async function resolveImports(filePaths: string[], config: Config) {
 
     const content = await fs.readFile(resolvedPath, "utf-8")
 
-    const dir = await fs.mkdtemp(path.join(tmpdir(), "shadcn-"))
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "airdrop-"))
     const sourceFile = project.createSourceFile(
       path.join(dir, basename(resolvedPath)),
       content,
@@ -494,7 +454,7 @@ export function resolveModuleByProbablePath(
   probableImportFilePath: string,
   files: string[],
   config: Config,
-  extensions: string[] = [".tsx", ".ts", ".js", ".jsx", ".css"]
+  extensions: string[] = [".ts", ".js"]
 ) {
   const cwd = path.normalize(config.resolvedPaths.cwd)
 

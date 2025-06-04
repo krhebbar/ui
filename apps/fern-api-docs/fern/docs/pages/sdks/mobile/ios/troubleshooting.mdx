@@ -1,0 +1,13 @@
+# Troubleshooting
+
+- **Issue**: Can't import the SDK into my app.   
+	**Solution**: Double-check the setup process and ensure that `DevRevSDK` is correctly linked to your application.
+
+- **Issue**: How does the DevRev SDK handle errors?   
+	**Solution**: The DevRev SDK reports all errors in the console using Apple's Unified Logging System. Look for error messages in the subsystem `ai.devrev.sdk`.
+
+- **Issue**: Support chat won't show.   
+	**Solution**: Ensure you have correctly called one of the identification methods: `DevRev.identifyUnverifiedUser(...)` or `DevRev.identifyAnonymousUser(...)`.
+
+- **Issue**: Not receiving push notifications.   
+	**Solution**: Ensure that your app is configured to receive push notifications and that your device is registered with the DevRev SDK.

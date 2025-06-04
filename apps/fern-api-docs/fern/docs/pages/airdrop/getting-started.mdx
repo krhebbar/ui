@@ -1,0 +1,104 @@
+Before starting snap-in development, it's important to understand these fundamental terms and concepts,
+as well as the capabilities and limitations of the external system being integrated.
+
+## DevRev organization
+
+If this is your first time setting up an organization within DevRev, you need to create a
+DevRev organization for developing your new Airdrop snap-in:
+
+1. Click on your profile picture in the top left corner.
+2. Go to the **Orgs** section and click on **+**.
+3. Fill in the necessary details and click **Create**.
+
+You now find your newly created organization under **Orgs**.
+
+## External system
+
+Before starting the development of a snap-in for integration with an external system API,
+consider gathering the following information:
+
+- **API documentation**: Obtain the official API documentation of the external system.
+  This is the primary source of information about how to connect and interact with the system.
+- **Authentication and authorization**: Understand the authentication and authorization
+  methods required. This may include API keys, OAuth tokens, or other security mechanisms.
+- **Endpoints and resources**: Identify the required API endpoints and resources. Understand
+  their functions, input parameters, expected outputs, and usage limitations.
+- **Data format**: Determine the data format used by the API, such as JSON or XML. This helps
+  in parsing responses and formatting requests appropriately.
+- **Rate limits and quotas**: Be aware of any rate limits or usage quotas. This information is
+  crucial to ensure that the integration does not exceed allowed requests or data usage.
+- **Error handling**: Learn about error response formats and codes. Knowing this helps in
+  handling errors and exceptions in your integration.
+
+## Basic concepts
+
+### Sync unit
+
+A _sync unit_ is one self-encompassing unit of data that is synced to an external system. For example:
+- A project in Jira.
+- An account in SalesForce.
+- An organization Zendesk.
+
+In Jira, users often have multiple projects. Each project acts as an individual sync unit. 
+In contrast, Zendesk operates with a single large pool of tickets and agents. Here, the entire Zendesk instance can be synced in a single airdrop.
+
+### Sync run
+
+Airdrop extractions are done in _sync runs_.
+A sync run is one end-to-end (extract-transform-load) execution of a _sync unit_.
+If you do an initial import from the external system to DevRev, that import will be one sync run.
+Another import in the same direction is another sync run.
+And if you then decide to do a reverse sync from DevRev to the external system, that would be another
+sync run.
+
+Each sync run is comprised out of phases.
+Phases follow sequentially, and each can consist of one or more invocations of the snap-in.
+
+### Forward sync
+
+A _forward sync_ is a sync run from an external system to DevRev.
+An **extractor** function in the snap-in is responsible for extracting data from the external system.
+
+### Reverse sync
+
+A _reverse sync_ is a sync run from DevRev to an external system.
+It uses a **loader** function, to create or update data in the external system.
+
+### Initial sync
+
+The first sync is called the _initial sync_.
+It is triggered manually by the end user in DevRev's **Airdrops** UI.
+
+During the initial sync, all data from the external sync unit is extracted from the external system and loaded into DevRev. 
+This process typically involves a large import and may take some time.
+
+An _initial import_ consists of the following phases:
+
+1. External sync units extraction
+2. Metadata extraction
+3. Data extraction
+4. Attachments extraction
+
+### 1-way (incremental sync)
+
+A _1-way sync_ (or _incremental sync_) refers to any extraction after the initial sync run has been successfully completed.
+
+An extractor extracts data that was created or updated in the external system after the start
+of the latest successful forward sync.
+This includes any changes that happened after the start of the previous sync, but were not picked up by it.
+
+A 1-way sync consists of the following phases:
+
+1. Metadata extraction
+2. Data extraction
+3. Attachments extraction
+
+### 2-way sync
+
+A _2-way sync_ is a reverse sync.
+The loader receives information about changes in DevRev since the last successful reverse sync and updates the data in the external system.
+
+A 2-way sync consists of the following phases:
+
+1. Data loading
+2. Attachments loading

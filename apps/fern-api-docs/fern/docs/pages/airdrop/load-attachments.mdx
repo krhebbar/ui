@@ -1,0 +1,44 @@
+In the load attachments phase, the snap-in saves each attachment to the external system.
+
+## Triggering event
+
+Airdrop initiates data loading by sending a message with the event type `START_LOADING_ATTACHMENTS` to the snap-in.
+
+If the maximum Airdrop snap-in runtime (13 minutes) has been reached, 
+the snap-in must respond to Airdrop with a message with event type of `ATTACHMENT_LOADING_PROGRESS`, together with an optional progress estimate.
+
+In case of `ATTACHMENT_LOADING_PROGRESS`, Airdrop starts the snap-in with a message with event type `CONTINUE_LOADING_ATTACHMENTS`.
+
+Once the data extraction is done, the snap-in must respond to Airdrop with a message with event type `ATTACHMENT_LOADING_DONE`.
+
+## Implementation
+
+This phase is defined in [load-attachments.ts](https://github.com/devrev/airdrop-template/blob/main/code/src/functions/loading/workers/load-attachments.ts). 
+
+The loading process involves providing the `create` function to add attachments to the external system. The `create` function is responsible for making API calls to the external system to create the attachments, as well as handling errors and the external system's rate limiting. The function should return the `id` and optionally `modifiedDate` of the record in the external system or indicates a rate-limiting back-off or logs errors if the attachment could not be created.
+
+**The snap-in must always emit a single message.**
+
+```typescript
+processTask<LoaderState>({
+  task: async ({ adapter }) => {
+    const { reports, processed_files } = await adapter.loadAttachments({
+      create: createAttachment,
+    });
+
+    await adapter.emit(LoaderEventType.AttachmentLoadingDone, {
+      reports,
+      processed_files,
+    });
+  },
+  onTimeout: async ({ adapter }) => {
+    await adapter.emit(LoaderEventType.AttachmentLoadingProgress, {
+      reports: adapter.reports,
+      processed_files: adapter.processedFiles,
+    });
+  },
+});
+```
+
+
+

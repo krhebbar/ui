@@ -1,97 +1,59 @@
-import * as fs from "fs/promises"
-import * as path from "path"
-import { preFlightBuild } from "@/src/preflights/preflight-build"
-import { registryItemSchema, registrySchema } from "@/src/registry"
-import { handleError } from "@/src/utils/handle-error"
-import { highlighter } from "@/src/utils/highlighter"
-import { logger } from "@/src/utils/logger"
-import { spinner } from "@/src/utils/spinner"
-import { Command } from "commander"
-import { z } from "zod"
-
-export const buildOptionsSchema = z.object({
-  cwd: z.string(),
-  registryFile: z.string(),
-  outputDir: z.string(),
-})
+import { Command } from "commander";
+import { logger } from "@/src/utils/logger"; // Adjust path
+import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
+import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
+import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
+import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
 
 export const build = new Command()
   .name("build")
-  .description("build components for a shadcn registry")
-  .argument("[registry]", "path to registry.json file", "./registry.json")
-  .option(
-    "-o, --output <path>",
-    "destination directory for json files",
-    "./public/r"
-  )
-  .option(
-    "-c, --cwd <cwd>",
-    "the working directory. defaults to the current directory.",
-    process.cwd()
-  )
-  .action(async (registry: string, opts) => {
-    try {
-      const options = buildOptionsSchema.parse({
-        cwd: path.resolve(opts.cwd),
-        registryFile: registry,
-        outputDir: opts.output,
-      })
+  .description("Perform a local build of your Airdrop project or Snap-in.")
+  .action(async (options) => {
+    logger.info(`Running ${CLI_NAME} build...`);
+    logger.break();
 
-      const { resolvePaths } = await preFlightBuild(options)
-      const content = await fs.readFile(resolvePaths.registryFile, "utf-8")
+    const projectValidationCwd = process.cwd();
+    const projectInfo: ValidationProjectInfo = await getAirdropProjectValidation(projectValidationCwd);
 
-      const result = registrySchema.safeParse(JSON.parse(content))
-
-      if (!result.success) {
-        logger.error(
-          `Invalid registry file found at ${highlighter.info(
-            resolvePaths.registryFile
-          )}.`
-        )
-        process.exit(1)
-      }
-
-      const buildSpinner = spinner("Building registry...")
-      for (const registryItem of result.data.items) {
-        if (!registryItem.files) {
-          continue
-        }
-
-        buildSpinner.start(`Building ${registryItem.name}...`)
-
-        // Add the schema to the registry item.
-        registryItem["$schema"] =
-          "https://ui.shadcn.com/schema/registry-item.json"
-
-        // Loop through each file in the files array.
-        for (const file of registryItem.files) {
-          file["content"] = await fs.readFile(
-            path.resolve(resolvePaths.cwd, file.path),
-            "utf-8"
-          )
-        }
-
-        // Validate the registry item.
-        const result = registryItemSchema.safeParse(registryItem)
-        if (!result.success) {
-          logger.error(
-            `Invalid registry item found for ${highlighter.info(
-              registryItem.name
-            )}.`
-          )
-          continue
-        }
-
-        // Write the registry item to the output directory.
-        await fs.writeFile(
-          path.resolve(resolvePaths.outputDir, `${result.data.name}.json`),
-          JSON.stringify(result.data, null, 2)
-        )
-      }
-
-      buildSpinner.succeed("Building registry.")
-    } catch (error) {
-      logger.break()
-      handleError(error)
+    if (!projectInfo.isValid || !projectInfo.rootPath) {
+      logger.error("Failed to validate project or project root not found.");
+      projectInfo.reasons.forEach(reason => logger.error(`- ${reason}`));
+      logger.info(`Please ensure you are in a valid Airdrop project or run '${CLI_NAME} doctor' for diagnostics.`);
+      process.exit(1);
     }
-  })
+
+    if (projectInfo.isAtRoot === false) {
+        logger.warn(`You are running '${CLI_NAME} build' from a subdirectory. Executing in the context of the project root: ${projectInfo.rootPath}`);
+        // Ensure build scripts are run from projectInfo.rootPath
+    }
+
+    logger.info(`Project root identified at: ${projectInfo.rootPath}`);
+
+    // Attempt to load airdrop.config.mjs
+    try {
+      const airdropConfig = await getConfig(projectInfo.rootPath);
+      if (!airdropConfig) {
+        logger.error("Failed to load airdrop.config.mjs. This file might be needed for build configurations.");
+        // Decide if this is a fatal error for build; for now, just a warning
+        logger.warn("Continuing build without airdrop.config.mjs, but it might be required.");
+      } else {
+        logger.info("Successfully loaded airdrop.config.mjs.");
+        // You can now use airdropConfig if needed by the build logic
+      }
+    } catch (e: any) {
+      logger.error(`Error loading airdrop.config.mjs: ${e.message}`);
+      // Decide if this is fatal; for now, just a warning
+      logger.warn("Continuing build despite error loading airdrop.config.mjs, but it might be required.");
+    }
+
+    logger.info(COMMAND_PLACEHOLDERS.build);
+    logger.break();
+    logger.info("This is a stub command. Actual build functionality will be implemented here.");
+    logger.info("For example, this might involve running a bundler (like tsc, esbuild, webpack) and creating a distributable archive.");
+
+    // Future implementation:
+    // - Read build scripts from package.json or airdrop.config.mjs
+    // - Execute build commands (e.g., `npm run build` or custom bundling logic)
+    // - Output artifacts to a 'dist' or 'build' folder
+    // - Create a compressed archive (e.g., .zip or .tar.gz) for release
+  });

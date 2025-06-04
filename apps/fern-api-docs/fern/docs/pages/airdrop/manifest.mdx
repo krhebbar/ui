@@ -1,0 +1,118 @@
+Start developing your snap-in with a `manifest.yaml` file. The manifest defines the snap-in's configuration, including its name, description, version, connection details, and functionality.
+
+Begin by setting the values for `name` and `description` in the template.
+
+```yaml
+name: Template Connector
+description: Template Connector for importing dummy data into DevRev
+```
+
+### Set snap-in functionalities
+
+DevRev supports creating snap-ins for importing data from an external system into DevRev (_extraction_) and exporting data from DevRev to an external system (_loading_). Implementing the extraction functionality is essential, while loading is optional.
+
+To define the functionalities, review the `functions` section in the manifest.
+
+```yaml
+functions:
+  - name: extraction
+    description: Extraction function for the template snap-in
+  - name: loading
+    description: Loading function for the template snap-in
+```
+
+If loading is not implemented, remove it from the list. This action also removes the option from the DevRev app.
+
+Check the `imports` section next.
+
+```yaml
+imports:
+  - slug: airdrop-template-snap-in
+    display_name: Template Connector
+    description: Template Connector for importing data into DevRev
+    extractor_function: extraction
+    loader_function: loading
+    allowed_connection_types:
+      - example-connection
+```
+
+Update the `slug`, `display_name`, and `description` to match your snap-in.
+
+If loading is not used, remove `loader_function`.
+
+Ensure that `extractor_function` and `loader_function` names correspond with those in the `functions` section.
+
+## Establish a connection to the external system
+
+_Keyrings_ provide a secure way to store and manage credentials within your DevRev snap-in. 
+
+Keyrings are a collection of authentication information, used by a snap-in to authenticate to the external system in API calls. 
+This can include a key (for example, a PAT token or API key), its type and the organization ID for which a key is valid.
+
+This eliminates the need to expose sensitive information like passwords or access tokens directly within your code or configuration files. They also provide a valid token by abstracting OAuth token renewal from the end user, so less work is needed on the developer's side.
+
+Keyrings are called **Connections** in the DevRev app.
+
+### Configure a keyring
+
+Keyrings are configured in the `manifest.yaml` by configuring a `keyring_type`, like in the [example](https://github.com/devrev/airdrop-template/blob/main/manifest.yaml):
+
+```yaml
+keyring_types:
+  - id: <id of the keyring type>
+    name: <name of the keyring type>
+    description: <description of the keyring type>
+    # The kind field specifies the type of keyring.
+    kind: <"secret"/"oauth2">
+    # is_subdomain field specifies whether the keyring contains a subdomain.
+    # Enabling this field allows the keyring to get the subdomain from the user during keyring creation.
+    # Default is false.
+    is_subdomain: <true/false>
+    # Name of the external system you are importing from.
+    # This system name should start with a capital letter.
+    external_system_name: <External system name>
+    secret_config:
+      # Define the fields in the secret.
+      # Each element represents one input field.
+      # User will provide this information when creating the connection in the UI.
+      # If omitted, the user will be asked for a generic secret.
+      fields:
+        - id: <field_id>
+          name: <field_name>
+          description: <field_description>
+          is_optional: <true/false> # optional: whether the field is optional or not. Default is false.
+      # The token_verification section is used to verify the token provided by the user.
+      token_verification:
+        # The URL to which the token will be sent for verification.
+        url: <url>
+        # The HTTP method to be used for the verification request.
+        method: <method> # The HTTP method to be used for the verification request.
+        # Optional: headers to be included in the verification request.
+        headers:
+          <header_name>: <header_value>
+        # Optional: query parameters to be included in the verification request.
+        query_params:
+          <param_name>: <param_value> # optional: query parameters to be included in the verification request.
+      # The organization_data section takes care of fetching organization data and is required if is_subdomain option is false.
+      organization_data:
+        type: "config"
+        # The URL to which the request is sent to fetch organization data.
+        url: <url>
+        # The HTTP method used to send the request.
+        method: "GET"
+        headers:
+          <header_name>: <header_value>
+        # The jq filter used to extract the organization data from the response.
+        # It should provide an object with id and name, depending on what the external system returns.
+        # For example "{id: .data[0].id, name: .data[0].name }".
+        response_jq: <jq_filter>
+```
+There are some options to consider:
+
+* `kind`  
+  The `kind` option can be either "secret" or "oauth2". The "secret" option is intended for storing various tokens, such as a PAT token. Use of OAuth2 is encouraged when possible. More information is available for [secret](/public/snapin-development/references/keyrings/secret-configuration) and [oauth2](/oauth-configuration).
+
+* `is_subdomain`  
+  The `is_subdomain` field relates to the API endpoints being called. When the endpoints for fetching data from an external system include a slug representing the organization—such as for example `https://subdomain.freshdesk.com/api/v2/tickets`—set this key to "true". In this scenario, users creating a new connection are prompted to insert the subdomain.
+
+  If no subdomain is present in the endpoint URL, set this key to "false". In this case, provide the `organization_data` part of the configuration. Specify the endpoint in the `url` field to fetch organization data. Users creating a new connection are prompted to select the organization from a list of options, as retrieved from the `organization_data.url` value.

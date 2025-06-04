@@ -1,0 +1,349 @@
+navigation:
+  - section: About
+    contents:
+      - page: For Developers
+        path: ../docs/pages/developer-intro.mdx
+      - page: Authentication
+        path: ../docs/pages/authentication.mdx
+      - page: Pagination
+        path: ../docs/pages/pagination.mdx
+      - page: Versioning
+        path: ../docs/pages/versioning.mdx
+      - page: Rate Limits
+        path: ../docs/pages/rate-limits.mdx
+      - page: Errors
+        path: ../docs/pages/responses.mdx
+  - api: API Reference
+    api-name: public
+    audiences:
+      - docs
+    layout:
+      - page: Getting started
+        path: ../docs/pages/welcome.mdx
+      - artifacts:
+          - page: Attachments
+            path: ../docs/pages/entities/artifacts.mdx
+      - auth-connections:
+          - page: Identity provider
+            path: ../docs/pages/entities/identity.mdx
+      - auth-tokens:
+          - page: Security tokens
+            path: ../docs/pages/entities/security-token.mdx
+      - dev-users:
+          - page: Product builders and service providers
+            path: ../docs/pages/entities/dev-users.mdx
+      - parts:
+          - page: Product components
+            path: ../docs/pages/entities/parts.mdx
+      - rev-orgs:
+          - page: Workspaces
+            path: ../docs/pages/entities/revorgs.mdx
+      - tags:
+          - page: Concepts
+            path: ../docs/pages/entities/tags.mdx
+      - timeline-entries:
+          - page: Discussions and events
+            path: ../docs/pages/entities/timeline.mdx
+      - webhooks:
+          - page: Event responses
+            path: ../docs/pages/entities/webhooks.mdx
+      - works:
+          - page: Tickets and issues
+            path: ../docs/pages/entities/works.mdx
+      - accounts:
+          - page: Accounts
+            path: ../docs/pages/entities/accounts.mdx
+      - slas:
+          - page: Service level agreement
+            path: ../docs/pages/entities/sla.mdx
+    paginated: true
+  - changelog: ../apis/public/changelog
+    title: Changelog
+  - section: Guides
+    slug: guides
+    contents:
+      - page: Webhooks
+        slug: webhooks
+        path: ../docs/pages/webhooks.mdx
+      - page: Restricted messages on a timeline
+        slug: timeline-entries
+        path: ../docs/pages/timeline-entries.mdx
+  - section: SDKs
+    slug: sdks
+    path: ../docs/pages/sdks/index.mdx
+    contents:
+      - section: PLuG Web SDK
+        slug: web
+        icon: fa-globe
+        contents:
+          - page: Install the Web SDK
+            slug: installation
+            path: ../docs/pages/sdks/web/install.mdx
+          - page: Install PLuG search
+            slug: install-search
+            path: ../docs/pages/sdks/web/search.mdx
+          - page: Identify your users with PLuG
+            slug: user-identity
+            path: ../docs/pages/sdks/web/user-identity.mdx
+          - page: Track events
+            slug: track-events
+            path: ../docs/pages/sdks/web/track-events.mdx
+          - page: Methods
+            slug: methods
+            path: ../docs/pages/sdks/web/methods.mdx
+          - page: Custom implementation
+            slug: customize
+            path: ../docs/pages/sdks/web/customize.mdx
+          - page: UserExperior migration
+            slug: migration
+            path: ../docs/pages/sdks/web/ue-migration.mdx
+      - section: DevRev SDK for Android
+        slug: android
+        icon: fa-brands fa-android
+        contents:
+          - page: Quickstart guide
+            slug: quickstart
+            path: ../docs/pages/sdks/mobile/android/quickstart.mdx
+          - page: Features
+            slug: features
+            path: ../docs/pages/sdks/mobile/android/features.mdx
+          - page: Migration guide
+            slug: migration-guide
+            path: ../docs/pages/sdks/mobile/android/migration-guide.mdx
+          - page: Troubleshooting
+            slug: troubleshooting
+            path: ../docs/pages/sdks/mobile/android/troubleshooting.mdx
+      - section: DevRev SDK for iOS
+        slug: ios
+        icon: fa-brands fa-apple
+        contents:
+          - page: Quickstart guide
+            slug: quickstart
+            path: ../docs/pages/sdks/mobile/ios/quickstart.mdx
+          - page: Features
+            slug: features
+            path: ../docs/pages/sdks/mobile/ios/features.mdx
+          - page: Migration guide
+            slug: migration-guide
+            path: ../docs/pages/sdks/mobile/ios/migration-guide.mdx
+          - page: Troubleshooting
+            slug: troubleshooting
+            path: ../docs/pages/sdks/mobile/ios/troubleshooting.mdx
+      - section: DevRev SDK for React Native and Expo
+        slug: react-native
+        icon: fa-brands fa-react
+        contents:
+          - page: Quickstart guide (React Native)
+            slug: quickstart
+            path: ../docs/pages/sdks/mobile/react-native/quickstart.mdx
+          - page: Quickstart guide (Expo)
+            slug: quickstart-expo
+            path: ../docs/pages/sdks/mobile/react-native/quickstart-expo.mdx
+          - page: Features
+            slug: features
+            path: ../docs/pages/sdks/mobile/react-native/features.mdx
+          - page: Migration guide
+            slug: migration-guide
+            path: ../docs/pages/sdks/mobile/react-native/migration-guide.mdx
+          - page: Troubleshooting
+            slug: troubleshooting
+            path: ../docs/pages/sdks/mobile/react-native/troubleshooting.mdx
+      - section: DevRev SDK for Cordova
+        slug: cordova
+        icon: fa-solid fa-robot
+        contents:
+          - page: Quickstart guide
+            slug: quickstart
+            path: ../docs/pages/sdks/mobile/cordova/quickstart.mdx
+          - page: Features
+            slug: features
+            path: ../docs/pages/sdks/mobile/cordova/features.mdx
+          - page: Migration guide
+            slug: migration-guide
+            path: ../docs/pages/sdks/mobile/cordova/migration-guide.mdx
+          - page: Troubleshooting
+            slug: troubleshooting
+            path: ../docs/pages/sdks/mobile/cordova/troubleshooting.mdx
+      - page: Push notifications for mobile
+        slug: push-notification
+        path: ../docs/pages/sdks/mobile/push-notification.mdx
+  - section: Snap-in development
+    slug: snapin-development
+    contents:
+      - page: Concepts
+        path: ../docs/pages/snapin-concepts.mdx
+      - section: Tutorials
+        slug: tutorials
+        contents:
+          - page: Overview
+            slug: overview
+            path: ../docs/pages/tutorial.mdx
+          - page: Getting started
+            slug: getting-started
+            path: ../docs/pages/start.mdx
+          - page: Using a snap-in to perform a DevRev action
+            slug: timer-ticket-creator
+            path: ../docs/pages/tutorials/timer-ticket-creator.mdx
+          - page: Using a snap-in to perform an external action
+            slug: perform-external-action
+            path: ../docs/pages/tutorials/perform-external-action.mdx
+          - page: Snap-in triggered by a DevRev event
+            slug: triggered-event
+            path: ../docs/pages/tutorials/triggered-event.mdx
+          - page: Snap-in triggered by an external source
+            slug: triggered-external-source
+            path: ../docs/pages/tutorials/triggered-external-source.mdx
+      - section: References
+        slug: references
+        contents:
+          - page: Install DevRev CLI
+            slug: cli-install
+            path: ../docs/pages/references/cli-install.mdx
+          - page: DevRev CLI reference
+            slug: cli
+            path: ../docs/pages/references/cli.mdx
+          - page: Snap-in manifest
+            slug: manifest
+            path: ../docs/pages/references/manifest.mdx
+          - page: Snap-in V1 manifest
+            slug: v1-manifest
+            path: ../docs/pages/references/v1-manifest.mdx
+          - section: Keyrings
+            slug: keyrings
+            contents:
+              - page: "Keyrings: Securely connecting snap-ins to external services"
+                slug: keyring-intro
+                path: ../docs/pages/references/keyrings/introduction.mdx
+              - page: "OAuth 2.0 configuration: Securely storing access tokens"
+                slug: oauth-configuration
+                path: ../docs/pages/references/keyrings/oauth_config.mdx
+              - page: "Secret configurations: Securely storing credentials"
+                slug: secret-configuration
+                path: ../docs/pages/references/keyrings/secret_config.mdx
+              - page: Developer keyrings
+                slug: developer-keyring
+                path: ../docs/pages/references/keyrings/developer_keyring.mdx
+          - page: Event sources
+            slug: event-sources
+            path: ../docs/pages/references/event_sources.mdx
+          - page: Inputs
+            path: ../docs/pages/references/inputs.mdx
+          - page: Commands
+            path: ../docs/pages/references/commands.mdx
+          - page: Functions
+            path: ../docs/pages/references/functions.mdx
+          - page: Function invocation
+            slug: function-invocation
+            path: ../docs/pages/references/function_invocation.mdx
+          - page: Hooks
+            path: ../docs/pages/references/hooks.mdx
+          - page: Snapkit
+            path: ../docs/pages/references/snapkit.mdx
+          - page: Snap Components
+            path: ../docs/pages/references/snap-components.mdx
+          - page: Snap-in resources
+            slug: snap-in-resources
+            path: ../docs/pages/references/snap-in-resources.mdx
+          - page: Customizing snap-in configuration
+            slug: customizing-snap-in-configuration
+            path: ../docs/pages/references/snap-in-configuration.mdx
+      - page: Development best practices
+        slug: best-practices
+        path: ../docs/pages/best_practices.mdx
+      - page: Locally testing snap-ins
+        path: ../docs/pages/testing.mdx
+      - page: Handling errors and retrying
+        slug: handling-errors-and-retrying
+        path: ../docs/pages/retry-mechanism.mdx
+      - page: Debugging
+        path: ../docs/pages/debugging.mdx
+      - page: Quotas and limits
+        slug: quotas-limits
+        path: ../docs/pages/limits.mdx
+      - page: Upgrade snap-ins
+        path: ../docs/pages/upgrades.mdx
+      - page: Code Samples
+        path: ../docs/pages/examples/samples.mdx
+      - page: Marketplace listings
+        path: ../docs/pages/marketplace-listings.mdx
+
+  - section: Airdrop
+    slug: airdrop
+    path: ../docs/pages/airdrop/overview.mdx
+    contents:
+      - page: "Getting started"
+        slug: getting-started
+        path: ../docs/pages/airdrop/getting-started.mdx
+      - section: "Development guide"
+        skip-slug: true
+        contents:
+          - page: "Airdrop snap-in template"
+            slug: snap-in-template
+            path: ../docs/pages/airdrop/snap-in-template.mdx
+          - page: "Local development"
+            slug: local-development
+            path: ../docs/pages/airdrop/local-development.mdx
+          - page: "Manifest"
+            slug: manifest
+            path: ../docs/pages/airdrop/manifest.mdx
+          - page: "Extraction phases"
+            slug: extraction-phases
+            path: ../docs/pages/airdrop/extraction-phases.mdx
+          - page: "External sync units extraction"
+            slug: external-sync-units-extraction
+            path: ../docs/pages/airdrop/external-sync-units-extraction.mdx
+          - page: "Metadata extraction"
+            slug: metadata-extraction
+            path: ../docs/pages/airdrop/metadata-extraction.mdx
+          - page: "Initial domain mapping"
+            slug: initial-domain-mapping
+            path: ../docs/pages/airdrop/initial-domain-mapping.mdx
+          - page: "Data extraction"
+            slug: data-extraction
+            path: ../docs/pages/airdrop/data-extraction.mdx
+          - page: "Attachments extraction"
+            slug: extract-attachments
+            path: ../docs/pages/airdrop/attachments-extraction.mdx
+          - page: "Loading phases"
+            slug: loading-phases
+            path: ../docs/pages/airdrop/loading-phases.mdx
+          - page: "Load data"
+            slug: load-data
+            path: ../docs/pages/airdrop/load-data.mdx
+          - page: "Load attachments"
+            slug: load-attachments
+            path: ../docs/pages/airdrop/load-attachments.mdx
+          - page: "Data and attachments deletion"
+            slug: data-attachments-deletion
+            hidden: true
+            path: ../docs/pages/airdrop/data-attachments-deletion.mdx
+      - page: "Examples of snap-ins"
+        slug: snap-in-examples
+        path: ../docs/pages/airdrop/snap-in-examples.mdx
+      - page: "Deploy to organization"
+        slug: deploy-to-organization
+        path: ../docs/pages/airdrop/deploy-to-organization.mdx
+      - page: "Publish to the marketplace"
+        slug: publish-to-marketplace
+        path: ../docs/pages/airdrop/publish-to-marketplace.mdx
+      - page: "MCP integration"
+        slug: mcp
+        path: ../docs/pages/airdrop/mcp.mdx
+      - page: "Common issues"
+        slug: faq
+        path: ../docs/pages/airdrop/faq.mdx
+      - page: "Supported DevRev object types"
+        slug: supported-object-types
+        path: ../docs/pages/airdrop/supported-object-types.mdx
+      - section: Data model
+        slug: data-model
+        contents:
+          - page: "Rich text fields"
+            slug: rich-text-fields
+            path: ../docs/pages/airdrop/data-model/rich-text-fields.mdx
+          - page: "Permissions"
+            slug: permissions
+            path: ../docs/pages/airdrop/data-model/permissions.mdx
+          - page: "Mapping reasons"
+            slug: mapping-reasons
+            path: ../docs/pages/airdrop/data-model/mapping-reasons.mdx

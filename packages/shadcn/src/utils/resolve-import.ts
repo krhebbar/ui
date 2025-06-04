@@ -8,6 +8,6 @@ export async function resolveImport(
     importPath,
     undefined,
     () => true,
-    [".ts", ".tsx", ".jsx", ".js", ".css"]
+    [".ts", ".js"]
   )
 }

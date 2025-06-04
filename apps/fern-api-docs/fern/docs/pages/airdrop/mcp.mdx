@@ -1,0 +1,83 @@
+The Model Context Protocol (MCP) is an open protocol that enables large language models to interact with applications through standardized interfaces.
+
+Chef-cli provides MCP integration through the `chef-cli mcp initial-mapping` subcommand. 
+This integration allows AI assistants to programmatically edit and test initial domain mapping files.
+
+## Limitations
+
+<Warning>
+MCP integration is experimental. Functionality may vary across different AI models and MCP clients.
+</Warning>
+
+Testing shows good results with Cursor and Claude Code. The AI can prepare initial mappings with significant autonomy, though developer oversight remains essential.
+
+## Prerequisites
+
+- Chef-cli installed and configured
+- MCP-compatible client (Cursor, Claude Code, etc.)
+- External domain metadata file
+- Empty or partially populated initial domain mapping file
+
+## Configuration
+
+Create a `.mcp.json` file with the following content:
+
+```json
+{
+    "mcpServers": {
+        "airdrop": {
+            "command": "chef-cli",
+            "args": [
+                "mcp initial-mapping"
+            ]
+        }
+    }
+}
+```
+
+### Cursor setup
+
+1. Provide `.cursor/mcp.json` in your project root.
+2. Using the editor Agent mode point the AI to the initial domain mapping file.
+3. Use the editor to guide the AI to create the initial domain mappings.
+4. Use `initial-mapping check` to test the initial domain mappings against the local domain metadata file.
+
+### Claude Code setup
+
+1. Provide `.mcp.json` in your project root.
+2. Using the editor point the AI to the initial domain mapping file.
+3. Use the editor to guide the AI to create the initial domain mappings.
+4. Use `initial-mapping check` to test the initial domain mappings against the local domain metadata file.
+
+### Other IDEs
+
+You can use the same `.mcp.json` file in other IDEs that support MCP.
+
+## Usage guidelines
+
+To guide the AI tool, provide the following instructions to your AI assistant:
+
+```markdown
+When asked to perform airdrop initial mapping:
+
+- Refer to the `metadata.json` for the external domain metadata.
+- Use `mappings.json` as your initial domain mapping file.
+- Call 'use_mapping' to test out how the initial mapping behaves on the current metadata
+- Use MCP tools to manipulate the initial mapping when adding and removing record type mappings, or unmapping fields or mapping simple fields. 
+    For more complex field mappings you may edit the mapping file directly. 
+    Refer to the `initial_mappings_schema.yaml` for its proper format.
+    - If doing so, always use 'use_mapping' to verify the mapping file is still valid.
+```
+
+Adjust file paths according to your project structure.
+
+## Available operations
+
+The MCP server provides tools for:
+
+- Testing mappings against metadata
+- Adding and removing record type mappings
+- Field mapping and unmapping operations
+- Validation of mapping file structure
+- Testing initial domain mapping files against local metadata files
+

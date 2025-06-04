@@ -1,0 +1,43 @@
+
+# Quickstart guide for Expo
+
+DevRev SDK, used for integrating DevRev services into your Expo app.
+
+## Requirements
+
+- `expo` (any version)
+- `react-native` (compatible with Expo version)
+- `@devrev/sdk-react-native` (version 1.0.2 or higher)
+
+## Installation
+
+1. To install the DevRev SDK, run the following command:
+	```bash
+	npx expo install @devrev/sdk-react-native-expo-plugin
+	```
+1. Configure the Expo config plugin in your `app.json` or `app.config.js`:
+	```json
+	{
+	  "expo": {
+	    "plugins": [
+	      "@devrev/sdk-react-native-expo-plugin"
+	    ]
+	  }
+	}
+	```
+1. Rebuild your app:
+	```bash
+	npx expo prebuild --clean
+	```
+
+## Set up the DevRev SDK
+
+1. Open the DevRev web app at [https://app.devrev.ai](https://app.devrev.ai) and go to the **Settings** page.
+2. Under **PLuG settings** copy the value under **Your unique App ID**.
+3. After obtaining the credentials, you can configure the DevRev SDK in your app.
+
+The SDK will be ready for use once you execute the following configuration method.
+
+```typescript
+DevRev.configure(appID: string)
+```

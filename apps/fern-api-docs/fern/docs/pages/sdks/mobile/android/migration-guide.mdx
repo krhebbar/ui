@@ -1,0 +1,13 @@
+# Migration guide
+
+This guide helps transition from the legacy UserExperior SDK to the new DevRev SDK.
+
+## Feature Equivalence Chart
+
+| Feature | UserExperior SDK | DevRev SDK (Kotlin) | DevRev SDK (Java) |
+|-|-|-|-|
+| Installation | `implementation 'com.userexperior:userexperior-android::<version>'` | `implementation("ai.devrev.sdk:devrev-sdk:<version>")` | `implementation("ai.devrev.sdk:devrev-sdk:<version>")` |
+| Initialization | `UserExperior.startRecording(Context context, String ueSdkAppVersionKey)` | `DevRev.configure(context: Context, appId: String)` | `DevRev.INSTANCE.configure(Context context, String appId)` |
+| User Identification | `UserExperior.setUserIdentifier(String userIdentifier)` | `DevRev.identifyAnonymousUser(userId: String)`<br />`DevRev.identifyUnverifiedUser(identity: Identity)` | `DevRev.INSTANCE.identifyAnonymousUser(String userId)`<br />`DevRev.INSTANCE.identifyUnverifiedUser(Identity identity)` |
+| Event Tracking | `UserExperior.logEvent(String event, HashMap<String, Object> properties)` | `DevRev.trackEvent(name: String, properties: HashMap<String, String>)` | `DevRevAnalyticsExtKt.trackEvent(DevRev.INSTANCE, String name, HashMap<String, String> properties)` |
+| Session Recording | `UserExperior.stopRecording()` | `DevRev.stopRecording()` | `DevRevObservabilityExtKt.stopRecording(DevRev.INSTANCE)` |

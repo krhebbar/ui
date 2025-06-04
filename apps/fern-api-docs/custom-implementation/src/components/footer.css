@@ -1,0 +1,33 @@
+.custom-footer a {
+	text-decoration: none;
+	color: black;
+	cursor: pointer;
+}
+
+.custom-footer * {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.custom-footer ol, ul {
+	list-style: none;
+}
+
+.custom-footer blockquote {
+	quotes: none;
+}
+
+.custom-footer blockquote:before, blockquote:after, q:before, q:after {
+	content: '';
+	content: none;
+}
+
+.custom-footer table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+.custom-footer {
+	border-top-width: 0;
+}

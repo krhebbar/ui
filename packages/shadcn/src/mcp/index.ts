@@ -10,7 +10,7 @@ import { zodToJsonSchema } from "zod-to-json-schema"
 
 export const server = new Server(
   {
-    name: "shadcn",
+    name: "airdrop",
     version: "0.0.1",
   },
   {
@@ -27,7 +27,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "init",
         description:
-          "Initialize a new project using a registry style project structure.",
+          "Initialize a new airdrop project using a registry style project structure.",
         inputSchema: zodToJsonSchema(z.object({})),
       },
       {
@@ -80,9 +80,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (request.params.name) {
       case "init": {
         const registry = await getRegistry(REGISTRY_URL)
-        const style = registry.items.find(
-          (item) => item.type === "registry:style"
-        )
 
         let text = `To initialize a new project, run the following command:
                 \`\`\`bash
@@ -108,31 +105,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 `
         }
 
-        if (!style) {
-          return {
-            content: [
-              {
-                type: "text",
-                text,
-              },
-            ],
-          }
-        }
-
         return {
           content: [
             {
               type: "text",
-              text: `To initialize a new project using the ${
-                style.name
-              } style, run the following command:
-              \`\`\`bash
-              npx shadcn@canary init ${getRegistryItemUrl(
-                style.name,
-                REGISTRY_URL
-              )}
-              \`\`\`
-              `,
+              text,
             },
           ],
         }

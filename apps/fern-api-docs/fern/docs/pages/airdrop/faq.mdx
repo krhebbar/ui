@@ -1,0 +1,138 @@
+## Airdrop template repository
+<AccordionGroup>
+  <Accordion title="Getting a *Conflict* error when running `make deploy`">
+    A snap-in package with the same slug already exists.
+    Override the `SNAP_IN_SLUG` variable by explicitly updating the variable in `scripts/vars.sh`.
+  </Accordion>
+  <Accordion title="Deployment of snap-in failed after *Waiting for snap-in version to be ready* message">
+    The snap-in version could not be built.
+    Check the logs by running the DevRev CLI command. For prettier UI, pipe the output to `jq`.
+    ```bash
+    devrev snap_in_package logs | jq
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Token handling
+<AccordionGroup>
+  <Accordion title="*Token is expired* when deploying or cleaning up">
+    Authentication token to the `DEV_ORG` has expired. Reauthenticate the organization by running:
+    ```bash
+    make auth
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Metadata extraction
+<AccordionGroup>
+  <Accordion title="Tips for defining record types">
+    The main purpose of metadata is to define record types. 
+    Each record type should correspond to a homogeneous set of records in the external system: a domain object that has a well-defined schema.
+
+    In some cases, this means simply declaring one record type for API endpoints like `/comments` of the external system,
+    but in other cases, external systems can have configurable custom types or subtypes (for example, issue types in Jira).
+    In these cases, the snap-in will need to query an API for the list of types and produce a dynamic list of record types in the metadata.
+  </Accordion>
+  
+  <Accordion title="Understanding record type categories">
+    Record types don't have hierarchy; each is a leaf type corresponding to concrete records in files marked with that itemtype. 
+    Record type categories can be used to group them, serving two purposes:
+
+    1. To define mapping rules that apply to a dynamic set of record types, unknown at the time the snap-in is created.
+    2. To tell the recipe system that a record can transition between two record types while preserving its identity.
+  </Accordion>
+  
+  <Accordion title="Working with integer fields">
+    The field type `int` is used to represent integer numeric values. 
+    In certain external systems, identifiers of records or enum values are also stored as integers. 
+    These are, however, not *conceptually integers* in Airdrop's perspective.
+    
+    The natural format of integers is `null` | JSON numbers without decimals.
+    Numbers encoded to strings (e.g., `"2112"`), or empty strings should not be used.
+  </Accordion>
+    
+  <Accordion title="Working with collections">
+    All logical data types can be modified to be a collection instead.
+    The natural format of a collection is a JSON array (or `null`), containing the natural format of its elements. 
+    For example:
+
+    ```json
+    {
+      "reporter_ids": [
+        {
+          "ref_type": "user",
+          "id": "2103232131",
+          "fallback_record_name": "John Doe"
+        },
+        {
+          "ref_type": "contact",
+          "id": "2103232144",
+          "fallback_record_name": "Jane Doe"
+        }
+      ],
+      "tags": ["bug", "good-first-issue"]
+    }
+    ```
+
+    Some systems provide collections as enum values or references in a string, separated by some separator (comma or semicolon):
+
+    ```json
+    {
+      "reporter_ids": "2103232131,2103232144",
+      "tags": "bug;good-first-issue"
+    }
+    ```
+
+    This format should be avoided, and the data normalized to the natural format in the extractor.
+  </Accordion>
+  
+  <Accordion title="Using struct fields">
+    Structs are embedded JSON objects inside a given field. 
+    They represent data that consists of multiple elements belonging together (like a phone number or address) but doesn't form its own record with identity.
+    
+    These are helpful when the whole struct is optional/nullable, but some of its fields are required, providing a cleaner representation than flattening it. 
+    Example:
+
+    ```json
+    {
+      "address": {
+        "country": "US",
+        "state": "TX",
+        "city": "Austin",
+        "address_line": "Rocket Road 1"
+      },
+      "phone_number": null
+    }
+    ```
+
+    Many systems resolve references to embedded structs:
+
+    ```json
+    {
+      "creator": {
+        "userId": "2103232144",
+        "name": "Jane Doe",
+        "role": "Adventurer",
+        "email": "jane@doe.com"
+      }
+    }
+    ```
+
+    Such detailed references should not be declared as structs in Airdrop. 
+    They should be transformed to either a simple ID reference or a dynamically typed reference with exactly the fields `id`, `fallback_record_name`, and `ref_type`. 
+    Using references and structs inside structs is currently not supported.
+  </Accordion>
+  
+  <Accordion title="Custom fields">
+    Any field in the metadata not otherwise mapped is offered to the end user as a custom field, with no additional effort needed.
+  </Accordion>
+</AccordionGroup>
+
+## Compatibility
+<AccordionGroup>
+  <Accordion title="Chef-cli version">
+    Check if chef-cli version is up to date. 
+    You can find the version you are using with `chef-cli --version` and the latest available version under GitHub releases.
+  </Accordion>
+</AccordionGroup>
+

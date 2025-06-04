@@ -1,28 +1,30 @@
 import path from "path"
-import { FRAMEWORKS, Framework } from "@/src/utils/frameworks"
-import {
-  Config,
-  RawConfig,
-  getConfig,
-  resolveConfigPaths,
-} from "@/src/utils/get-config"
-import { getPackageInfo } from "@/src/utils/get-package-info"
-import fg from "fast-glob"
 import fs from "fs-extra"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
-
-export type TailwindVersion = "v3" | "v4" | null
+import * as yaml from "yaml"
+import { ProjectInfo as ValidationProjectInfo } from "../types/project-info"; // Import the new interface
 
 export type ProjectInfo = {
-  framework: Framework
-  isSrcDir: boolean
-  isRSC: boolean
+  name: string
+  description: string
+  slug: string // We'll derive this from imports[0].slug or use a default
+  serviceAccountName?: string
+  externalSystemName?: string
+  functions?: Array<{ name: string; description: string }>
+  keyring?: {
+    type: string
+    id: string
+  }
+  tokenVerification?: {
+    method: string
+    url: string
+  }
   isTsx: boolean
-  tailwindConfigFile: string | null
-  tailwindCssFile: string | null
-  tailwindVersion: TailwindVersion
   aliasPrefix: string | null
+  manifestPath: string
+  codePath: string
+  functionsPath: string
 }
 
 const PROJECT_SHARED_IGNORE = [
@@ -39,192 +41,274 @@ const TS_CONFIG_SCHEMA = z.object({
   }),
 })
 
-export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
-  const [
-    configFiles,
-    isSrcDir,
-    isTsx,
-    tailwindConfigFile,
-    tailwindCssFile,
-    tailwindVersion,
-    aliasPrefix,
-    packageJson,
-  ] = await Promise.all([
-    fg.glob(
-      "**/{next,vite,astro,app}.config.*|gatsby-config.*|composer.json|react-router.config.*",
-      {
-        cwd,
-        deep: 3,
-        ignore: PROJECT_SHARED_IGNORE,
+const MANIFEST_SCHEMA = z.object({
+  version: z.string().optional(),
+  name: z.string(),
+  description: z.string(),
+  service_account: z.object({
+    display_name: z.string(),
+  }).optional(),
+  functions: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+  })).optional(),
+  keyring_types: z.array(z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    external_system_name: z.string().optional(),
+    kind: z.string().optional(),
+    is_subdomain: z.boolean().optional(),
+    secret_config: z.any().optional(),
+    token_verification: z.object({
+      url: z.string(),
+      method: z.string(),
+    }).optional(),
+  })).optional(),
+  imports: z.array(z.object({
+    slug: z.string(),
+    display_name: z.string().optional(),
+    description: z.string().optional(),
+    extractor_function: z.string().optional(),
+    loader_function: z.string().optional(),
+    allowed_connection_types: z.array(z.string()).optional(),
+  })).optional(),
+})
+
+// Helper function to check for manifest file (yml or yaml)
+async function findManifestFile(dir: string): Promise<string | null> {
+  const ymlPath = path.join(dir, "manifest.yml");
+  if (await fs.pathExists(ymlPath)) {
+    return ymlPath;
+  }
+  const yamlPath = path.join(dir, "manifest.yaml");
+  if (await fs.pathExists(yamlPath)) {
+    return yamlPath;
+  }
+  return null;
+}
+
+export async function getProjectRoot(cwd: string): Promise<ValidationProjectInfo> {
+  let currentDir = path.resolve(cwd);
+  const root = path.parse(currentDir).root; // Get the root of the filesystem
+
+  const result: ValidationProjectInfo = {
+    isValid: false,
+    rootPath: null,
+    reasons: [],
+    isAirdropProject: false,
+    isAtRoot: false,
+  };
+
+  while (currentDir !== root) {
+    const dirName = path.basename(currentDir);
+    if (dirName.startsWith("airdrop-")) {
+      const manifestFile = await findManifestFile(currentDir);
+      if (manifestFile) {
+        result.isAirdropProject = true;
+        result.rootPath = currentDir;
+        // Check if the original cwd is the root we found
+        result.isAtRoot = path.resolve(cwd) === currentDir;
+        if (!result.isAtRoot) {
+          result.reasons.push(
+            "You are inside an Airdrop project, but not at its root. Please navigate to the root directory to proceed."
+          );
+        }
+        // We found the project root, now we'd typically validate its structure.
+        // For now, just finding it is enough for this function's core responsibility.
+        // The isValid flag will be set by the main validation function later.
+        return result;
       }
-    ),
-    fs.pathExists(path.resolve(cwd, "src")),
-    isTypeScriptProject(cwd),
-    getTailwindConfigFile(cwd),
-    getTailwindCssFile(cwd),
-    getTailwindVersion(cwd),
-    getTsConfigAliasPrefix(cwd),
-    getPackageInfo(cwd, false),
-  ])
-
-  const isUsingAppDir = await fs.pathExists(
-    path.resolve(cwd, `${isSrcDir ? "src/" : ""}app`)
-  )
-
-  const type: ProjectInfo = {
-    framework: FRAMEWORKS["manual"],
-    isSrcDir,
-    isRSC: false,
-    isTsx,
-    tailwindConfigFile,
-    tailwindCssFile,
-    tailwindVersion,
-    aliasPrefix,
+    }
+    // Move to parent directory
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached the top without finding the project
+      break;
+    }
+    currentDir = parentDir;
   }
 
-  // Next.js.
-  if (configFiles.find((file) => file.startsWith("next.config."))?.length) {
-    type.framework = isUsingAppDir
-      ? FRAMEWORKS["next-app"]
-      : FRAMEWORKS["next-pages"]
-    type.isRSC = isUsingAppDir
-    return type
-  }
-
-  // Astro.
-  if (configFiles.find((file) => file.startsWith("astro.config."))?.length) {
-    type.framework = FRAMEWORKS["astro"]
-    return type
-  }
-
-  // Gatsby.
-  if (configFiles.find((file) => file.startsWith("gatsby-config."))?.length) {
-    type.framework = FRAMEWORKS["gatsby"]
-    return type
-  }
-
-  // Laravel.
-  if (configFiles.find((file) => file.startsWith("composer.json"))?.length) {
-    type.framework = FRAMEWORKS["laravel"]
-    return type
-  }
-
-  // Remix.
-  if (
-    Object.keys(packageJson?.dependencies ?? {}).find((dep) =>
-      dep.startsWith("@remix-run/")
-    )
-  ) {
-    type.framework = FRAMEWORKS["remix"]
-    return type
-  }
-
-  // TanStack Start.
-  if (
-    configFiles.find((file) => file.startsWith("app.config."))?.length &&
-    [
-      ...Object.keys(packageJson?.dependencies ?? {}),
-      ...Object.keys(packageJson?.devDependencies ?? {}),
-    ].find((dep) => dep.startsWith("@tanstack/start"))
-  ) {
-    type.framework = FRAMEWORKS["tanstack-start"]
-    return type
-  }
-
-  // React Router.
-  if (
-    configFiles.find((file) => file.startsWith("react-router.config."))?.length
-  ) {
-    type.framework = FRAMEWORKS["react-router"]
-    return type
-  }
-
-  // Vite.
-  // Some Remix templates also have a vite.config.* file.
-  // We'll assume that it got caught by the Remix check above.
-  if (configFiles.find((file) => file.startsWith("vite.config."))?.length) {
-    type.framework = FRAMEWORKS["vite"]
-    return type
-  }
-
-  return type
+  result.reasons.push(
+    "Not inside an Airdrop project. No directory starting with 'airdrop-' and containing a manifest.yml/manifest.yaml file was found in the current or parent directories."
+  );
+  return result;
 }
 
-export async function getTailwindVersion(
-  cwd: string
-): Promise<ProjectInfo["tailwindVersion"]> {
-  const [packageInfo, config] = await Promise.all([
-    getPackageInfo(cwd, false),
-    getConfig(cwd),
-  ])
+// If MANIFEST_SCHEMA is not exported from get-project-info.ts,
+// redefine a minimal one here for validation purposes or pass the parsed manifest.
+const MINIMAL_MANIFEST_SCHEMA_FOR_VALIDATION = z.object({
+  name: z.string().min(1, { message: "Manifest must have a name." }),
+  slug: z.string().min(1, { message: "Manifest must have a slug." }),
+  version: z.string().min(1, { message: "Manifest must have a version." }),
+  description: z.string().min(1, { message: "Manifest must have a description." }),
+  serviceAccount: z.object({}).passthrough().optional(), // Simplified, just check existence if needed by context
+  service_account: z.object({}).passthrough().optional(), // Allow snake_case
+  functions: z.array(z.object({}).passthrough()).min(1, { message: "Manifest must define at least one function." }),
+}).passthrough(); // Allow other fields
 
-  // If the config file is empty, we can assume that it's a v4 project.
-  if (config?.tailwind?.config === "") {
-    return "v4"
+export async function validateAirdropProjectStructure(
+  projectInfo: ValidationProjectInfo
+): Promise<ValidationProjectInfo> {
+  if (!projectInfo.rootPath) {
+    // This should ideally not happen if getProjectRoot found a root
+    projectInfo.isValid = false;
+    projectInfo.reasons.push("Project root not found, cannot validate structure.");
+    return projectInfo;
   }
 
-  if (
-    !packageInfo?.dependencies?.tailwindcss &&
-    !packageInfo?.devDependencies?.tailwindcss
-  ) {
-    return null
-  }
+  const rootPath = projectInfo.rootPath;
+  let structureIsValid = true; // Assume valid until a check fails
 
-  if (
-    /^(?:\^|~)?3(?:\.\d+)*(?:-.*)?$/.test(
-      packageInfo?.dependencies?.tailwindcss ||
-        packageInfo?.devDependencies?.tailwindcss ||
-        ""
-    )
-  ) {
-    return "v3"
-  }
+  // Check for code/ directory
+  const codeDirPath = path.join(rootPath, "code");
+  if (!(await fs.pathExists(codeDirPath)) || !(await fs.lstat(codeDirPath)).isDirectory()) {
+    projectInfo.reasons.push("Missing 'code/' directory at project root.");
+    structureIsValid = false;
+  } else {
+    // Check for code/src/
+    const srcDirPath = path.join(codeDirPath, "src");
+    if (!(await fs.pathExists(srcDirPath)) || !(await fs.lstat(srcDirPath)).isDirectory()) {
+      projectInfo.reasons.push("Missing 'code/src/' directory.");
+      structureIsValid = false;
+    } else {
+      // Check for code/src/functions/
+      const functionsDirPath = path.join(srcDirPath, "functions");
+      if (!(await fs.pathExists(functionsDirPath)) || !(await fs.lstat(functionsDirPath)).isDirectory()) {
+        projectInfo.reasons.push("Missing 'code/src/functions/' directory.");
+        structureIsValid = false;
+      }
+      // Optional: code/src/functions/factory.ts
+      const factoryFilePath = path.join(functionsDirPath, "factory.ts");
+      if (!(await fs.pathExists(factoryFilePath))) {
+        projectInfo.reasons.push("Optional: 'code/src/functions/factory.ts' is recommended but not found.");
+        // Not setting structureIsValid = false as it's optional
+      }
 
-  return "v4"
-}
+      // Check for code/src/main.ts
+      const mainTsPath = path.join(srcDirPath, "main.ts");
+      if (!(await fs.pathExists(mainTsPath))) {
+        projectInfo.reasons.push("Missing 'code/src/main.ts' file.");
+        structureIsValid = false;
+      }
 
-export async function getTailwindCssFile(cwd: string) {
-  const [files, tailwindVersion] = await Promise.all([
-    fg.glob(["**/*.css", "**/*.scss"], {
-      cwd,
-      deep: 5,
-      ignore: PROJECT_SHARED_IGNORE,
-    }),
-    getTailwindVersion(cwd),
-  ])
-
-  if (!files.length) {
-    return null
-  }
-
-  const needle =
-    tailwindVersion === "v4" ? `@import "tailwindcss"` : "@tailwind base"
-  for (const file of files) {
-    const contents = await fs.readFile(path.resolve(cwd, file), "utf8")
-    if (
-      contents.includes(`@import "tailwindcss"`) ||
-      contents.includes(`@import 'tailwindcss'`) ||
-      contents.includes(`@tailwind base`)
-    ) {
-      return file
+      // Check for code/src/index.ts
+      const indexTsPath = path.join(srcDirPath, "index.ts");
+      if (!(await fs.pathExists(indexTsPath))) {
+        projectInfo.reasons.push("Missing 'code/src/index.ts' file.");
+        structureIsValid = false;
+      }
     }
   }
 
-  return null
+  // Validate manifest.yml/manifest.yaml content
+  const manifestFilePath = await findManifestFile(rootPath); // Re-use helper from getProjectRoot
+  if (!manifestFilePath) {
+    // This case should have been caught by getProjectRoot if it's a prerequisite
+    projectInfo.reasons.push("Manifest file (manifest.yml or manifest.yaml) not found at project root.");
+    structureIsValid = false;
+  } else {
+    try {
+      const manifestContent = await fs.readFile(manifestFilePath, "utf8");
+      const manifestData = yaml.parse(manifestContent);
+
+      // Check for serviceAccount (either camelCase or snake_case)
+      // The issue states "serviceAccount", but manifest.yaml often uses snake_case.
+      // The schema allows passthrough, so we check specific fields manually if not covered by zod schema directly.
+      const hasServiceAccount = manifestData.serviceAccount || manifestData.service_account;
+      if (!hasServiceAccount) {
+          projectInfo.reasons.push("Manifest must define 'serviceAccount' (or 'service_account').");
+          structureIsValid = false;
+      }
+
+
+      const validationResult = MINIMAL_MANIFEST_SCHEMA_FOR_VALIDATION.safeParse(manifestData);
+      if (!validationResult.success) {
+        structureIsValid = false;
+        validationResult.error.errors.forEach(err => {
+          projectInfo.reasons.push(`Manifest validation error: ${err.path.join('.')} - ${err.message}`);
+        });
+      }
+    } catch (e: any) {
+      projectInfo.reasons.push(`Error parsing manifest file: ${e.message}`);
+      structureIsValid = false;
+    }
+  }
+
+  // If all checks passed so far, and it was identified as an Airdrop project by getProjectRoot
+  if (structureIsValid && projectInfo.isAirdropProject) {
+    projectInfo.isValid = true;
+    if (projectInfo.reasons.length === 0 || projectInfo.reasons.every(r => r.startsWith("Optional:"))) {
+        // If only optional reasons, or no reasons, it's valid.
+        // Clear "not at root" message if structure is otherwise valid and it was the only warning.
+        if (projectInfo.isAtRoot) {
+             const notAtRootMsg = "You are inside an Airdrop project, but not at its root. Please navigate to the root directory to proceed.";
+             const index = projectInfo.reasons.indexOf(notAtRootMsg);
+             if (index > -1 && projectInfo.reasons.length === 1) {
+                 projectInfo.reasons.splice(index, 1);
+             }
+        }
+        // If no reasons remain, add a success message
+        if (projectInfo.reasons.length === 0) {
+            projectInfo.reasons.push("Project structure and manifest are valid.");
+        }
+    }
+  } else {
+      projectInfo.isValid = false;
+      if (projectInfo.isAirdropProject && structureIsValid && projectInfo.reasons.length === 0) {
+          // This case should not be hit if logic is correct, but as a fallback:
+          projectInfo.reasons.push("Project structure appears valid, but it was not fully validated. Review other messages.");
+      } else if (!projectInfo.isAirdropProject && projectInfo.reasons.length === 0) {
+          // If not an airdrop project and no reasons yet, it means getProjectRoot didn't find it.
+          // getProjectRoot already adds a reason for this.
+      }
+  }
+
+  return projectInfo;
 }
 
-export async function getTailwindConfigFile(cwd: string) {
-  const files = await fg.glob("tailwind.config.*", {
-    cwd,
-    deep: 3,
-    ignore: PROJECT_SHARED_IGNORE,
-  })
-
-  if (!files.length) {
+export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
+  const manifestPath = path.resolve(cwd, "manifest.yaml")
+  const codePath = path.resolve(cwd, "code")
+  const functionsPath = path.resolve(codePath, "src/functions")
+  
+  // Check if this is an airdrop project
+  if (!fs.existsSync(manifestPath) || !fs.existsSync(codePath)) {
     return null
   }
 
-  return files[0]
+  try {
+    // Read and parse manifest.yaml
+    const manifestContent = await fs.readFile(manifestPath, "utf8")
+    const manifest = MANIFEST_SCHEMA.parse(yaml.parse(manifestContent))
+
+    const [isTsx, aliasPrefix] = await Promise.all([
+      isTypeScriptProject(codePath),
+      getTsConfigAliasPrefix(codePath),
+    ])
+
+    return {
+      name: manifest.name,
+      description: manifest.description,
+      slug: manifest.imports?.[0]?.slug || "airdrop-project", // Use first import slug or default
+      serviceAccountName: manifest.service_account?.display_name,
+      externalSystemName: manifest.keyring_types?.[0]?.external_system_name,
+      functions: manifest.functions,
+      keyring: manifest.keyring_types?.[0] ? {
+        type: manifest.keyring_types[0].kind || "unknown",
+        id: manifest.keyring_types[0].id,
+      } : undefined,
+      tokenVerification: manifest.keyring_types?.[0]?.token_verification,
+      isTsx,
+      aliasPrefix,
+      manifestPath,
+      codePath,
+      functionsPath,
+    }
+  } catch (error) {
+    console.error("Failed to parse project info:", error)
+    return null
+  }
 }
 
 export async function getTsConfigAliasPrefix(cwd: string) {
@@ -232,42 +316,33 @@ export async function getTsConfigAliasPrefix(cwd: string) {
 
   if (
     tsConfig?.resultType === "failed" ||
-    !Object.entries(tsConfig?.paths).length
+    !Object.entries(tsConfig?.paths || {}).length
   ) {
     return null
   }
 
-  // This assume that the first alias is the prefix.
+  // Look for common alias patterns
   for (const [alias, paths] of Object.entries(tsConfig.paths)) {
     if (
       paths.includes("./*") ||
-      paths.includes("./src/*") ||
-      paths.includes("./app/*") ||
-      paths.includes("./resources/js/*") // Laravel.
+      paths.includes("./src/*")
     ) {
       return alias.replace(/\/\*$/, "") ?? null
     }
   }
 
   // Use the first alias as the prefix.
-  return Object.keys(tsConfig?.paths)?.[0].replace(/\/\*$/, "") ?? null
+  return Object.keys(tsConfig?.paths || {})?.[0].replace(/\/\*$/, "") ?? null
 }
 
 export async function isTypeScriptProject(cwd: string) {
-  const files = await fg.glob("tsconfig.*", {
-    cwd,
-    deep: 1,
-    ignore: PROJECT_SHARED_IGNORE,
-  })
-
-  return files.length > 0
+  const tsConfigPath = path.resolve(cwd, "tsconfig.json")
+  return fs.existsSync(tsConfigPath)
 }
 
 export async function getTsConfig(cwd: string) {
   for (const fallback of [
-    "tsconfig.json",
-    "tsconfig.web.json",
-    "tsconfig.app.json",
+    "tsconfig.json"
   ]) {
     const filePath = path.resolve(cwd, fallback)
     if (!(await fs.pathExists(filePath))) {
@@ -289,67 +364,21 @@ export async function getTsConfig(cwd: string) {
   return null
 }
 
-export async function getProjectConfig(
-  cwd: string,
-  defaultProjectInfo: ProjectInfo | null = null
-): Promise<Config | null> {
-  // Check for existing component config.
-  const [existingConfig, projectInfo] = await Promise.all([
-    getConfig(cwd),
-    !defaultProjectInfo
-      ? getProjectInfo(cwd)
-      : Promise.resolve(defaultProjectInfo),
-  ])
+export async function getAirdropProjectValidation(cwd: string): Promise<ValidationProjectInfo> {
+  // First, determine the project root and basic Airdrop project identification
+  const rootCheckResult = await getProjectRoot(cwd);
 
-  if (existingConfig) {
-    return existingConfig
+  // If no rootPath was found, it means it's not an Airdrop project according to getProjectRoot.
+  // getProjectRoot will have already populated reasons.
+  // We can return early if isAirdropProject is false.
+  if (!rootCheckResult.isAirdropProject || !rootCheckResult.rootPath) {
+    // Ensure isValid is false if not an Airdrop project or root path is missing
+    rootCheckResult.isValid = false;
+    return rootCheckResult;
   }
 
-  if (
-    !projectInfo ||
-    !projectInfo.tailwindCssFile ||
-    (projectInfo.tailwindVersion === "v3" && !projectInfo.tailwindConfigFile)
-  ) {
-    return null
-  }
+  // Now, validate the structure of the found project root
+  const finalValidationResult = await validateAirdropProjectStructure(rootCheckResult);
 
-  const config: RawConfig = {
-    $schema: "https://ui.shadcn.com/schema.json",
-    rsc: projectInfo.isRSC,
-    tsx: projectInfo.isTsx,
-    style: "new-york",
-    tailwind: {
-      config: projectInfo.tailwindConfigFile ?? "",
-      baseColor: "zinc",
-      css: projectInfo.tailwindCssFile,
-      cssVariables: true,
-      prefix: "",
-    },
-    iconLibrary: "lucide",
-    aliases: {
-      components: `${projectInfo.aliasPrefix}/components`,
-      ui: `${projectInfo.aliasPrefix}/components/ui`,
-      hooks: `${projectInfo.aliasPrefix}/hooks`,
-      lib: `${projectInfo.aliasPrefix}/lib`,
-      utils: `${projectInfo.aliasPrefix}/lib/utils`,
-    },
-  }
-
-  return await resolveConfigPaths(cwd, config)
-}
-
-export async function getProjectTailwindVersionFromConfig(
-  config: Config
-): Promise<TailwindVersion> {
-  if (!config.resolvedPaths?.cwd) {
-    return "v3"
-  }
-
-  const projectInfo = await getProjectInfo(config.resolvedPaths.cwd)
-
-  if (!projectInfo?.tailwindVersion) {
-    return null
-  }
-
-  return projectInfo.tailwindVersion
+  return finalValidationResult;
 }

@@ -1,0 +1,34 @@
+:root {
+  /* Light Theme */
+  --code-foreground: #1f2937; /* editor.foreground */
+  --code-token-keyword: #7c3aed; /* keyword */
+  --code-token-constant: #15803d; /* constant */
+  --code-token-string: #ca8a04; /* string */
+  --code-token-comment: #6b7280; /* comment */
+  --code-token-parameter: #1f2937; /* parameter (same as foreground) */
+  --code-token-function: #15803d; /* function */
+  --code-token-string-expression: #ca8a04; /* string-expression */
+  --code-token-punctuation: #1f2937; /* punctuation */
+  --code-token-link: #2563eb; /* link */
+  --code-token-number: #dc2626; /* number */
+  --code-token-property: #15803d; /* property */
+  --code-highlight-color: #f3f4f6; /* lineHighlightBackground */
+}
+
+[data-theme="dark"],
+.dark {
+  /* Dark Theme */
+  --code-foreground: #d0d0d0; /* editor.foreground */
+  --code-token-keyword: #cba6f7; /* keyword */
+  --code-token-constant: #6ee7b7; /* constant */
+  --code-token-string: #facc15; /* string */
+  --code-token-comment: #6b7280; /* comment */
+  --code-token-parameter: #d0d0d0; /* parameter (same as foreground) */
+  --code-token-function: #6ee7b7; /* function */
+  --code-token-string-expression: #facc15; /* string-expression */
+  --code-token-punctuation: #d0d0d0; /* punctuation */
+  --code-token-link: #a5b4fc; /* link */
+  --code-token-number: #f87171; /* number */
+  --code-token-property: #6ee7b7; /* property */
+  --code-highlight-color: #27272a; /* lineHighlightBackground */
+}
