@@ -1,0 +1,89 @@
+Each snap-in must handle all the phases of Airdrop extraction. In a snap-in, you typically define a run
+function that iterates over events and invokes workers per extraction phase.
+
+The Airdrop snap-in extraction lifecycle consists of four phases: 
+* External sync units extraction (only for initial sync)
+* Metadata extraction
+* Data extraction  
+* Attachments extraction
+
+Each phase is defined in a separate file and is responsible for fetching the respective data.
+
+<Note>
+  Snap-in development is an iterative process.
+  It typically begins with retrieving some data from the external system. 
+  The next step involves crafting an initial version of the external domain metadata and validating it through chef-cli. 
+  This metadata is used to prepare the initial domain mapping and checking for any possible issues.
+  API calls to the external system are then corrected to fetch the missing data.
+  Start by working with one item type (we recommend starting with users), and once it maps well to DevRev objects and imports as desired, proceed with other item types.
+</Note>
+
+The SDK library exports a `processTask` function, which takes an object parameter with two keys:
+* `task`: a function that implements the functionality for the given phase.
+* `onTimeout`: a function that handles timeouts, typically by simply emitting a message to the Airdrop platform.
+
+State management is crucial for snap-ins to maintain the state of the extraction task.
+State is saved to the Airdrop backend by calling the `postState` function.
+During the extraction the state is stored in the adapter and can be retrieved using the `adapter.state` property.
+
+```typescript
+import { AirdropEvent, EventType, spawn } from "@devrev/ts-adaas";
+
+export interface ExtractorState {
+  todos: { completed: boolean };
+  users: { completed: boolean };
+  attachments: { completed: boolean };
+}
+
+export const initialState: ExtractorState = {
+  todos: { completed: false },
+  users: { completed: false },
+  attachments: { completed: false },
+};
+
+function getWorkerPerExtractionPhase(event: AirdropEvent) {
+  let path;
+  switch (event.payload.event_type) {
+    case EventType.ExtractionExternalSyncUnitsStart:
+      path = __dirname + '/workers/external-sync-units-extraction';
+      break;
+    case EventType.ExtractionMetadataStart:
+      path = __dirname + '/workers/metadata-extraction';
+      break;
+    case EventType.ExtractionDataStart:
+    case EventType.ExtractionDataContinue:
+      path = __dirname + '/workers/data-extraction';
+      break;
+    case EventType.ExtractionAttachmentsStart:
+    case EventType.ExtractionAttachmentsContinue:
+      path = __dirname + '/workers/attachments-extraction';
+      break;
+  }
+  return path;
+}
+
+const run = async (events: AirdropEvent[]) => {
+  for (const event of events) {
+    const file = getWorkerPerExtractionPhase(event);
+    await spawn<ExtractorState>({
+      event,
+      initialState,
+      workerPath: file,
+      initialDomainMapping: {
+        /* your initial domain mapping JSON here */
+      },
+      // options: {},
+    });
+  }
+};
+
+export default run;
+```
+
+<Note>
+  You must pass the <code>initialDomainMapping</code> parameter to{" "}
+  <code>spawn</code> when running extraction phases. This ensures the correct
+  domain mapping is installed and used by the snap-in.
+</Note>
+
+```

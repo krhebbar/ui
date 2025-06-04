@@ -1,0 +1,68 @@
+For easier development you can run your Airdrop snap-in locally and receive logs directly in your console.
+
+## Prerequisites
+
+- [devrev-cli](https://developer.devrev.ai/snapin-development/references/cli-install) (version 4.7 or higher)
+- [jq](https://stedolan.github.io/jq)
+- [nodejs](https://nodejs.org/en/download/package-manager) (version 18.x.x+ or higher)
+- [ngrok](https://ngrok.com)
+
+## Run the template
+
+DevRev offers a starter Airdrop snap-in template that is ready for immediate use and testing. 
+
+1. Create a new repository:
+   - Create a new repository from this template by clicking the "Use this template" button in the upper right corner and then "Create a new repository".
+   - The repository name must start with `airdrop-` (for example, `airdrop-<external system>-snap-in`).
+2. Open the project in your IDE and authenticate to your DevRev organization using the DevRev CLI:
+   ```bash
+   devrev profiles authenticate --org <your DevRev organization slug>
+   ```
+3. Install the snap-in dependencies from the `code` directory:
+   ```bash
+   npm ci
+   ```
+4. Start the snap-in development server from the `code` directory:
+   ```bash
+   npm run test:server -- local
+   ```
+   This will start the snap-in server on `http://localhost:8000`.
+5. Start the ngrok tunnel in a separate terminal window:
+   ```bash
+   ngrok http 8000
+   ```
+   This will create a tunnel to your local server.
+   The ngrok forwarding URL will be displayed in the terminal window.
+6. Copy the ngrok forwarding URL and create a new snap-in version and snap-in package using the DevRev CLI:
+   ```bash
+   devrev snap_in_version create-one  --manifest ./manifest.yaml --create-package --testing-url <ngrok forwarding URL>
+   ```
+7. Create a snap-in draft using the DevRev CLI:
+   ```bash
+   devrev snap_in draft
+   ```
+8. After the snap-in draft is created, install the snap-in:
+   ```bash
+   devrev snap_in activate
+   ```
+
+# Initial sync 
+
+Now that you have a running snap-in, you can start an airdrop.
+Go to DevRev app and click **Airdrops** -> **Start Airdrop** -> **Your snap-in**.
+
+1. Starting an airdrop begins with establishing a connection to the external system. The Airdrop snap-in prompts for specific information needed to create this connection. Afterwards, the snap-in verifies that the connection is successful and you should see a success message.
+
+2. Once the connection is established, the snap-in collects information from the external system about the data unit to be exported. This phase is called _external sync units extraction_. An external sync unit is the data unit from the external system to be imported to DevRev. At this point, the DevRev app prompts the user to select an external sync unit from the list.
+
+3. The snap-in then extracts data from the external system.
+
+4. Afterwards, the DevRev app requests the mapping of data from the external system to DevRev. The user can decide which fields from each system should match.
+
+5. Once mapping is complete, the snap-in saves the data to DevRev.
+
+6. Finally, the snap-in streams any possible attachments from the external system to DevRev.
+
+The process described above is called the **initial sync**. In all subsequent syncs, the first two steps are skipped.
+
+The snap-in constantly communicates with Airdrop platform, which manages its behavior. When an action occurs in the DevRev app, Airdrop platform sends a message to the snap-in with details about the event. The snap-in performs an action based on the event type. For example, when a user starts a new airdrop for the first time, Airdrop platform instructs the snap-in to perform an external sync unit extraction. The snap-in carries out the task and sends back available sync units to Airdrop platform.

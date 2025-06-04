@@ -1,0 +1,165 @@
+Once you have [installed PLuG](./installation), all your users who interact with the widget are created as anonymous users in the DevRev app with a random name since there is no information about the user.
+
+For users who are logged into your website, you can identify them in PLuG so they can view their past conversations. Identifying your users also enables more personalized engagement.
+
+In this flow, you have to generate a session token for every user who visits your website. The session token identifies the customer when they interact with the widget. The session token is generated using the application access token and customer information. It should be generated on your website's back end since the app token needs to be kept hidden.
+
+To identify logged-in users, follow these steps:
+
+## Generate an application access token
+
+1. In DevRev, go to **Settings > Support > PLuG Tokens** through the settings icon on the top-left corner.
+2. Under the **Application access tokens** panel, click **New token** and copy the token that's displayed.
+
+<Callout intent="note">
+Ensure you copy your access token, as you will not be able to view it again.
+</Callout>
+
+## Generate a session token
+
+<Callout intent="note">
+For security reasons, this call should be made from the server side so that your AAT isn't exposed.
+</Callout>
+
+Using the `rev_info` method, you can generate and recognize a user within the DevRev system by providing relevant user details. This method enables you to convey information systematically, ensuring alignment between your DevRev CRM and the structured data model. For information regarding terminologies, click [here](https://devrev.ai/docs/product/grow).
+
+```bash
+curl --location 'https://api.devrev.ai/auth-tokens.create' \
+--header 'accept: application/json, text/plain, */*' \
+--header 'authorization: <AAT>' \
+--header 'content-type: application/json' \
+--data-raw '{
+    "rev_info": {
+        "user_ref": "example@devrev.ai",
+        "account_ref": "devrev.ai",
+        "workspace_ref": "devrev-dev",
+        "user_traits": {
+            "email": "test-user@devrev.ai",
+            "display_name": "Devrev Test USer",
+            "phone_numbers": ["+911122334455"],
+            "custom_fields": {
+               "tnt__<field1_name>": "value 1"
+            }
+        },
+        "workspace_traits": {
+            "display_name": "Devrev Dev",
+            "custom_fields": {}
+        },
+        "account_traits": {
+            "display_name": "Devrev",
+            "domains": [
+                "devrev.ai"
+            ],
+            "custom_fields": {
+                "tnt__<field2_name>": "value x"
+            }
+        }
+    }
+}'
+ ```
+
+<Callout intent="note">
+Ensure that you follow the specified format when providing your phone number.
+</Callout>
+
+## Pass custom attributes
+
+To create custom attributes, see [Object customization](https://devrev.ai/docs/product/object-customization).
+
+You can pass the custom attributes that are created as shown below:
+```json
+
+"custom_fields": {
+  "tnt__custom_attribute_name1": <value>,
+  "tnt__custom_attribute_name2": <value>,
+}
+ ```
+
+You can pass custom traits, as shown above, not only for `users` but also for `workspaces` and `accounts`.
+
+If you prefer a two-level structure, where users are directly associated with an account instead of a workspace, you can provide the `user_ref` and details along with the `account_ref` and details.
+
+**Attributes for users**
+
+|Attributes   |Description   |Type   |
+|---|---|---|
+|`user_ref`   |A unique user reference that the DevRev app uses for identifying your users. This parameter is required.   |string   |
+|`email`   |The email address of the customer. It's used for sending email notifications of any support messages.   |string   |
+|`display_name`   |The name of the user that's shown on the widget.   |string   |
+|`phone_numbers`   |The mobile number of the customer.   |array   |
+
+**Attributes for workspaces**                                              
+
+|Attributes   |Description   |Type   |
+|---|---|---|
+|`workspace_ref`   |A unique reference for the user's workspace. If not provided, and an account reference is passed, the user is directly attached to the account.   |string   |
+|`display_name`   |The name of the workspace that's shown on the widget.   |string   |
+
+**Attributes for accounts**                                                        
+
+|Attributes   |Description   |Type   |
+|---|---|---|
+|`account_ref`   |A unique reference for the account.    |string   |
+|`display_name`    | The name of the account that's shown on the widget.    |string   |
+|`domains`   |The domain names of the accounts that the users belongs to.   |array   |
+| `phone_numbers`    |The phone number associated with the account.   |array   |
+
+## Pass the session token 
+
+While initializing the PLuG widget you pass the session token for DevRev to identify this user and thereby make the widget more customized for the user and their context.
+
+```jsx
+// You can generate this session token using the above API in your backend
+const sessionToken = '<SESSION_TOKEN>'
+<script type="text/javascript" src="https://plug-platform.devrev.ai/static/plug.js"></script>
+<script>
+    (() => {
+      window.plugSDK.init({
+        app_id: '<your_unique_app_id>',
+          session_token: sessionToken
+        })})();
+</script>
+```
+
+## Identify users without session token
+
+You can also pass the identifiers in the `plugSDK.init` option without generating the session token.
+
+<Callout intent="note">
+This frontend user identification, by its nature, is not secure as the data is transmitted through the client side. It is recommended to use the session token method to securely identify users.
+</Callout>
+
+<Callout intent="warning">
+This method is currently in beta and comes with the following limitations:
+- Unverified users cannot be converted or merged into verified users.
+- An external reference used by an unverified user cannot be reused for any other user.
+</Callout>
+
+```jsx
+window.plugSDK.init({
+  app_id: '<your_unique_app_id>',
+  identity: {
+    user_ref: string;
+    user_traits?: { // optional
+      custom_fields?: object; // optional
+      display_name?: string; // optional
+      email?: string; // optional
+      phone_numbers?: string[]; // optional
+    }
+  }
+})
+```
+
+You can add or update the data in `user_traits` by using the `updateIdentity` method on the PLuG SDK. Attached is a sample code snippet for the same. 
+
+```jsx
+window.plugSDK.updateIdentity({
+  user_traits: {
+    custom_fields?: object; // optional
+    display_name?: string; // optional
+    email?: string; // optional
+    phone_numbers?: string[]; // optional
+  }
+})
+```
+

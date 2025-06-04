@@ -1,0 +1,21 @@
+api: 
+  specs:
+    - openapi: ./openapi-beta.yaml
+groups:
+  ts-sdk:
+    audiences:
+      - sdks
+    generators:
+      - name: fernapi/fern-typescript-node-sdk
+        version: 0.35.0
+        output:
+          location: npm
+          package-name: "@devrev/api"
+          token: ${NPM_TOKEN}
+        github:
+          repository: "devrev/sdk-typescript"
+        smart-casing: true
+        config:
+          namespaceExport: DevRev
+          allowCustomFetcher: true
+          skipResponseValidation: true

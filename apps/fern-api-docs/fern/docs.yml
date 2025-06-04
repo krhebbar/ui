@@ -1,0 +1,85 @@
+instances:
+  - url: devrev.docs.buildwithfern.com
+    custom-domain: developer.devrev.ai
+
+title: DevRev | Docs
+
+navbar-links: []
+
+experimental: 
+  openapi-parser-v3: true
+
+colors:
+  accentPrimary: 
+    dark: "#5D65EE1A"
+    light: "#5D65EE1A"
+  background: 
+    dark: "#131414"
+    light: '#ffffff'
+
+logo: {}
+
+css:
+  - ./dist/output.css
+
+js:
+  - path: ./dist/output.js
+    strategy: beforeInteractive
+
+
+typography:
+  bodyFont:
+    name: SF Pro
+    path: ./fonts/SF-Pro-Text-Regular.woff2
+    weight: "400"
+  headingsFont:
+    name: SF Pro Display
+    path: ./fonts/SF-Pro-Display-Regular.woff2
+    weight: "600"
+  codeFont: 
+    name: SF mono
+    path:  ./fonts/sf-mono-regular.woff2
+
+favicon: ./docs/assets/favicon.ico
+
+versions: 
+  - display-name: Public
+    path: ./versions/public.yml
+    slug: public
+  - display-name: Beta
+    path: ./versions/beta.yml
+    availability: beta
+    slug: beta
+
+redirects:
+  - source: /:path*/sdks/plug/methods
+    destination: /:path*/sdks/web/methods
+    permanent: true
+  - source: /:path*/sdks/plug/methods
+    destination: /:path*/sdks/web/methods
+    permanent: true
+  - source: /:path*/sdks/plug/install-ios
+    destination: /:path*/sdks/ios
+    permanent: true
+  - source: /:path*/sdks/plug/install-android
+    destination: /:path*/sdks/android
+    permanent: true
+  - source: /:path*/snap-in-development/:slug*
+    destination: /:path*/snapin-development/:slug*
+    permanent: true
+  - source: /:path*/web/overview
+    destination: /:path*/sdks
+    permanent: true
+  - source: /:path*/sdks/mobile/:slug*
+    destination: /:path*/sdks/:slug*
+    permanent: true    
+  - source: /:path*/snapin-development/adaas/:slug*
+    destination: /:path*/airdrop/:slug*
+    permanent: true 
+  - source: /:path*/airdrop/overview
+    destination: /:path*/airdrop
+    permanent: true   
+
+analytics:
+  ga4:
+    measurement-id: G-XP1LEFVYQ9

@@ -1,0 +1,284 @@
+## Introduction
+
+In this tutorial, you learn how to develop a snap-in that mirrors an issue from DevRev to GitHub. This requires addition of a command that can be run from the **Discussions** tab of an issue in DevRev, which creates an issue in GitHub.
+
+## Background context
+
+1. **GitHub APIs mastery:**
+
+   - Delve into understanding GitHub [APIs](https://docs.github.com/en/rest).
+   - Learn how to fetch details and perform actions using GitHub APIs.
+
+2. **Secrets and keyrings in DevRev snap-ins:**
+
+   - Explore the usage of secrets and refer to
+     [keyrings](/snapin-development/references/keyrings) in DevRev snap-ins.
+
+3. **Command creation and utilization in DevRev:**
+   - Gain proficiency in creating and using
+     [commands](/snapin-development/references/commands) in DevRev.
+
+<Steps>
+
+### Installation guide
+
+- Install [DevRev CLI](/snapin-development/references/cli-install)
+- Install [jq](https://stedolan.github.io/jq).
+- Install [DevRev SDK](https://www.npmjs.com/package/@devrev/typescript-sdk?activeTab=readme)
+
+<Callout intent="info">
+If you did not follow the [getting started](/snapin-development/tutorials/getting-started) tutorial then follow these steps to authenticate and initialize the snap-in TypeScript template:
+
+```bash
+devrev profiles authenticate -o <dev-org-slug> -u <youremail@yourdomain.com>
+```
+
+```bash
+devrev snap_in_version init
+```
+</Callout>
+
+#### Trigger
+
+To initiate the process of creating a GitHub issue directly from a DevRev issue, a trigger mechanism is essential. In this context, the implementation involves the introduction of a specialized command. This command is designed to be executed exclusively from the discussion section of a DevRev issue, serving as the catalyst for replicating the issue on GitHub.
+
+#### Action
+
+The primary action involves leveraging the issue creation API provided by GitHub. This API is utilized to create the GitHub issue seamlessly from the corresponding issue in DevRev.
+
+### Creating the snap-in
+
+#### Updating the manifest
+
+To outline the structure of the snap-in, the initial step is to define key attributes in the snap-in's manifest. Begin by specifying the name, description, and account display name for the snap-in.
+
+```yml
+version: "2"
+name: "GitHub issue creator"
+description: "Replicate DevRev issues in GitHub."
+
+service_account:
+  display_name: GitHub Issue Creator
+```
+
+### Keyrings
+
+To facilitate authentication for our API calls, the initial step involves creating a Personal Access Token (PAT) in GitHub. This PAT can be stored as a [connection](/snapin-development/references/keyrings) within DevRev. Subsequently, this
+connection is employed within our snap-in in the form of keyrings.
+
+```yml
+keyrings:
+  organization:
+    - name: github_connection
+      display_name: Github Connection
+      description: Github PAT
+      types:
+        - snap_in_secret
+```
+
+### Functions and commands
+
+Having established the foundational configurations, the subsequent step is to define the functions and commands responsible for orchestrating the core logic of the snap-in.
+
+```yaml
+functions:
+  - name: command_handler
+    description: Function to create a GitHub issue
+```
+
+The command states where you can use it. For example, in the **Discussions** tab of issues.
+
+It also explains the different situations and ways in which you can make use of this command.
+
+```yml
+commands:
+  - name: gh_issue
+    namespace: devrev
+    description: Command to create a GitHub issue.
+    surfaces:
+      - surface: discussions
+        object_types:
+          - issue
+    usage_hint: "[OrgName] [RepoName]"
+    function: command_handler
+```
+
+To utilize this command, execute `/gh_issue OrgName RepoName` in the **Discussions** tab of the issue. Within the function logic, validations are implemented to ensure the correctness of both the organization name (`OrgName`) and repository
+name (`RepoName`) before proceeding with the issue creation.
+
+### Function logic
+
+After creating the manifest and establishing the snap-in's logic, the next step is to define the function logic that handles the business logic. Once you understand the payload structure of a command, you can proceed with its implementation.
+
+To proceed, define the handler function for command events.
+
+```ts
+const handleEvent = async (event: any) => {
+  // Function logic goes here.
+};
+```
+
+Within this handler, the initial step involves extracting the GitHub token provided as input in the keyring. Subsequently, the [Octokit](https://github.com/octokit/octokit.js), responsible for managing GitHub API requests, is initialized:
+
+```ts
+const githubPAT = event.input_data.keyrings.github_connection;
+const octokit = new Octokit({
+  auth: githubPAT,
+});
+```
+
+To facilitate authentication for DevRev API calls, a DevRev token is required.
+The initialization process for the DevRev SDK involves using the received endpoint.
+
+```ts
+const devrevToken = event.context.secrets.service_account_token;
+const endpoint = event.execution_metadata.devrev_endpoint;
+const devrevSDK = client.setup({
+  endpoint: endpoint,
+  token: devrevToken,
+});
+```
+
+With the SDKs successfully initialized, the next step is to invoke the necessary
+APIs.
+
+As a preliminary step, the required fields for creating a GitHub Issue, namely **title** and **body**, need to be extracted. These details are sourced from the issue.
+
+To facilitate this, introduce a function defined for this specific purpose:
+
+```ts
+const getIssueDetails = async (workId: string, devrevSDK: any) => {
+  try {
+    // Get the issue details from the database using the workId
+    const workItemResp = await devrevSDK.worksGet({
+      id: workId,
+    });
+    const workItem = workItemResp.data.work;
+
+    // Populate the issue details
+    const issueDetails = {
+      description: workItem.body,
+      issueDisplayName: workItem.display_id,
+      title: workItem.title,
+    };
+    return issueDetails;
+  } catch (error) {
+    console.error(error);
+    throw new Error("Failed to get issue details");
+  }
+};
+```
+
+Now, the function can be called within the handler function to obtain the necessary issue details::
+
+```ts
+const workId = event.payload.source_id;
+const issueDetails = await getIssueDetails(workId, devrevSDK);
+```
+
+Following this, the next step involves parsing the parameters `Organization` and
+`Repository Name` that were passed in the command:
+
+```ts
+const getOrgAndRepoNames = (paramString: string): string[] => {
+  const paramList = paramString.split(" ");
+  if (paramList.length !== 2) {
+    throw new Error("Invalid Parameters");
+  }
+  const [orgName, repoName] = paramList;
+  return [orgName, repoName];
+};
+```
+
+The GitHub REST API (https://docs.github.com/en/rest/orgs/orgs?apiVersion=2022-11-28#get-an-organization) is used to confirm the specified organisation name.
+
+```ts
+const verifyOrgName = async (orgName: string, octokit: Octokit) => {
+  try {
+    await octokit.request("GET /orgs/{org}", {
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      org: orgName,
+    });
+  } catch (error) {
+    console.error(error);
+    throw new Error("Invalid Organisation Name");
+  }
+};
+```
+
+Similarly, the [GET Repository](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository) is used to validate whether the entered repository name is correct.
+
+```ts
+const verifyRepoName = async (
+  orgName: string,
+  repoName: string,
+  octokit: Octokit
+) => {
+  try {
+    await octokit.request("GET /repos/{owner}/{repo}", {
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      owner: orgName,
+      repo: repoName,
+    });
+  } catch (error) {
+    console.error(error);
+    throw new Error("Invalid Repository Name");
+  }
+};
+```
+
+After completing all the necessary verifications, the [POST create issue](https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#create-an-issue) can be invoked to create a new issue.
+
+```ts
+const createGitHubIssue = async (
+  orgName: string,
+  repoName: string,
+  issueDetails: any,
+  octokit: Octokit
+) => {
+  try {
+    await octokit.request("POST /repos/{owner}/{repo}/issues", {
+      body: issueDetails.description,
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      owner: orgName,
+      repo: repoName,
+      title: "[" + issueDetails.issueDisplayName + "] " + issueDetails.title,
+    });
+  } catch (error) {
+    console.error(error);
+    throw new Error("Failed to create issue");
+  }
+};
+```
+
+The completion of functional logic is a key milestone in the process. After laying the framework, now you'll learn how to install this snap-in for your organization.
+
+### Deploying the snap-in to your organization
+
+Once the code has been validated, the next steps involve creating the snap-in version and subsequently creating the snap-in itself. Before installing the snap-in, it's essential to set up a GitHub Personal Access Token (PAT) and add it to the connections in DevRev as a snap-in secret. Ensure that the secret is shared within the organization so that the snap-in can utilize it.
+
+Follow these steps to install the snap-in in your organization:
+
+#### Step 1: Create a GitHub personal access token
+
+Generate a GitHub Personal Access Token (PAT) by following the steps outlined in the [GitHub documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+
+#### Step 2: Add PAT to DevRev connections
+
+Add the generated PAT as a snap-in secret in DevRev. This secret is used during the installation of the snap-in. Ensure that the secret is shared within the organization to allow the snap-in to access it.
+
+#### Step 3: Install the snap-in
+
+During the installation of the snap-in, utilize the shared secret to authenticate and connect with GitHub. This ensures that the snap-in has the necessary permissions to interact with GitHub APIs.
+
+</Steps>
+
+## Resources
+
+The final snap-in code and manifest can be found [here](https://github.com/devrev/snap-in-examples/tree/main/9-external-action).

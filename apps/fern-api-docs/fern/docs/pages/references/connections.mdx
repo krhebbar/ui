@@ -1,0 +1,27 @@
+Connections are a way to authenticate with external services. They're defined in the snap-in manifest under the `keyrings` section.
+
+The developer can specify a list of keyrings that the snap-in requires. The installer is asked to provide the connection when installing the snap-in.
+
+For example, to require the installer to provide either a GitHub PAT or GitHub OAuth when installing the snap-in, the following can be specified in the manifest:
+
+```yaml
+keyrings:
+  - name: github
+    description: GitHub Auth
+    types:
+      - devrev-github-oauth
+      - devrev-github-pat
+    display_name: GitHub Connection
+```
+
+In the above YAML, the `name` specifies a unique identifier for the connection in the snap-in.
+The `description` is a human readable description of the connection shown to the user at the time of snap-in installation.
+The `types` field specifies the list of possible connection types that the user can provide.
+The `display_name` is the name that's shown to the user when they are asked to provide a connection.
+
+The following connection types are currently supported, where the Identifier field is the value to be specified in the `types` field of the connection in the manifest:
+
+| Connection Name              | Identifier                    | AppName             | Description                                        |
+| ---------------------------- | ----------------------------- | ------------------- | -------------------------------------------------- |
+| DevRev PAT                   | devrev-pat                    | devrev              | Authenticate with DevRev using PAT                 |
+| DevRev Snap-in Secret        | devrev-snap-in-secret         | generic             | Store a generic secret string                      |

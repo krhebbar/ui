@@ -1,0 +1,25 @@
+navigation:
+  - section: About
+    contents:
+      - page: For Developers
+        path: ../docs/pages/developer-intro.mdx
+  - api: API Reference
+    api-name: beta
+    audiences:
+      - docs
+    paginated: true
+    snippets:
+      typescript: "@devrev/api"
+  - changelog: ../apis/beta/changelog
+    title: Changelog
+  - section: Guides
+    contents:
+      - page: Object customization
+        path: ../docs/pages/customization.mdx
+      - page: Custom objects
+        path: ../docs/pages/custom-objects.mdx
+      - page: Account creation
+        path: ../docs/pages/create-accounts.mdx
+      - page: Agents async API
+        slug: agents-async-api
+        path: ../docs/pages/interact-agent.mdx

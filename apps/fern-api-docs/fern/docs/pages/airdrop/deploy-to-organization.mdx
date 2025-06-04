@@ -1,0 +1,27 @@
+Once you're ready to test your snap-in in a production environment, you can deploy the snap-in to your organization.
+
+Follow these steps:
+
+1. Copy `.env.example` to a new file named `.env` and fill in the required variables.
+2. Deploy a draft version of your snap-in to your organization by using `make deploy`.
+3. Install the snap-in in your DevRev by going to **Settings** > **Snap-ins** > **Install snap-in**.
+4. Set up the connection under **Settings** > **Airdrops** > **Connections**.
+5. Create an import at **Settings** > **Airdrops** > **Airdrop**.
+
+This step is also a prerequisite for publishing the snap-in on the DevRev marketplace.
+
+### Observability
+
+To observe logs from your snap-in in your development environment:
+
+```bash
+devrev snap_in_package logs | jq
+```
+
+To open logs in your favorite editor:
+
+```bash
+devrev snap_in_package logs | code -
+```
+
+For more information, refer to [Debugging](/snapin-development/debugging).

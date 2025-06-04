@@ -1,0 +1,32 @@
+# Quickstart guide
+
+This guide helps you integrate the DevRev SDK into your Cordova app.
+
+## Requirements
+
+- Cordova CLI 10.0.0 or higher.
+- A minimum deployment target of Android 5.0 (API level 21) or iOS 11.
+
+## Installation
+
+To install the DevRev SDK, run the following command:
+
+```sh
+cordova plugin add devrev-cordova-plugin
+```
+
+## Set up the DevRev SDK
+
+1. Open the DevRev web app at [https://app.devrev.ai](https://app.devrev.ai) and go to the **Settings** page.
+2. Under **PLuG settings**, copy the value under **Your unique App ID**.
+3. After obtaining the credentials, configure the DevRev SDK in your app.
+
+<Callout intent="note">
+The DevRev SDK must be configured before you can use any of its features.
+</Callout>
+
+The SDK will be ready for use once you execute the following configuration method:
+
+```javascript
+DevRev.configure(appID, successCallback, errorCallback)
+```

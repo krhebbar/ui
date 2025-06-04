@@ -1,0 +1,371 @@
+This cookbook provides a step-by-step guide to use the asynchronous API for DevRev agents. It assumes you've already created an agent using the DevRev agent builder platform.
+
+The DevRev async API enables you to execute agents without any execution timeout concerns. The execution occurs as an asynchronous workflow that sends events to you via webhooks. This approach ensures:
+
+- Agent complexity does not bring timeout concerns with it.
+- Complete execution tracking via progress events.
+- Ability to handle long-running agent tasks.
+
+<Callout type="note">
+  In any unlikely and unforeseen circumstances, if an individual operation of the workflow times out, you do not receive an error event right now to notify that you should not wait for any more messages. It is better to have a client side timeout for now while the issue is brainstormed and fixed for you. 
+</Callout>
+
+## Set up webhook
+
+Before using the async API, you need to create a webhook to receive agent execution events:
+
+<CodeBlocks>
+  ```bash
+  curl --location 'https://api.devrev.ai/internal/webhooks.create' \
+  --header 'Content-Type: application/json' \
+  --header 'Authorization: <YOUR_API_TOKEN>' \
+  --data '{
+      "url": "https://your-application.com/webhook-endpoint",
+      "event_types": ["ai_agent_response"],
+      "headers": [
+        {
+          "name": "x-api-key",
+          "value": "your-secret-key"
+        }
+      ]
+  }'
+  ```
+
+  ```javascript
+  const axios = require('axios');
+
+  async function createWebhook() {
+    const response = await axios.post('https://api.devrev.ai/internal/webhooks.create', {
+      url: "https://your-application.com/webhook-endpoint",
+      event_types: ["ai_agent_response"],
+      headers: [
+        {
+          name: "x-api-key",
+          value: "your-secret-key"
+        }
+      ]
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': '<YOUR_API_TOKEN>'
+      }
+    });
+
+    return response.data;
+  }
+  ```
+</CodeBlocks>
+
+Save the webhook ID from the response (format: `don:integration:dvrv-us-1:devo/0:webhook/auCJ7By8`). You need this when making async API calls.
+
+Make sure that your webhook endpoint can appropriately respond to the verify events sent by DevRev to verify your webhook. This verify event has a challenge string which you need to return in response. You return the response like this:
+
+  ```json
+  200 OK
+  {
+    "challenge": "DlrVaK7zRyZWwbJhj5dZHDlrVaK7Jhj5dZZjH"
+  }
+  ```
+
+
+You should follow the documentation provided for webhooks [here](https://developer.devrev.ai/public/guides/webhooks)
+
+## Make async API calls
+
+**Key parameters:**
+
+- `agent`: Your agent's ID.
+- `event.input_message.message`: The query for your agent.
+- `session_object`: A unique identifier for the conversation session (maintains agent memory).
+- `webhook_target.webhook`: The webhook ID created earlier.
+
+**To execute an agent asynchronously:**
+
+<CodeBlocks>
+  ```bash
+  curl --location 'https://api.devrev.ai/internal/ai-agents.events.execute-async' \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --header 'Authorization: <YOUR_API_KEY>' \
+  --data '{
+    "agent": "don:core:dvrv-us-1:devo/0:ai_agent/1",
+    "event": {
+      "input_message": {
+        "message": "Your query to the agent"
+      }
+    },
+    "session_object": "unique_conversation_identifier",
+    "webhook_target": {
+      "webhook": "don:integration:dvrv-us-1:devo/0:webhook/auCJ7By8"
+    },
+    "client_metadata": {
+        "user_id": "12345",
+        "conversation_id": "conv-789"
+    }
+  }'
+  ```
+
+  ```javascript
+  const executeAgent = async () => {
+    const response = await fetch('https://api.devrev.ai/internal/ai-agents.events.execute-async', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': '<YOUR_API_KEY>'
+      },
+      body: JSON.stringify({
+        agent: "don:core:dvrv-us-1:devo/0:ai_agent/1",
+        event: {
+          input_message: {
+            message: "Your query to the agent"
+          }
+        },
+        session_object: "unique_conversation_identifier",
+        webhook_target: {
+          webhook: "don:integration:dvrv-us-1:devo/0:webhook/auCJ7By8"
+        },
+        client_metadata: {
+          user_id: "12345",
+          conversation_id: "conv-789"
+        }
+      })
+    });
+    
+    return await response.json();
+  };
+  ```
+</CodeBlocks>
+
+<Callout type="warning">
+  The session_object parameter is critical for maintaining conversation state
+  across multiple calls.
+</Callout>
+
+## Handle webhook events
+
+Your webhook endpoint receives three types of events.
+
+### Progress messages
+
+These show which skills are being triggered and executed.
+
+```json Skill triggered
+{
+  "payload": {
+    "ai_agent_response": {
+      "agent": "don:core:dvrv-us-1:devo/xyz:ai_agent/123",
+      "agent_response": "progress",
+      "client_metadata": { /* your original metadata */ },
+      "progress": {
+        "progress_state": "skill_triggered",
+        "skill_triggered": {
+          "args": { /* skill arguments */ },
+          "skill_name": "SkillName",
+          "workflow": { /* This is not populated if KnowledgeSearch skill is called */
+            "display_id": "workflow-84",
+            "id": "don:integration:dvrv-us-1:devo/xyz:workflow/84"
+          }
+        }
+      },
+      "session": "don:core:dvrv-us-1:devo/xyz:ai_agent_session/3810",
+      "session_object": "unique_conversation_identifier"
+    },
+    "type": "ai_agent_response"
+  }
+}
+```
+
+```json Skill executed
+{
+  "payload": {
+    "ai_agent_response": {
+      "agent": "don:core:dvrv-us-1:devo/xyz:ai_agent/123",
+      "agent_response": "progress",
+      "client_metadata": { /* your original metadata */ },
+      "progress": {
+        "progress_state": "skill_executed",
+        "skill_executed": {
+          "output": { /* skill output */ },
+          "skill_name": "SkillName"
+        }
+      },
+      "session": "don:core:dvrv-us-1:devo/xyz:ai_agent_session/3810",
+      "session_object": "unique_conversation_identifier"
+    },
+    "type": "ai_agent_response"
+  }
+}
+```
+
+### Final message
+
+This event contains the agent's final response after all skills are executed.
+
+```json
+{
+  "payload": {
+    "ai_agent_response": {
+      "agent": "don:core:dvrv-us-1:devo/xyz:ai_agent/123",
+      "agent_response": "message",
+      "client_metadata": {
+        /* your original metadata */
+      },
+      "message": "The agent's final response message",
+      "session": "don:core:dvrv-us-1:devo/xyz:ai_agent_session/3810",
+      "session_object": "unique_conversation_identifier"
+    },
+    "type": "ai_agent_response"
+  }
+}
+```
+
+### Error message
+
+This event indicates an error occurred during execution.
+
+```json
+{
+  "payload": {
+    "ai_agent_response": {
+      "agent": "don:core:dvrv-us-1:devo/xyz:ai_agent/123",
+      "agent_response": "error",
+      "client_metadata": {
+        /* your original metadata */
+      },
+      "error": {
+        "error": "Error description"
+      },
+      "session": "don:core:dvrv-us-1:devo/xyz:ai_agent_session/3810",
+      "session_object": "unique_conversation_identifier"
+    },
+    "type": "ai_agent_response"
+  }
+}
+```
+
+## Implementation patterns
+
+### Custom applications
+
+<Callout type="info">
+  This pattern is ideal for custom chat interfaces, backend systems, or any
+  application that needs to interact with DevRev agents.
+</Callout>
+
+For building custom applications with the async API:
+
+1. Create a webhook endpoint in your application that can receive POST requests.
+2. Register this endpoint with DevRev using the webhooks.create API.
+3. Make async API calls with your agent ID and webhook ID.
+4. Process incoming webhook events to:
+   - Track progress (optional).
+   - Display the final agent response to the user.
+   - Handle any errors.
+
+Example flow for a chat application:
+
+```javascript
+// 1. When user sends a message
+function handleUserMessage(message) {
+  // Show loading indicator
+  displayLoadingIndicator();
+
+  // Make async API call
+  fetch("https://api.devrev.ai/internal/ai-agents.events.execute-async", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "YOUR_API_KEY",
+    },
+    body: JSON.stringify({
+      agent: "your_agent_id",
+      event: {
+        input_message: {
+          message: message,
+        },
+      },
+      session_object: "conversation_" + userId,
+      webhook_target: {
+        webhook: "your_webhook_id",
+      },
+      client_metadata: {
+        conversation_id: conversationId,
+      },
+    }),
+  });
+}
+
+// 2. Webhook handler (server-side)
+app.post("/webhook-endpoint", (req, res) => {
+  const event = req.body;
+
+  // Add handling for verify events
+
+  const conversationId =
+    event.payload.ai_agent_response.client_metadata.conversation_id;
+
+  if (event.payload.ai_agent_response.agent_response === "message") {
+    // Final message
+    const message = event.payload.ai_agent_response.message;
+    sendToClient(conversationId, {
+      type: "agent_response",
+      message: message,
+    });
+  } else if (event.payload.ai_agent_response.agent_response === "error") {
+    // Error occurred
+    sendToClient(conversationId, {
+      type: "agent_error",
+      error: event.payload.ai_agent_response.error.error,
+    });
+  }
+
+  res.status(200).send("OK");
+});
+```
+
+<Callout type="tip">
+  Using WebSockets or Server-Sent Events can provide real-time updates to your
+  UI as events are received.
+</Callout>
+
+### Talk to agent node in workflows
+
+<Callout type="note">
+  This is in early access, please contact support to have it enabled for you.
+</Callout>
+
+If you're using DevRev workflows:
+
+<Callout type="info">
+  The workflow engine handles the async API calls for you when using the Talk To
+  Agent node.
+</Callout>
+
+1. Add the "Talk To Agent" node to your workflow 
+2. Configure it with your agent ID
+3. Connect it to response nodes to process the agent's output
+4. The async API is used automatically by the workflow engine
+
+
+## Troubleshooting
+
+<Callout type="warning">Common issues and their solutions</Callout>
+
+**Not receiving webhook events?**
+
+- Verify your webhook URL is publicly accessible
+- Check that you've registered for the "ai_agent_response" event type
+- Ensure your server responds with a 2xx status code quickly
+
+**Execution errors?**
+
+- Check the error message in the error event
+- Verify your agent ID is correct
+- Ensure your session_object is a valid string
+
+**Agent not responding as expected?**
+
+- Review the skill_triggered and skill_executed events to see which skills were invoked
+- Check if any skills returned error outputs
+- Verify your agent's configuration in the DevRev agent builder

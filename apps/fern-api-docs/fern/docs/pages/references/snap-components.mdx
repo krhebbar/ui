@@ -1,0 +1,113 @@
+Snap components enable adding custom UI components defined by snap-kit to the DevRev UI.
+These components can be used to display data or interact with the user.
+Snap components are defined in the snap-in manifest file. DevRev UI renders these components based on the defined configuration.
+
+Each snap-component has the following properties:
+
+- `surface` : The surface where the snap component can be displayed.
+- `snap_kit_action_name` : The name of the action within the snap kit that is triggered when the snap component's defined action is engaged.
+- `snap_kit_body` : The initial body content of the snap kit action that is rendered upon loading the snap component.
+- `initializer` : Refers to a function that can be invoked to set up the snap component. This is particularly useful when the component needs to be initialized with server data, depending on the context in which it is being deployed.
+
+```yaml
+functions:
+ - name: upgrade_test_function_1
+   description: first function
+
+snap_kit_actions:
+  - name: show_test_cases
+    function: show_test_cases_or_runs
+
+snap_components:
+  - name: show_test_cases
+    display_name: Test Case Details
+    description: Test Case Details
+    surface: issue
+    snap_kit_action_name: show_test_cases
+    initializer: upgrade_test_function_1
+    snap_kit_body:
+      {
+        "snaps":[]
+      }
+```
+
+## Format of context passed to snap-kit action
+
+```typescript
+// The payload contains details and values of the snap-kit from which the action was invoked.
+interface Payload {
+  action: {
+    block_id: string;
+    id: string;
+    timestamp: number;
+    type: string;
+    value: string;
+  };
+  action_id: string;
+  actor_id: string;
+  body: {
+    snaps: any[];
+  };
+  context: {
+ // id of the object where the snap component is invoked.
+    object_id: string;
+  };
+  dev_org: string;
+  parent_id: string;
+  request_id: string;
+}
+
+interface Secrets {
+  actor_session_token: string;
+  service_account_token: string;
+}
+
+interface Context {
+  dev_oid: string;
+  // Snap-kit action ID in DONv2 format.
+  source_id: string;
+  snap_in_id: string;
+  snap_in_version_id: string;
+  service_account_id: string;
+  secrets: Secrets;
+}
+
+interface ExecutionMetadata {
+  request_id: string;
+  // function that is being invoked.
+  function_name: string;
+  // endpoint for DevRev that can be used to make API calls.
+  devrev_endpoint: string;
+}
+
+interface InputData {
+  global_values: {
+    // contains the inputs that are defined in the snap-in.
+  };
+  event_sources: any;
+  resources: {
+    keyrings: any;
+    tags: any;
+  };
+}
+
+// Event object passed to the snap-kit action.
+interface Event {
+ // The payload of the event
+  payload: Payload;
+  context: Context;
+  execution_metadata: ExecutionMetadata;
+  input_data: InputData;
+}
+```
+
+## List of surfaces
+
+| Surface                 | Description                                                                                   |
+|-------------------------|-----------------------------------------------------------------------------------------------|
+| issue                   | Issue surface is used to display snap components in the issue view.                           |
+| support                 | Support surface is used to display snap components in the Customer Portal.                    |
+| comments_rte            | Comments RTE surface is used to display snap components in the comments section of the timeline. |
+| snap_in__configuration  | Snap-in configuration surface is used to display snap components in the snap-in configuration view. |
+| plug                    | Plug surface is used to display snap components in the plug widget.                           |
+

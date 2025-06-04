@@ -1,0 +1,137 @@
+The DevRev API is organized around REST. Our API has predictable resource-oriented URLs, accepts form-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
+
+If you're new to DevRev APIs, you've come to the right place. Our APIs serve as the foundation for integrating your apps, building automations, and creating custom snap-ins.
+You can also refer to our [Postman collection](https://postman.devrev.ai/).
+
+[![Run In Postman](https://run.pstmn.io/button.svg)](https://postman.devrev.ai/)
+
+<CodeBlock>
+  ```
+  https://api.devrev.ai
+  ```
+</CodeBlock>
+
+You can use the DevRev API in test a demo organization which doesn’t affect your live data or interact with your real customers. 
+
+To create a new organization in DevRev:
+
+1. Click on your profile picture on the top left corner. 
+2. Go to the **Orgs** section and click on **+**.
+3. Fill in the details and click **Create**.
+
+Now you can find your newly created org in **Orgs**.
+
+Login into your demo org and [obtain the PAT token](/about/authentication#generate-a-personal-access-token-pat). 
+Now you can use this PAT token to make test API calls and try building something new.
+
+In this tutorial, you will be able to retrive your account information by using the `dev-users` API. Let's get started with DevRev APIs.
+
+## Prerequisites
+
+First, create a DevRev account or log in.
+
+Every call to a DevRev API must include a PAT. After you create your account, [generate a personal access token](/about/authentication) and store it in a safe place. 
+
+In this guide, you’ll make a call to the [`dev-users.self`](/api-reference/dev-users/self) API which gets the authenticated user's information. You will retrieve the user object created for your account on DevRev. This user object contains information such as a unique identifier, full name, display name, and profile picture.
+
+Every object in DevRev is uniquely identified by an `id` known as DevRev Object Notation (DON). DON `id` can be found in the API response. 
+The value `SELF` can be passed in as `id` to reference the logged-in user.
+
+The `display-id` shown in the UI for [work item](https://docs.devrev.ai/product/core#work) objects such as issues and tickets can be used interchangeably with the `id` to enhance usability. In the image below, `ISS-69` serves as an example of a `display-id` for issues.
+
+![Display ID in DevRev UI](../img/display_id.png)
+
+Next, you'll want to set up your development environment to connect and interact with the DevRev API.
+
+## Send your first API request
+
+To do this, make a GET request to the DevRev server ("https://api.devrev.ai/dev-users.self") and include the PAT created in the authorization header of the request. 
+
+This guide shows you how to get user information with a GET request using two popular languages as well as cURL:
+
+### Making a GET request 
+
+<CodeBlocks>
+  <CodeBlock title = "cURL">
+    ```bash
+    curl --location --request GET 'https://api.devrev.ai/dev-users.self' \
+    --header 'Authorization: <PAT>'
+    ```
+  </CodeBlock>
+  <CodeBlock title = "Python">
+    ```python
+    import requests
+
+    url = 'https://api.devrev.ai/dev-users.self'
+    headers = {
+        'Authorization': '<PAT>'
+    }
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        # You can access the response content with response.text
+        print(response.text)
+    else:
+        print(f'Request failed with status code {response.status_code}')
+
+    ```
+  </CodeBlock>
+  <CodeBlock title = "Node JS">
+  ```js
+  const axios = require('axios');
+
+const url = 'https://api.devrev.ai/dev-users.self';
+const token = '<PAT>'; // Replace <PAT> with your actual personal access token
+
+axios.get(url, {
+  headers: {
+    'Authorization': token,
+  }
+})
+  .then(response => {
+    console.log(response.data);
+  })
+  .catch(error => {
+    console.error(error);
+  });
+  ```
+  </CodeBlock>
+</CodeBlocks>
+
+If everything works, the command line displays the following response for a user named "John Smith Doe":
+
+<CodeBlock title = "Response">
+```json
+{
+    "dev_user": {
+        "display_handle": "John Doe",
+        "created_date": "2022-01-28T10:45:53.698Z",
+        "modified_date": "2022-01-28T10:45:53.698Z",
+        "profile_picture": "<logo-url-here>",
+        "auth0_user_ids": [
+            "auth0|abcd1234eca43c006913f97d"
+        ],
+        "id": "don:identity:dvrv-us-1:devo/20:devu/40",
+        "display_id": "DEVU-40",
+        "state": "active",
+        "full_name": "John Smith Doe",
+        "email": "JohnDoe@devrev.ai"
+    }
+}
+```
+</CodeBlock>
+
+
+The response contains `"id": "don:identity:dvrv-us-1:devo/20:devu/40",`. The `id` identifies the `devo` ID (Dev organization ID) as `devo/<devo-id>` and the `devu` ID (Dev user ID) as `devu/<devu-id>`. 
+In the present response, `devo/<devo-id>` is 20, and `devu/<devu-id>` is 40, respectively.
+
+In general, you can find devo, devu, revo, revu IDs in the `id` or `external_ref` fields of the API response.
+
+<Callout intent="info">
+Facing an error while authenticating the APIs? Refer to our [errors guide](/about/errors) to learn more about our error codes.
+</Callout>
+
+## Next steps
+
+You’re all set to explore our platform. You are ready to browse through our APIs and build your first integration with DevRev.

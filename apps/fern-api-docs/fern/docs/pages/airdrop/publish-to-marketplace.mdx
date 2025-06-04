@@ -1,0 +1,43 @@
+When your snap-in is ready for use by you or other organizations, you can publish it to the DevRev marketplace. 
+Before starting the publication process, make sure your snap-in is deployed to your organization.
+If you need a refresher, refer to the [instructions](/snapin-development/adaas/development-guide/deploy-to-organization) for deploying your snap-in.
+
+### 1. Create marketplace listing
+
+When creating a new marketplace listing, an initial marketplace submission must be created with all the mandatory properties. To create a new listing, run the following command, which starts a wizard to guide you through the process:
+
+```bash
+devrev marketplace_submissions create
+```
+
+### 2. Submit marketplace listing for review
+
+The newly created marketplace submission is in the _Draft_ state. In order to publish it, it first has to transition to _Waiting for review_ state. This can be done by running the following command, which starts a wizard to guide you through the process:
+
+```bash
+devrev marketplace_submissions transition
+```
+
+Once the submission is transitioned to the _Waiting for review_ state, it needs to be approved by a marketplace admin. While in review, the state of the submission is _In review_. Once it is reviewed, the state changes to either _Approved_ or _Rejected_.
+
+<Callout intent="note">
+  Submissions whose state is _In review_ or _Approved_ cannot be modified.
+</Callout>
+
+If the submission was rejected, you can transition it back to _Draft_ and modify it to satisfy the requirements. Once it is updated, you can transition it back to _Waiting for review_ to be reviewed again.
+
+### 3. Publish marketplace submission
+
+If the submission is approved, you can publish it using the following command, which starts a wizard to guide you through the process:
+
+```bash
+devrev marketplace_items publish
+```
+
+To make sure that marketplace item was published you can retrieve it using its ID:
+
+```bash
+devrev marketplace_items show [marketplace_item_id] | jq '{name: .name, id: .id, state: .state}'
+```
+
+Learn more about the markeplace [here](/snapin-development/marketplace-listings).

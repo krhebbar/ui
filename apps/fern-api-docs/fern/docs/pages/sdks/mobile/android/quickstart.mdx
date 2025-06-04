@@ -1,0 +1,150 @@
+# Quickstart guide
+
+## Requirements
+
+- Android Studio 2022.1.1 or later
+- Android Gradle plugin version 7.4 or later
+- Gradle version 7.6 or later
+- Minimum Android SDK 24
+
+## Integration
+
+To integrate the latest version of our SDK into your app, follow these steps:
+
+<Tabs>
+<Tab title="Kotlin">
+1. Add the following dependencies to your app's `build.gradle.kts` file:
+
+   ```kotlin
+   dependencies {
+    implementation("ai.devrev.sdk:devrev-sdk:<version>")
+   }
+   ```
+2. Add `mavenCentral` to your root `build.gradle.kts` file:
+   ```kotlin
+   repositories {
+    mavenCentral()
+   }
+   ```
+</Tab>
+<Tab title="Groovy">
+1. Add the following dependencies to your app's `build.gradle` file:
+
+   ```groovy
+   dependencies {
+    implementation 'ai.devrev.sdk:devrev-sdk:<version>'
+   }
+   ```
+
+2. Add `mavenCentral` to your root `build.gradle` file:
+   ```groovy
+   repositories {
+       mavenCentral()
+   }
+   ```
+</Tab>
+</Tabs>
+
+## Set up the DevRev SDK
+
+1. Open the DevRev web app at [https://app.devrev.ai](https://app.devrev.ai) and go to the **Settings** page.
+2. Under **PLuG settings** copy the value under **Your unique App ID**.
+3. After obtaining the credentials, you can configure the DevRev SDK in your app.
+
+The SDK will be ready for use once you execute the following configuration method.
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.configure(context: Context, appId: String)
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.configure(Context context, String appId);
+   ```
+  </Tab>
+</Tabs>
+
+Ensure that the custom application is specified in the `AndroidManifest.xml`:
+
+```xml
+<application
+    android:name=".MyApp">
+</application>
+```
+
+Use this property to check whether the DevRev SDK has been configured:
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   DevRev.isConfigured
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   DevRev.INSTANCE.isConfigured();
+   ```
+  </Tab>
+</Tabs>
+
+<Callout intent="note">
+`prefersDialogMode`, if set to true, enables the SDK to open the screens in the app's main task/activity
+</Callout>
+
+4. To configure the SDK, you need to call the following method inside your `Application` class:
+
+<Callout intent="note">
+If you don’t have a custom `Application` class, create one as shown below.
+</Callout>
+
+<Tabs>
+  <Tab title="Kotlin">
+   ```kotlin
+   import ai.devrev.sdk.DevRev
+
+   class FooApplication : Application() {
+
+      override fun onCreate() {
+         super.onCreate()
+         DevRev.configure(
+               context = this,
+               appId = "<APP_ID>"
+         )
+      }
+   }
+   ```
+  </Tab>
+  <Tab title="Java">
+   ```java
+   import ai.devrev.sdk.DevRev;
+
+   public class FooApplication extends Application {
+
+      @Override
+      public void onCreate() {
+         super.onCreate();
+         DevRev.INSTANCE.configure(
+               this,
+               "<APP_ID>"
+         );
+      }
+   }
+   ```
+  </Tab>
+</Tabs>
+
+5. In the `onCreate` method of your `Application`, configure the DevRev SDK with the required parameters using the credentials obtained earlier.
+6. Ensure that the custom application is specified in the `AndroidManifest.xml`, as shown below:
+```xml
+<application
+    android:name=".FooApplication">
+</application>
+```
+
+## Sample app
+
+We provide a sample app demonstrating use cases with both XML-based UI and Jetpack Compose as part our [public repository](https://github.com/devrev/devrev-sdk-android).
+
+Before running the sample app, make sure to configure it with your DevRev credentials. To do this, update the `ai.devrev.sdk.sample.DevRevApplication` class with your credentials.
