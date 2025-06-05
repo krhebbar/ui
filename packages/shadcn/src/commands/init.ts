@@ -1,15 +1,10 @@
 import path from "path"
 import { preFlightInit } from "@/src/preflights/preflight-init"
 import { addComponents } from "@/src/utils/add-item"
-import { createProject } from "@/src/utils/create-project"
 import * as ERRORS from "@/src/utils/errors"
 import {
   getConfig,
-  resolveConfigPaths,
 } from "@/src/utils/get-config"
-import {
-  getProjectInfo,
-} from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
@@ -34,7 +29,6 @@ import { cloneTemplate } from "@/src/utils/git";
 import fs from "fs-extra";
 import yaml from 'js-yaml'; // Added import
 
-const AIRDROP_TEMPLATE_URL = "https://github.com/devrev/airdrop-template";
 import { Command } from "commander"
 import prompts from "prompts"
 import { z } from "zod"
@@ -107,7 +101,6 @@ export async function runInit(
     skipPreflight?: boolean;
   }
 ) {
-  let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo
   // Updated airdropConfigResult type to include new env var names
   let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; devrevPatEnvVarName?: string; devrevOrgEnvVarName?: string; };
 
@@ -258,14 +251,14 @@ export async function runInit(
         }
       } else {
         // Directory is not empty, or it's a forced/silent operation on an existing dir.
-        // getProjectInfo would have been called by preflight or needs to be called if preflight was skipped.
-        projectInfoFromGetProjectInfo = preflight.projectInfo || await getProjectInfo(options.cwd);
+        // projectInfo (from preflight) would have been available if needed.
+        // Original getProjectInfo call removed as its result was unused.
       }
     } else if (options.skipPreflight) {
         // Preflight skipped, try to get project info directly if it's an existing project context
         // This path might need careful review depending on how skipPreflight is used
         if (await fs.pathExists(path.join(options.cwd, "manifest.yml")) || await fs.pathExists(path.join(options.cwd, "manifest.yaml"))) {
-            projectInfoFromGetProjectInfo = await getProjectInfo(options.cwd);
+            // Original getProjectInfo call removed as its result was unused.
         }
     }
   }
@@ -556,7 +549,7 @@ async function gatherAirdropConfiguration(
         type: "list",
         name: "externalSyncUnits",
         message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
-        initial: "tickets,conversations",
+        initial: "",
         separator: ",",
       },
       {
@@ -585,30 +578,12 @@ async function gatherAirdropConfiguration(
     hint: "- Space to select. Enter to submit."
   });
 
-  // Add prompts for DevRev PAT and Org Slug environment variable names
-  promptsList.push(
-    {
-      type: "text",
-      name: "devrevPatEnvVarName",
-      message: "Environment variable name for DevRev PAT Token (e.g., DEVREV_PAT):",
-      initial: "DEVREV_PAT",
-    },
-    {
-      type: "text",
-      name: "devrevOrgEnvVarName",
-      message: "Environment variable name for DevRev Organization Slug (e.g., DEVREV_ORG):",
-      initial: "DEVREV_ORG",
-    }
-  );
-
   const responses = await prompts(promptsList);
    // Handle cases where prompts might be skipped (e.g. user presses Ctrl+C during promptsList)
   if (Object.keys(responses).length === 0 && promptsList.length > 0 && !options.yes && !options.silent) {
     // This condition might indicate that prompts were exited early (e.g. Ctrl+C)
     // Check some key expected responses
-    if (typeof responses.devrevObjects === 'undefined' ||
-        typeof responses.devrevPatEnvVarName === 'undefined' ||
-        typeof responses.devrevOrgEnvVarName === 'undefined') {
+    if (typeof responses.devrevObjects === 'undefined') {
         logger.error("Project configuration was not completed (essential prompts skipped). Aborting.");
         process.exit(0);
     }
@@ -617,11 +592,6 @@ async function gatherAirdropConfiguration(
         logger.error("External system configuration was not completed. Aborting.");
         process.exit(0);
     }
-  }
-  // Specific check for cancellation of new prompts if they were the only ones left (e.g. if promptsList was short)
-  if (typeof responses.devrevPatEnvVarName === 'undefined' || typeof responses.devrevOrgEnvVarName === 'undefined') {
-    logger.error("DevRev PAT or Organization Slug environment variable names were not provided. Aborting.");
-    process.exit(0);
   }
 
 
@@ -667,9 +637,18 @@ async function gatherAirdropConfiguration(
     }
   }
 
-  const externalSyncUnitsList = (needsExternalSystem && responses.externalSyncUnits)
-                               ? (Array.isArray(responses.externalSyncUnits) ? responses.externalSyncUnits : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean))
-                               : undefined;
+  let externalSyncUnitsList = (needsExternalSystem && responses.externalSyncUnits)
+                               ? (
+                                  Array.isArray(responses.externalSyncUnits)
+                                    ? responses.externalSyncUnits.map((s: string) => s.trim()).filter(Boolean)
+                                    : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean)
+                                 ).filter(unit => unit.length > 0) // Ensure empty strings after split are removed
+                               : []; // Default to empty array if not needed or no response
+
+  // Additional check for the case where externalSyncUnits is an empty string from the prompt
+  if (needsExternalSystem && responses.externalSyncUnits === "") {
+    externalSyncUnitsList = [];
+  }
 
   return {
     projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName,
@@ -687,8 +666,8 @@ async function gatherAirdropConfiguration(
         }
       : undefined,
     connection: needsExternalSystem && connectionDetails ? connectionDetails : undefined,
-    devrevPatEnvVarName: responses.devrevPatEnvVarName,
-    devrevOrgEnvVarName: responses.devrevOrgEnvVarName,
+    devrevPatEnvVarName: "DEVREV_PAT",
+    devrevOrgEnvVarName: "DEVREV_ORG",
   };
 }
 
@@ -760,12 +739,10 @@ function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, 
     }
   }
 
-  if (config.devrevPatEnvVarName) {
-    envVars[config.devrevPatEnvVarName] = "your-devrev-pat-here";
-  }
-  if (config.devrevOrgEnvVarName) {
-    envVars[config.devrevOrgEnvVarName] = "your-devrev-org-slug-here";
-  }
+  // Add DevRev PAT and Org slug environment variables directly
+  // These names are now fixed due to changes in gatherAirdropConfiguration
+  envVars["DEVREV_PAT"] = "your-devrev-pat-here";
+  envVars["DEVREV_ORG"] = "your-devrev-org-slug-here";
 
   return envVars;
 }
@@ -847,29 +824,13 @@ async function updateManifestYaml(
     yamlData.description = manifestDescriptionPlaceholderTarget;
   }
 
-  // These fields are explicitly set or omitted based on new config, so remove old ones.
+  // Explicitly delete type, slug, and connection from the root of yamlData
   delete yamlData.type;
+  delete yamlData.slug;
   delete yamlData.connection;
 
-  // Define the core new structure based on gathered config
-  const newCoreManifestValues: any = {
-    name: manifestName,
-    description: yamlData.description, // Use the (potentially placeholder-replaced) description
-    type: projectType === 'snap-in'
-            ? (externalSystem ? 'snap-in.external-system' : 'snap-in.native')
-            : 'airdrop',
-    slug: projectSlugForManifest, // This is the main slug for the snap-in/airdrop itself
-  };
-
-  if (connection && externalSystem) { // Only add connection if it's configured
-    newCoreManifestValues.connection = {
-      type: connectionTypeForManifest,
-      id: connectionIdForManifest,
-    };
-  }
-
-  // Merge existing yamlData with newCoreManifestValues, then specific deeper updates
-  yamlData = { ...yamlData, ...newCoreManifestValues };
+  // The rest of the function continues, but these fields (type, slug, connection)
+  // should not be reintroduced at the root level.
 
 
   // Service account update
