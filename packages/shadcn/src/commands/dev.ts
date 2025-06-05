@@ -7,7 +7,7 @@ import {
   getSnapInContext,
 } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
-import inquirer from "inquirer";
+import prompts from "prompts";
 
 export const dev = new Command()
   .name("dev")
@@ -46,25 +46,25 @@ export const dev = new Command()
     }
 
     if (!path) {
-      const pathAnswers = await inquirer.prompt([
+      const pathAnswers = await prompts([
         {
-          type: "input",
+          type: "text",
           name: "path",
           message: "Enter the path to your Snap-in code/distributables:",
-          default: "./",
-          validate: (input) => input ? true : "Path cannot be empty.",
+          initial: "./",
+          validate: (input: string) => input ? true : "Path cannot be empty.",
         },
       ]);
       path = pathAnswers.path;
     }
 
     if (!url) { // URL is specific to dev command, always prompt if not given
-      const urlAnswers = await inquirer.prompt([
+      const urlAnswers = await prompts([
         {
-          type: "input",
+          type: "text",
           name: "url",
           message: "Enter your ngrok or other forwarding URL for testing:",
-          validate: (input) => {
+          validate: (input: string) => {
             if (!input) return "URL cannot be empty.";
             if (!input.startsWith("http://") && !input.startsWith("https://")) {
                 return "URL must start with http:// or https://";
@@ -89,9 +89,9 @@ export const dev = new Command()
           packageId = context.snap_in_package_id;
         } else {
           // Prompt only if not creating a package with a slug
-          const pkgAnswers = await inquirer.prompt([
+          const pkgAnswers = await prompts([
             {
-              type: "input",
+              type: "text",
               name: "packageId",
               message: "Enter the Snap-in package ID (leave blank if --create-package is used with a manifest slug):",
             }
@@ -110,12 +110,12 @@ export const dev = new Command()
 
     // Prompt for manifestPath only if not provided by options and not found via projectInfo
     if (!manifestPath) { // manifestPath would be set if projectInfo.manifestPath existed
-        const manifestAnswers = await inquirer.prompt([
+        const manifestAnswers = await prompts([
             {
-                type: "input",
+                type: "text",
                 name: "manifestPath",
                 message: "Enter the path to your Snap-in manifest file (e.g., manifest.yaml, default is auto-detected by CLI if left blank):",
-                default: "", // CLI will auto-detect if empty
+                initial: "", // CLI will auto-detect if empty
             }
         ]);
         if (manifestAnswers.manifestPath) manifestPath = manifestAnswers.manifestPath;
@@ -156,12 +156,12 @@ export const dev = new Command()
       }
 
       // 3. Activate the Snap-in
-      const activationPrompt = await inquirer.prompt([
+      const activationPrompt = await prompts([
         {
             type: "confirm",
             name: "activate",
             message: `Do you want to activate this Snap-in (ID: ${snapInId}) for testing?`,
-            default: true,
+            initial: true,
         }
       ]);
 

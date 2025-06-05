@@ -1,12 +1,7 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { checkoutSnapInContext, listSnapInContexts } from "../../utils/devrev-cli-wrapper";
-import inquirer from "inquirer";
-// inquirer-autocomplete-prompt is not a standard dependency, assuming it might not be available.
-// Using standard list prompt instead. If autocomplete is essential, it needs to be added as a project dependency.
-// import inquirerAutocompletePrompt from 'inquirer-autocomplete-prompt';
-// inquirer.register('autocomplete', inquirerAutocompletePrompt);
-
+import prompts from "prompts";
 
 export const contextCheckout = new Command()
   .name("checkout")
@@ -24,13 +19,15 @@ export const contextCheckout = new Command()
           process.exit(0);
         }
 
-        const answers = await inquirer.prompt([
+        const answers = await prompts([
           {
-            type: "list", // Using 'list' as 'autocomplete' might not be installed
+            type: "select",
             name: "contextName",
             message: "Select the Snap-in context to checkout:",
-            choices: availableContexts,
-            //pageSize: 10, // For list type
+            choices: availableContexts.map((context: string) => ({
+              title: context,
+              value: context
+            })),
           },
         ]);
         contextName = answers.contextName;

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { createSnapInPackage } from "../../utils/devrev-cli-wrapper";
-import inquirer from "inquirer";
+import prompts from "prompts";
 
 export const packageCreate = new Command()
   .name("create")
@@ -13,12 +13,12 @@ export const packageCreate = new Command()
     let { slug } = options;
 
     if (!slug) {
-      const answers = await inquirer.prompt([
+      const answers = await prompts([
         {
-          type: "input",
+          type: "text",
           name: "slug",
           message: "Enter the slug name for the new Snap-in package:",
-          validate: (input) => {
+          validate: (input: string) => {
             if (!input) return "Slug name cannot be empty.";
             // Basic slug validation (lowercase, numbers, hyphens)
             if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input)) {

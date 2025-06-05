@@ -86,7 +86,7 @@ export async function preFlightInit(
         filesInEffectivePath[0] === ".git")
   } catch (e) {
     // This might happen if effectivePath is somehow invalid after all, though unlikely here
-    logger.warn(`Could not read directory contents of ${effectivePath}: ${e.message}`)
+    logger.warn(`Could not read directory contents of ${effectivePath}: ${(e as Error).message}`)
     // Keep isDirectoryEmpty as false
   }
   

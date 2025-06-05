@@ -9,7 +9,7 @@ import {
   getSnapInContext,
 } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
-import inquirer from "inquirer";
+import prompts from "prompts";
 
 export const release = new Command()
   .name("release")
@@ -134,14 +134,12 @@ export const release = new Command()
     }
 
     try {
-        const { activate } = await inquirer.prompt([
-            {
+        const { activate } = await prompts({
             type: "confirm",
             name: "activate",
             message: `Do you want to activate this Snap-in (ID: ${snapInToActivateId})? This will make it live.`,
-            default: true,
-            },
-        ]);
+            initial: true,
+        });
 
         if (activate) {
             logger.info(`Activating Snap-in ID '${snapInToActivateId}'...`);

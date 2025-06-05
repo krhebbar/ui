@@ -6,7 +6,7 @@ import { logger } from "@/src/utils/logger"; // Adjust path
 // import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
 import { createSnapInVersion, getSnapInContext } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
-import inquirer from "inquirer";
+import prompts from "prompts";
 
 export const build = new Command()
   .name("build")
@@ -45,18 +45,21 @@ export const build = new Command()
     }
 
     if (!path && !archivePath) {
-      const answers = await inquirer.prompt([
+      const answers = await prompts([
         {
-          type: "input",
+          type: "text",
           name: "pathOrArchive",
           message: "Enter the path to your Snap-in code/distributables or a pre-built archive:",
-          validate: (input) => input ? true : "Path or archive cannot be empty.",
+          validate: (input: string) => input ? true : "Path or archive cannot be empty.",
         },
         {
-            type: "list",
+            type: "select",
             name: "type",
             message: "Is this a path to code/distributables or a pre-built archive?",
-            choices: ["Code Path", "Archive Path"],
+            choices: [
+              { title: "Code Path", value: "Code Path" },
+              { title: "Archive Path", value: "Archive Path" }
+            ],
         }
       ]);
       if (answers.type === "Code Path") {
@@ -78,9 +81,9 @@ export const build = new Command()
           logger.info(`Using Snap-in package ID from current context: ${context.snap_in_package_id}`);
           packageId = context.snap_in_package_id;
         } else {
-          const pkgAnswers = await inquirer.prompt([
+          const pkgAnswers = await prompts([
             {
-              type: "input",
+              type: "text",
               name: "packageId",
               message: "Enter the Snap-in package ID (leave blank if --create-package is used with a manifest slug):",
             }
@@ -100,12 +103,12 @@ export const build = new Command()
 
     // Prompt for manifestPath only if not provided by options and not found via projectInfo
     if (!manifestPath) { // manifestPath would be set if projectInfo.manifestPath existed
-        const manifestAnswers = await inquirer.prompt([
+        const manifestAnswers = await prompts([
             {
-                type: "input",
+                type: "text",
                 name: "manifestPath",
                 message: "Enter the path to your Snap-in manifest file (e.g., manifest.yaml, default is auto-detected by CLI if left blank):",
-                default: "", // CLI will auto-detect if empty
+                initial: "", // CLI will auto-detect if empty
             }
         ]);
         if (manifestAnswers.manifestPath) manifestPath = manifestAnswers.manifestPath;
