@@ -101,7 +101,6 @@ export async function runInit(
     skipPreflight?: boolean;
   }
 ) {
-<<<<<<< HEAD
   let preflightCheckResult;
   if (!options.skipPreflight) {
     preflightCheckResult = await preFlightInit(options);
@@ -124,9 +123,6 @@ export async function runInit(
 
 
   // let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo - Potentially remove if preflightCheckResult replaces its use cases
-=======
-  // Updated airdropConfigResult type to include new env var names
->>>>>>> 94b8037e (Refactor: Simplify and clean up snap-in init command)
   let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; devrevPatEnvVarName?: string; devrevOrgEnvVarName?: string; };
 
   // --- Start of Manifest Overwrite Prompt and Conditional Logic ---
@@ -226,7 +222,6 @@ export async function runInit(
           logger.info(`Snap-in template cloned (silent/yes mode).`);
         }
       } else {
-<<<<<<< HEAD
         logger.info("Skipping template cloning due to existing manifest and user choice/--yes without --force.");
       }
   }
@@ -253,17 +248,6 @@ export async function runInit(
              // If options.cwd is truly empty, maybe we should create options.cwd/projectName?
              // For now, let's stick to options.cwd from preflight as the true root.
              // logger.warn(`Project name '${airdropConfigResult.projectName}' differs from target directory name '${path.basename(options.cwd)}'. Using '${options.cwd}' as root.`);
-=======
-        // Directory is not empty, or it's a forced/silent operation on an existing dir.
-        // projectInfo (from preflight) would have been available if needed.
-        // Original getProjectInfo call removed as its result was unused.
-      }
-    } else if (options.skipPreflight) {
-        // Preflight skipped, try to get project info directly if it's an existing project context
-        // This path might need careful review depending on how skipPreflight is used
-        if (await fs.pathExists(path.join(options.cwd, "manifest.yml")) || await fs.pathExists(path.join(options.cwd, "manifest.yaml"))) {
-            // Original getProjectInfo call removed as its result was unused.
->>>>>>> 94b8037e (Refactor: Simplify and clean up snap-in init command)
         }
 
 
