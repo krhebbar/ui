@@ -1,0 +1,17 @@
+$ devrev snap_in_context checkout --help
+checkout the requested snap_in_context
+
+Usage:
+  devrev snap_in_context checkout [flags]
+
+Flags:
+  -h, --help   help for checkout
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

@@ -1,0 +1,28 @@
+$ devrev snap_in_version --help
+DevRev Snap-in version interactions
+
+Usage:
+  devrev snap_in_version [command]
+
+Available Commands:
+  create-one        Create a Snap-in version
+  delete-one        delete a snap_in_version by don id
+  init              Setup a 'hello world' Snap-in
+  list              Lists Snap-in versions under a Snap-in package.
+  show              Get a Snap-in version
+  upgrade           Upgrades a Snap-in version.
+  validate-manifest Validate a Snap-in version manifest
+
+Flags:
+  -h, --help   help for snap_in_version
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with
+
+Use "devrev snap_in_version [command] --help" for more information about a command.

@@ -1,0 +1,18 @@
+$ devrev snap_in delete-one --help
+delete a snap_ins by don id
+
+Usage:
+  devrev snap_in delete-one [id] [flags]
+
+Flags:
+      --force   Force delete of Snap-in
+  -h, --help    help for delete-one
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

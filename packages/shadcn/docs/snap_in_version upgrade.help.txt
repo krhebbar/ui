@@ -1,0 +1,22 @@
+$ devrev snap_in_version upgrade --help
+Upgrades a Snap-in version.
+
+Usage:
+  devrev snap_in_version upgrade [id] [flags]
+
+Flags:
+      --archive string       Archive path
+      --force                Force upgrade of Snap-in version even if it is not compatible for upgrade with existing version
+  -h, --help                 help for upgrade
+      --manifest string      Manifest path
+      --path string          Path to the directory containing the manifest file a source code for Snap-in function(s)
+      --testing-url string   URL for testing Snap-in version
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

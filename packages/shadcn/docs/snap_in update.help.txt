@@ -1,0 +1,18 @@
+$ devrev snap_in update --help
+Reads line-oriented json input, updates one object from every line, extracting the id to update from a json field that has the same name as the id in list-s output (so it can be piped to it)
+
+Usage:
+  devrev snap_in update [id] [flags]
+
+Flags:
+  -n, --concurrency int   Number of goroutines to use  (default 1)
+  -h, --help              help for update
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

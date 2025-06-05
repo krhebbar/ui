@@ -1,0 +1,20 @@
+$ devrev snap_in_package create-one --help
+Creates a Snap-in package.
+
+Usage:
+  devrev snap_in_package create-one [flags]
+
+Flags:
+  -n, --concurrency int   Number of goroutines to use  (default 1)
+  -h, --help              help for create-one
+      --no-prune          Do not remove keys the server does not expect
+  -s, --slug string       Globally unique slug for the Snap-in package
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

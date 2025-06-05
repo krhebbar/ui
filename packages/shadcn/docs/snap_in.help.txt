@@ -1,0 +1,28 @@
+$ devrev snap_in --help
+DevRev Snap-ins interactions
+
+Usage:
+  devrev snap_in [command]
+
+Available Commands:
+  activate    Activates a Snap-in.
+  deactivate  Deactivates a Snap-in.
+  delete-one  delete a snap_ins by don id
+  draft       Create a Snap-in in draft mode from a given Snap-in version.
+  list        Lists Snap-ins for a Dev organization.
+  show        Gets a Snap-in.
+  update      Interactive update of a Snap-in.
+
+Flags:
+  -h, --help   help for snap_in
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with
+
+Use "devrev snap_in [command] --help" for more information about a command.

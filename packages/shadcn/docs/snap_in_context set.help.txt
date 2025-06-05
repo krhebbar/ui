@@ -1,0 +1,20 @@
+$ devrev snap_in_context set --help
+set the current snap_in_context
+
+Usage:
+  devrev snap_in_context set [slug_name] [flags]
+
+Flags:
+  -h, --help                     help for set
+      --snap_in string           snap_in id
+      --snap_in_package string   snap_in_package id
+      --snap_in_version string   snap_in_version id
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

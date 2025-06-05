@@ -1,0 +1,18 @@
+$ devrev snap_in deactivate --help
+Deactivates a Snap-in.
+
+Usage:
+  devrev snap_in deactivate [id] [flags]
+
+Flags:
+      --force   Force deactivate of snap-in
+  -h, --help    help for deactivate
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

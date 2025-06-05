@@ -1,0 +1,20 @@
+$ devrev snap_in_package list --help
+Lists Snap-in packages for a Dev organization.
+
+Usage:
+  devrev snap_in_package list [flags]
+
+Flags:
+  -n, --concurrency int    Number of goroutines to use  (default 1)
+  -m, --first-n uint32     get the first N result only
+  -h, --help               help for list
+  -S, --sort stringArray   Set fields to sort by, format <filed_name>:asc|desc
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

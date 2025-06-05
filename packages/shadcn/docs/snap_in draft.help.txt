@@ -1,0 +1,18 @@
+$ devrev snap_in draft --help
+Given a Snap-in version ID, the command creates a Snap-in in the draft mode in the Dev organization.
+
+Usage:
+  devrev snap_in draft [flags]
+
+Flags:
+  -h, --help                     help for draft
+      --snap_in_version string   Snap-in version from which the Snap-in needs to be created
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

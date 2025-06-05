@@ -1,0 +1,26 @@
+$ devrev snap_in_package logs --help
+Fetches logs for functions based on the filters specified in the request and the query.
+
+Usage:
+  devrev snap_in_package logs [id] [flags]
+
+Flags:
+      --after string     Timestamp after which to fetch logs. E.g. 2023-01-15T10:24:17Z. Defaults to 15 minutes earlier.
+      --all              Fetches logs for all snap_in_packages. Overrides the id argument.
+      --before string    Timestamp before which to fetch logs. E.g. 2023-02-15T10:24:17Z.  Defaults to now.
+      --cursor string    Cursor for next page of results.
+      --filters string   Filters for the log message as a json. E.g. { "level": {"values": ["info"]}, "dev_org": {"exclude": true, "values": ["don:identity:dvrv-us-1:devo/abc"]} }
+  -f, --follow           Follows cursor for new logs.
+  -h, --help             help for logs
+      --limit uint32     Number of logs to fetch.
+      --query string     Query message text.
+      --region string    Region to fetch logs from (e.g. dvrv-us-1 or dvrv-eu-1). Defaults to the region of the current profile.
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with

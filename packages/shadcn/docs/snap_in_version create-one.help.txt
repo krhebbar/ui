@@ -1,0 +1,26 @@
+$ devrev snap_in_version create-one --help
+Create a Snap-in version
+
+Usage:
+  devrev snap_in_version create-one [flags]
+
+Flags:
+      --archive string       Archive path
+  -n, --concurrency int      Number of goroutines to use  (default 1)
+      --create-package       Create a Snap-in package
+  -h, --help                 help for create-one
+      --manifest string      Manifest path
+      --no-prune             Do not remove keys the server does not expect
+      --package string       Snap-in package ID
+      --path string          Path to Snap-in function code and manifest file
+      --testing-url string   URL for testing Snap-in version
+  -w, --wait-status int      Timeout in minutes for waiting on Snap-in version creation
+
+Global Flags:
+      --debug         enables detailed report of all api calls
+  -v, --info          enables human readable info on stderr
+  -q, --no-progress   prevents a progressbar on stderr
+  -o, --org string    dev-org slug to use
+      --summary       enables json summary of what was done on stderr
+      --trace         enables stack traces
+  -u, --usr string    dev-user email to log in with
