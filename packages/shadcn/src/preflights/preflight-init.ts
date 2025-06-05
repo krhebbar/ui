@@ -13,10 +13,13 @@ export async function preFlightInit(
   const errors: Record<string, boolean> = {}
 
   // Ensure target directory exists.
-  // Check for empty project. We assume if no manifest.yml exists, the project is empty.
+  // Check for empty project. We assume if no manifest.yaml or manifest.yml exists, the project is empty.
+  const manifestYamlPath = path.resolve(options.cwd, "manifest.yaml");
+  const manifestYmlPath = path.resolve(options.cwd, "manifest.yml");
+
   if (
     !fs.existsSync(options.cwd) ||
-    !fs.existsSync(path.resolve(options.cwd, "manifest.yml"))
+    (!fs.existsSync(manifestYamlPath) && !fs.existsSync(manifestYmlPath))
   ) {
     errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
     return {
@@ -35,25 +38,25 @@ export async function preFlightInit(
     silent: options.silent,
   }).start()
   
-  // Check if this is a valid airdrop project by looking for manifest.yml and code directory
-  const manifestPath = path.resolve(options.cwd, "manifest.yml")
+  // Check if this is a valid airdrop project by looking for manifest.(y(a)ml) and code directory
   const codePath = path.resolve(options.cwd, "code")
+  const actualManifestPath = fs.existsSync(manifestYamlPath) ? manifestYamlPath : manifestYmlPath;
   
-  if (!fs.existsSync(manifestPath) || !fs.existsSync(codePath)) {
+  if (!fs.existsSync(actualManifestPath) || !fs.existsSync(codePath)) {
     manifestSpinner?.fail()
     logger.break()
     logger.error(
       `This does not appear to be a valid airdrop project at ${highlighter.info(
         options.cwd
       )}.\n` +
-        `Expected to find ${highlighter.info("manifest.yml")} and ${highlighter.info("code/")} directory.`
+        `Expected to find ${highlighter.info("manifest.yaml (or .yml)")} and ${highlighter.info("code/")} directory.`
     )
     logger.break()
     process.exit(1)
   }
   
   manifestSpinner?.succeed(
-    `Verifying airdrop project. Found ${highlighter.info("manifest.yml")}.`
+    `Verifying airdrop project. Found ${highlighter.info(path.basename(actualManifestPath))}.`
   )
 
   return {
