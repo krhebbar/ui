@@ -1,0 +1,4 @@
+name: Valid Project
+version: 0.0.1
+# This is a minimal valid manifest for testing purposes.
+# It simulates a project that init command should detect.
