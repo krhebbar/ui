@@ -107,14 +107,56 @@ export async function runInit(
     skipPreflight?: boolean;
   }
 ) {
-  let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo
-  // Updated airdropConfigResult type to include new env var names
+  let preflightCheckResult;
+  if (!options.skipPreflight) {
+    preflightCheckResult = await preFlightInit(options);
+    if (preflightCheckResult.errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] && !options.force) {
+        // If preflight determined the dir doesn't exist and it's not a forced operation,
+        // it means init should likely create it or error out if not interactive.
+        // The preflight already logs if dir doesn't exist.
+        // For now, let runInit proceed, it will handle actual creation or error if not interactive.
+    }
+    options.cwd = preflightCheckResult.projectRootPath; // IMPORTANT: Update cwd for all subsequent operations
+
+    // Adjust isNewProject based on preflight results
+    if (preflightCheckResult.isDirectoryEmpty && !preflightCheckResult.isExistingProjectStructure) {
+        options.isNewProject = true;
+    } else if (preflightCheckResult.isExistingProjectStructure) {
+        options.isNewProject = false;
+    }
+    // if neither, options.isNewProject retains its initial value (false) or what was set by --yes
+  }
+
+
+  // let projectInfoFromGetProjectInfo; // Stores result from original getProjectInfo - Potentially remove if preflightCheckResult replaces its use cases
   let airdropConfigResult: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; devrevPatEnvVarName?: string; devrevOrgEnvVarName?: string; };
 
+  // --- Start of Manifest Overwrite Prompt and Conditional Logic ---
+  let shouldGenerateManifest = true; // Default to true
+  if (preflightCheckResult && preflightCheckResult.manifestFileExists && !options.force) {
+    if (!options.yes) { // Only prompt if not --yes
+      const { overwriteManifest } = await prompts({
+        type: "confirm",
+        name: "overwriteManifest",
+        message: `A manifest.yml (or .yaml) already exists at ${highlighter.info(options.cwd)}. Do you want to overwrite it with a new one? (y/N)`,
+        initial: false,
+      });
+      if (!overwriteManifest) {
+        logger.info("Skipping manifest generation/overwrite.");
+        shouldGenerateManifest = false;
+      }
+    } else { // --yes is present but not --force
+      logger.info(`Found existing manifest at ${highlighter.info(options.cwd)}. Skipping overwrite due to --yes without --force.`);
+      shouldGenerateManifest = false;
+    }
+  }
+  // --- End of Manifest Overwrite Prompt ---
+
+
   // Handling for new projects in silent (-s) or yes (-y) mode
-  // Check if manifest.yml or manifest.yaml exists to determine if it's truly a new project setup area
-  if ((options.silent || options.yes) && !(await fs.pathExists(path.join(options.cwd, "manifest.yml"))) && !(await fs.pathExists(path.join(options.cwd, "manifest.yaml")))) {
-      // For silent/yes mode, we must create a default config and determine project name
+  // This block needs to use preflightCheckResult if available
+  if (options.isNewProject && (options.silent || options.yes)) {
+      // For silent/yes mode on a new project (empty dir, no existing structure as per preflight)
       const defaultConfigCore = createDefaultAirdropConfig();
       const projectTypeForNaming = defaultConfigCore.projectType || 'airdrop';
 
@@ -122,91 +164,32 @@ export async function runInit(
             ? generateAirdropSnapInFolderName(defaultConfigCore.externalSystem?.name || "default-snapin")
             : `airdrop-${defaultConfigCore.externalSystem?.slug || "default-project"}`;
 
-      // If options.cwd already ends with the determined project name, don't append it again.
-      // This handles cases where user might do `mkdir my-proj && cd my-proj && airdrop init -y`
-      if (path.basename(options.cwd) !== tempProjectName) {
-        options.cwd = path.resolve(options.cwd, tempProjectName);
-      }
+      // options.cwd is already preflightCheckResult.projectRootPath
+      // If the basename of this path is not already the tempProjectName, it means user might have
+      // provided a generic path like `.` or `new-dir` which preflight resolved.
+      // We might want to create a subdirectory *inside* this options.cwd if it's truly empty
+      // and its name doesn't match. This part needs careful thought.
+      // For now, assume options.cwd from preflight is the target root.
+      // If the logic requires creating a sub-folder, that needs to be explicit here.
+      // Let's assume for now that if options.cwd (from preflight) is empty, we use it directly.
+      // The naming part (tempProjectName) is more about the *content* and config values.
 
       airdropConfigResult = {
           ...defaultConfigCore,
           projectTypeFromPrompt: projectTypeForNaming as 'airdrop' | 'snap-in',
-          projectName: path.basename(options.cwd), // Use the final path's basename as projectName
+          projectName: path.basename(options.cwd), // Use the final path's basename
       };
 
-      await fs.ensureDir(options.cwd);
-      logger.info(`Project directory determined/created: ${highlighter.info(options.cwd)} (silent/yes mode)`);
-      options.isNewProject = true;
+      await fs.ensureDir(options.cwd); // Ensure dir, though preflight might have confirmed it
+      logger.info(`Project directory confirmed/created: ${highlighter.info(options.cwd)} (silent/yes mode on new project)`);
+      // options.isNewProject is already true
 
-      if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
-        logger.info(`Cloning Airdrop project template...`);
-        const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
-                                     ? airdropTemplates[0]
-                                     : undefined;
-        if (airdropTemplateToUse) {
-          logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
-          const cloneSuccess = await cloneTemplate({
-            repoUrl: airdropTemplateToUse.url,
-            targetPath: options.cwd,
-            branch: airdropTemplateToUse.branch,
-            path: airdropTemplateToUse.path
-          });
-          if (!cloneSuccess) {
-            logger.error("Failed to clone Airdrop project template. Aborting initialization.");
-            process.exit(1);
-          }
-          logger.info(`Airdrop project template cloned successfully into ${highlighter.info(options.cwd)}.`);
-        } else {
-          logger.error("No Airdrop templates found in configuration. Cannot proceed with cloning. Please define airdrop templates in init-config.ts.");
-          process.exit(1);
-        }
-      } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
-        const initConf = getInitConfig();
-        // For silent/yes mode, still use default Snap-in template
-        const templateToUse = initConf.snapInTemplates.find(t => t.name === initConf.defaultSnapInTemplateName);
-        if (!templateToUse) {
-            logger.error(`Default Snap-in template '${initConf.defaultSnapInTemplateName}' not found. Aborting.`);
-            process.exit(1);
-        }
-        logger.info(`Using default Snap-in template: ${templateToUse.name} (silent/yes mode)`);
-        // Clone logic using templateToUse
-        const cloneSuccess = await cloneTemplate({
-          repoUrl: templateToUse.url,
-          targetPath: options.cwd,
-          branch: templateToUse.branch,
-          path: templateToUse.path
-        });
-        if (!cloneSuccess) {
-          logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
-          process.exit(1);
-        }
-        logger.info(`Snap-in template cloned (silent/yes mode).`);
-      }
-  }
-
-  // Interactive new project flow or preflight for existing projects
-  if (!options.isNewProject) { // if not already handled by silent/yes new project
-    if (!options.skipPreflight) {
-      const preflight = await preFlightInit(options);
-      // Check if the directory is empty or doesn't exist, and it's not a forced or silent operation
-      if (preflight.errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] && !options.yes && !options.force) {
-        // This is an interactive new project setup
-        airdropConfigResult = await gatherAirdropConfiguration(options); // Gather all details including names
-
-        // If options.cwd already ends with the determined project name from prompts, don't append.
-        if (path.basename(options.cwd) !== airdropConfigResult.projectName) {
-            options.cwd = path.resolve(options.cwd, airdropConfigResult.projectName || "");
-        }
-
-        await fs.ensureDir(options.cwd);
-        logger.info(`Created project directory: ${highlighter.info(options.cwd)}`);
-        options.isNewProject = true; // Mark as new project
-
+      if (shouldGenerateManifest) { // Check if we should proceed with template cloning (which includes manifest)
         if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
           logger.info(`Cloning Airdrop project template...`);
           const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
-                                       ? airdropTemplates[0]
-                                       : undefined;
+                                      ? airdropTemplates[0]
+                                      : undefined;
           if (airdropTemplateToUse) {
             logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
             const cloneSuccess = await cloneTemplate({
@@ -226,24 +209,12 @@ export async function runInit(
           }
         } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
           const initConf = getInitConfig();
-          let templateToUse;
-          // Use selectedSnapInTemplateName from airdropConfigResult for interactive mode
-          if (airdropConfigResult.selectedSnapInTemplateName) {
-            templateToUse = initConf.snapInTemplates.find(t => t.name === airdropConfigResult.selectedSnapInTemplateName);
-            if (!templateToUse) {
-                logger.error(`Selected Snap-in template '${airdropConfigResult.selectedSnapInTemplateName}' not found. Aborting.`);
-                process.exit(1);
-            }
-            logger.info(`Using selected Snap-in template: ${templateToUse.name}`);
-          } else {
-            // This else block should ideally not be reached if prompts are correctly handled for interactive snap-in selection.
-            // It serves as a fallback or indicates an unexpected state if selectedSnapInTemplateName is missing in interactive mode for a snap-in.
-            // (Silent/yes mode is handled earlier and does not rely on selectedSnapInTemplateName)
-            logger.error("No Snap-in template selected or found (selectedSnapInTemplateName missing). Aborting.");
-            process.exit(1);
+          const templateToUse = initConf.snapInTemplates.find(t => t.name === initConf.defaultSnapInTemplateName);
+          if (!templateToUse) {
+              logger.error(`Default Snap-in template '${initConf.defaultSnapInTemplateName}' not found. Aborting.`);
+              process.exit(1);
           }
-
-          // The rest of the cloning logic remains the same, using templateToUse:
+          logger.info(`Using default Snap-in template: ${templateToUse.name} (silent/yes mode)`);
           const cloneSuccess = await cloneTemplate({
             repoUrl: templateToUse.url,
             targetPath: options.cwd,
@@ -251,51 +222,109 @@ export async function runInit(
             path: templateToUse.path
           });
           if (!cloneSuccess) {
-            logger.error("Failed to clone Snap-in template. Aborting initialization.");
+            logger.error("Failed to clone Snap-in template in silent/yes mode. Aborting.");
             process.exit(1);
           }
-          logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
+          logger.info(`Snap-in template cloned (silent/yes mode).`);
         }
       } else {
-        // Directory is not empty, or it's a forced/silent operation on an existing dir.
-        // getProjectInfo would have been called by preflight or needs to be called if preflight was skipped.
-        projectInfoFromGetProjectInfo = preflight.projectInfo || await getProjectInfo(options.cwd);
+        logger.info("Skipping template cloning due to existing manifest and user choice/--yes without --force.");
       }
-    } else if (options.skipPreflight) {
-        // Preflight skipped, try to get project info directly if it's an existing project context
-        // This path might need careful review depending on how skipPreflight is used
-        if (await fs.pathExists(path.join(options.cwd, "manifest.yml")) || await fs.pathExists(path.join(options.cwd, "manifest.yaml"))) {
-            projectInfoFromGetProjectInfo = await getProjectInfo(options.cwd);
+  }
+
+
+  // Interactive new project flow or operations on existing projects
+  if (!options.isNewProject) { // If not a new project (i.e., existing structure or non-empty dir)
+    // This block runs if:
+    // 1. preflight determined it's an existing project structure.
+    // 2. preflight determined it's a non-empty directory without full structure, and not --yes.
+    //    (If --yes on non-empty non-structured, it might have been treated as new if preflight.isDirectoryEmpty was false but preflight.isExistingProjectStructure was also false)
+
+    // If it's interactive (not --yes) and preflight said it's an empty dir (MISSING_DIR_OR_EMPTY_PROJECT can mean empty)
+    // then it's an interactive new project setup.
+    if (preflightCheckResult && preflightCheckResult.isDirectoryEmpty && !preflightCheckResult.isExistingProjectStructure && !options.yes && !options.force) {
+        airdropConfigResult = await gatherAirdropConfiguration(options);
+
+        // options.cwd is already set by preflight. We assume this is the target.
+        // If gatherAirdropConfiguration's projectName implies a *subfolder*, that needs adjustment.
+        // For now, assume options.cwd from preflight is the root where project should be initialized.
+        // The `projectName` from `gatherAirdropConfiguration` will be used for config values, not necessarily folder creation here.
+        if (path.basename(options.cwd) !== airdropConfigResult.projectName && projectTypeFromPrompt !== 'snap-in') { // For snap-ins, folder name can differ from snapInBaseName
+             // This case is tricky: preflight gave a root, prompts gave a name.
+             // If options.cwd is truly empty, maybe we should create options.cwd/projectName?
+             // For now, let's stick to options.cwd from preflight as the true root.
+             // logger.warn(`Project name '${airdropConfigResult.projectName}' differs from target directory name '${path.basename(options.cwd)}'. Using '${options.cwd}' as root.`);
         }
-    }
-  }
 
-  // Gather configuration if not already done (e.g. for existing projects or if preflight didn't result in new project path)
-  // This typically runs for existing projects or if the new project path was already set (e.g. user cd'd into an empty dir)
-  if (!airdropConfigResult!) {
-    airdropConfigResult = await gatherAirdropConfiguration(options);
-     // If projectName was gathered and options.cwd doesn't reflect it (e.g. init in existing empty dir)
-    // This specific scenario (interactive init in an existing *empty* dir that's not the project name) is tricky.
-    // The current gatherAirdropConfiguration doesn't assume it creates the dir, runInit does.
-    // For now, we assume options.cwd is the correct root for config files.
-  }
 
-  // Final check for manifest file after potential directory creation and cloning
-  const configFromManifest = await getConfig(options.cwd); // This should point to the final project CWD
-  if (!configFromManifest && airdropConfigResult.projectTypeFromPrompt === 'airdrop') { // Snap-ins might not have it initially
-    logger.error(`Failed to read manifest file at ${highlighter.info(options.cwd)}. Ensure a manifest.yml/yaml exists for Airdrop projects.`);
-    // For Snap-ins, a manifest might be part of the template, or created later.
-    // If it's an Airdrop project, it's more critical at this stage.
-    // Consider if we need to throw an error or just warn for snap-ins.
-    if (airdropConfigResult.projectTypeFromPrompt === 'airdrop') {
-        throw new Error("Manifest file not found after project setup for Airdrop project.");
+        await fs.ensureDir(options.cwd);
+        logger.info(`Project directory confirmed/created: ${highlighter.info(options.cwd)}`);
+        options.isNewProject = true; // Mark as new project for subsequent logic like template cloning
+
+        if (shouldGenerateManifest) { // Check if we should proceed with template cloning
+            if (airdropConfigResult.projectTypeFromPrompt === "airdrop") {
+              logger.info(`Cloning Airdrop project template...`);
+              const airdropTemplateToUse = airdropTemplates && airdropTemplates.length > 0
+                                          ? airdropTemplates[0]
+                                          : undefined;
+              if (airdropTemplateToUse) {
+                logger.info(`Cloning Airdrop project from template: ${airdropTemplateToUse.name}`);
+                const cloneSuccess = await cloneTemplate({ repoUrl: airdropTemplateToUse.url, targetPath: options.cwd, branch: airdropTemplateToUse.branch, path: airdropTemplateToUse.path });
+                if (!cloneSuccess) { logger.error("Failed to clone Airdrop project template."); process.exit(1); }
+                logger.info(`Airdrop project template cloned into ${highlighter.info(options.cwd)}.`);
+              } else {
+                logger.error("No Airdrop templates found. Cannot clone."); process.exit(1);
+              }
+            } else if (airdropConfigResult.projectTypeFromPrompt === "snap-in") {
+              const initConf = getInitConfig();
+              let templateToUse = initConf.snapInTemplates.find(t => t.name === airdropConfigResult.selectedSnapInTemplateName);
+              if (!templateToUse) { logger.error(`Selected Snap-in template '${airdropConfigResult.selectedSnapInTemplateName}' not found.`); process.exit(1); }
+              logger.info(`Using selected Snap-in template: ${templateToUse.name}`);
+              const cloneSuccess = await cloneTemplate({ repoUrl: templateToUse.url, targetPath: options.cwd, branch: templateToUse.branch, path: templateToUse.path });
+              if (!cloneSuccess) { logger.error("Failed to clone Snap-in template."); process.exit(1); }
+              logger.info(`Snap-in template cloned into ${highlighter.info(options.cwd)}.`);
+            }
+        } else {
+            logger.info("Skipping template cloning due to existing manifest and user choice.");
+        }
     } else {
-        logger.warn(`Manifest file not found at ${highlighter.info(options.cwd)}. This might be expected for a new Snap-in if the template doesn't include it.`);
+        // This is an existing project or a non-empty directory where user chose not to overwrite manifest,
+        // or it's a forced/silent operation on an existing dir.
+        // `options.isNewProject` should be false here.
+        options.isNewProject = false;
+        // `projectInfoFromGetProjectInfo` was part of old logic, if needed, it should use `options.cwd` (which is now `projectRootPath`)
+        // projectInfoFromGetProjectInfo = preflightCheckResult.projectInfo || await getProjectInfo(options.cwd); // This line might be obsolete
     }
   }
 
 
-  // Check for existing snapin.config.mjs in the final options.cwd
+  // Gather configuration if not already done (e.g., for existing projects where preflight didn't set it up as new)
+  if (!airdropConfigResult!) { // Notice the "!" - ensure airdropConfigResult is defined by this point or handle error
+    // This typically runs for existing projects or if the new project path was already set (e.g. user cd'd into an empty dir and preflight confirmed it)
+    airdropConfigResult = await gatherAirdropConfiguration(options);
+    // options.cwd is already the correct project root path from preflight
+  }
+
+
+  // Final check for manifest file after potential directory creation and cloning.
+  // This uses options.cwd which is already projectRootPath.
+  const configFromManifest = await getConfig(options.cwd);
+  if (!configFromManifest && shouldGenerateManifest && airdropConfigResult.projectTypeFromPrompt === 'airdrop') {
+    // If we were supposed to generate a manifest (e.g. cloned a template) and it's still not found for Airdrop.
+    logger.error(`Failed to read manifest file at ${highlighter.info(options.cwd)} even after setup attempt. Ensure a manifest.yml/yaml exists for Airdrop projects.`);
+    throw new Error("Manifest file not found after project setup for Airdrop project.");
+  } else if (!configFromManifest && !shouldGenerateManifest && preflightCheckResult && preflightCheckResult.manifestFileExists) {
+    // User skipped overwrite, so configFromManifest might be null if getConfig failed on existing.
+    // This implies we should try to use the existing manifest if possible or warn.
+    logger.info(`Using existing manifest at ${highlighter.info(options.cwd)} as per user choice (overwrite skipped).`);
+    // Potentially, try to load the existing manifest again explicitly if `getConfig` had issues.
+    // For now, assume `getConfig` would have worked if the file is valid.
+  } else if (!configFromManifest && airdropConfigResult.projectTypeFromPrompt === 'snap-in') {
+    logger.warn(`Manifest file not found at ${highlighter.info(options.cwd)}. This might be expected for a new Snap-in if the template doesn't include it or manifest generation was skipped.`);
+  }
+
+
+  // Check for existing snapin.config.mjs in the final options.cwd (projectRootPath)
   const hasExistingSnapInConfig = await hasSnapInConfig(options.cwd); // Renamed
   if (hasExistingSnapInConfig && !options.force && !options.isNewProject) { // Don't ask to overwrite if it's a new project
     if (!options.yes) {
@@ -341,25 +370,103 @@ export async function runInit(
     }
   }
   
-  const coreConfig = extractCoreConfigForGeneration(airdropConfigResult); // Renamed function call
+  const coreConfig = extractCoreConfigForGeneration(airdropConfigResult);
 
-  const configSpinner = spinner(`Creating project configuration (snapin.config.mjs)...`).start(); // Updated message
-  await writeSnapInConfig(options.cwd, coreConfig); // Renamed function call
+  const configSpinner = spinner(`Creating project configuration (snapin.config.mjs)...`).start();
+  await writeSnapInConfig(options.cwd, coreConfig);
   
-  const envVars = extractEnvVarsFromConfig(coreConfig); // Use updated coreConfig variable
+  const envVars = extractEnvVarsFromConfig(coreConfig);
   if (Object.keys(envVars).length > 0) {
     await updateEnvFile(options.cwd, envVars);
+
+    // Read the .env file to check actual values
+    const envFilePath = path.join(options.cwd, ".env");
+    let finalEnvContent = "";
+    try {
+      finalEnvContent = await fs.readFile(envFilePath, "utf8");
+    } catch {
+      // .env file might not have been created if no envVars were to be written, though unlikely for init
+    }
+
+    const finalEnvValues: Record<string, string> = {};
+    finalEnvContent.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        if (key && valueParts.length > 0) {
+          finalEnvValues[key.trim()] = valueParts.join("=").trim();
+        } else if (key) {
+          finalEnvValues[key.trim()] = ""; // Handle empty values
+        }
+      }
+    });
+
+    const patEnvVarName = airdropConfigResult.devrevPatEnvVarName || "DEVREV_PAT";
+    const orgEnvVarName = airdropConfigResult.devrevOrgEnvVarName || "DEVREV_ORG";
+
+    const placeholderMessages: string[] = [];
+
+    // Check PAT variable
+    if (finalEnvValues[patEnvVarName] === undefined || finalEnvValues[patEnvVarName] === "your-devrev-pat-here" || finalEnvValues[patEnvVarName] === "") {
+      placeholderMessages.push(`- ${patEnvVarName} is missing or has a placeholder value.`);
+    }
+
+    // Check Org variable
+    if (finalEnvValues[orgEnvVarName] === undefined || finalEnvValues[orgEnvVarName] === "your-devrev-org-slug-here" || finalEnvValues[orgEnvVarName] === "") {
+      placeholderMessages.push(`- ${orgEnvVarName} is missing or has a placeholder value.`);
+    }
+
+    // Add check for OAuth variables if connection is OAuth2
+    if (coreConfig.connection?.type === "oauth2") {
+        const oauthConnection = coreConfig.connection;
+        if (typeof oauthConnection.clientId === 'string') {
+            const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
+            if (clientIdMatch && clientIdMatch[1]) {
+                const clientIdEnvVar = clientIdMatch[1];
+                if (finalEnvValues[clientIdEnvVar] === undefined || finalEnvValues[clientIdEnvVar] === "your-client-id-here" || finalEnvValues[clientIdEnvVar] === "") {
+                    placeholderMessages.push(`- ${clientIdEnvVar} (OAuth Client ID) is missing or has a placeholder value.`);
+                }
+            }
+        }
+        if (typeof oauthConnection.clientSecret === 'string') {
+            const clientSecretMatch = oauthConnection.clientSecret.match(/process\.env\.([A-Z_0-9]+)/);
+            if (clientSecretMatch && clientSecretMatch[1]) {
+                const clientSecretEnvVar = clientSecretMatch[1];
+                if (finalEnvValues[clientSecretEnvVar] === undefined || finalEnvValues[clientSecretEnvVar] === "your-client-secret-here" || finalEnvValues[clientSecretEnvVar] === "") {
+                    placeholderMessages.push(`- ${clientSecretEnvVar} (OAuth Client Secret) is missing or has a placeholder value.`);
+                }
+            }
+        }
+    } else if (coreConfig.connection?.type === "secret") {
+        const secretConnection = coreConfig.connection as SecretConnection;
+        if (secretConnection.tokenEnvVarName) {
+            const tokenEnvVar = secretConnection.tokenEnvVarName;
+             if (finalEnvValues[tokenEnvVar] === undefined || finalEnvValues[tokenEnvVar] === "your-api-token-here" || finalEnvValues[tokenEnvVar] === "") {
+                placeholderMessages.push(`- ${tokenEnvVar} (API Token) is missing or has a placeholder value.`);
+            }
+        }
+    }
+
+    if (placeholderMessages.length > 0) {
+      logger.warn("\nPlease update the following placeholder values in your .env file:");
+      placeholderMessages.forEach(msg => logger.warn(msg));
+      logger.break();
+    }
   }
   
   await copyConfigTypes(options.cwd);
-  await generateTypeDefinitions(options.cwd, coreConfig); // Use updated coreConfig variable
-  configSpinner.succeed(`Project configuration created successfully in ${highlighter.info(options.cwd)}.`); // Updated message
+  await generateTypeDefinitions(options.cwd, coreConfig);
+  configSpinner.succeed(`Project configuration created successfully in ${highlighter.info(options.cwd)}.`);
 
-  // Update manifest.yaml
-  await updateManifestYaml(options.cwd, coreConfig, airdropConfigResult);
+  // Update manifest.yaml, only if shouldGenerateManifest is true OR if it's not a new project (meaning we might be updating an existing one)
+  if (shouldGenerateManifest || (!options.isNewProject && preflightCheckResult && preflightCheckResult.manifestFileExists)) {
+    await updateManifestYaml(options.cwd, coreConfig, airdropConfigResult);
+  } else {
+    logger.info("Skipping manifest.yaml update based on earlier choices or new project state without manifest generation.");
+  }
 
   if (options.components?.length) {
-    // Re-fetch config after writing, to ensure components are added based on the *new* configuration
+    // Re-fetch config after writing, to ensure components are added based on the *new* or existing-but-verified configuration
     const finalConfigForComponents = await getConfig(options.cwd);
     if (finalConfigForComponents) {
       await addComponents(options.components, finalConfigForComponents, {

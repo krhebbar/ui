@@ -3,7 +3,7 @@ import prompts from "prompts"
 import { findProjectRoot } from "@/src/utils/preflight/project-root"
 import { initOptionsSchema } from "@/src/commands/init"
 import * as ERRORS from "@/src/utils/errors"
-import { highlighter } from "@/src/utils/highlighter"
+// import { highlighter } from "@/src/utils/highlighter" // Not used directly in new logic for success message
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
 import fs from "fs-extra"
@@ -13,28 +13,33 @@ export async function preFlightInit(
   options: z.infer<typeof initOptionsSchema>
 ) {
   const errors: Record<string, boolean> = {}
-
-  // Ensure target directory exists.
-  if (!fs.existsSync(options.cwd)) {
-    errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
-    return {
-      errors,
-      projectInfo: null,
-    }
-  }
-
-  const projectSpinner = spinner(`Preflight checks.`, {
+  const projectSpinner = spinner(`Preflight checks for init...`, {
     silent: options.silent,
   }).start()
 
-  const projectRoot = findProjectRoot(options.cwd)
+  // Initial directory existence check
+  if (!fs.existsSync(options.cwd)) {
+    errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
+    projectSpinner?.fail("Target directory does not exist.")
+    return {
+      errors,
+      projectRootPath: options.cwd,
+      isExistingProjectStructure: false,
+      manifestFileExists: false,
+      configFileExists: false,
+      isDirectoryEmpty: false, // Or true, depending on desired default for non-existent dir
+    }
+  }
 
-  if (projectRoot && projectRoot !== options.cwd) {
+  let effectivePath = options.cwd
+  const resolvedRootCandidate = findProjectRoot(options.cwd)
+
+  if (resolvedRootCandidate && resolvedRootCandidate !== options.cwd) {
     projectSpinner?.stop() // Stop spinner before prompting
     const response = await prompts({
       type: "confirm",
       name: "switchDir",
-      message: `We found a valid Snap-in/Editor project at: ${projectRoot}. Do you want to switch to this directory and run the command from there? (y/N)`,
+      message: `We found a valid Snap-in/Editor project at: ${resolvedRootCandidate}. Do you want to switch to this directory and run the command from there? (y/N)`,
       initial: false,
     })
 
@@ -43,37 +48,57 @@ export async function preFlightInit(
         `This command should be run from the root of your Snap-in/Editor project.`
       )
       logger.info(
-        `Please change your current directory to ${projectRoot} and try again.`
+        `Please change your current directory to ${resolvedRootCandidate} and try again.`
       )
       process.exit(0)
     }
-    // If user says no, continue in current dir, spinner can be restarted or kept stopped.
-    // For now, let's assume we want to restart it if other checks follow.
-    projectSpinner?.start()
+    // User declined to switch, effectivePath remains options.cwd
+    projectSpinner?.start() // Restart spinner if needed
+  } else {
+    effectivePath = resolvedRootCandidate || options.cwd
   }
 
-  // Verify if the current or resolved projectRoot is a valid project directory
-  const currentPathToCheck = projectRoot || options.cwd
-  const manifestPath = path.join(currentPathToCheck, "manifest.yml")
-  const codePath = path.join(currentPathToCheck, "code")
+  // Determine project state at effectivePath
+  const manifestPathYml = path.join(effectivePath, "manifest.yml")
+  const manifestPathYaml = path.join(effectivePath, "manifest.yaml")
+  const codePathDir = path.join(effectivePath, "code")
+  const snapInConfigPath = path.join(effectivePath, "snapin.config.mjs")
 
-  if (!fs.existsSync(manifestPath) || !fs.existsSync(codePath)) {
-    projectSpinner?.fail()
-    logger.error(
-      `This command must be run from the root of a Snap-in or Editor project (i.e., where manifest.yml and code/ directory exist).`
-    )
-    logger.info(
-      `This command should be run from the root of your Snap-in/Editor project.`
-    )
-    process.exit(1)
+  const manifestFileExists =
+    fs.existsSync(manifestPathYml) || fs.existsSync(manifestPathYaml)
+  const codeDirExists =
+    fs.existsSync(codePathDir) && fs.lstatSync(codePathDir).isDirectory()
+  const configFileExists = fs.existsSync(snapInConfigPath)
+  const isExistingProjectStructure = manifestFileExists && codeDirExists
+
+  let isDirectoryEmpty = false
+  try {
+    const filesInEffectivePath = fs.readdirSync(effectivePath)
+    isDirectoryEmpty =
+      filesInEffectivePath.length === 0 ||
+      (filesInEffectivePath.length === 1 &&
+        filesInEffectivePath[0] === ".git")
+  } catch (e) {
+    // This might happen if effectivePath is somehow invalid after all, though unlikely here
+    logger.warn(`Could not read directory contents of ${effectivePath}: ${e.message}`)
+    // Keep isDirectoryEmpty as false
   }
   
-  projectSpinner?.succeed(
-    `Preflight checks passed. Found ${highlighter.info("manifest.yml")} and ${highlighter.info("code/")} at ${currentPathToCheck}.`
-  )
+  if (Object.keys(errors).length > 0) {
+     // This condition would typically be met by the initial cwd check only now
+    projectSpinner?.fail(`Preflight checks failed.`)
+  } else {
+    projectSpinner?.succeed(
+      `Preflight checks complete. Target directory: ${effectivePath}`
+    )
+  }
 
   return {
     errors,
-    projectInfo: null, // We'll update this when we refactor get-project-info.ts
+    projectRootPath: effectivePath,
+    isExistingProjectStructure,
+    manifestFileExists,
+    configFileExists,
+    isDirectoryEmpty,
   }
 }

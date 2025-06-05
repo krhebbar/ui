@@ -121,7 +121,7 @@ export async function updateEnvFile(
   })
 
   // Merge with new vars
-  const mergedVars = { ...existingVars, ...envVars }
+  const mergedVars = { ...envVars, ...existingVars }
 
   // Generate new content
   const newEnvContent = Object.entries(mergedVars)
