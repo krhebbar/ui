@@ -1,4 +1,11 @@
 import { execa } from "execa";
+import dotenv from "dotenv";
+import fs from "fs";
+
+// Initialize dotenv to load environment variables from .env file
+if (fs.existsSync(".env")) {
+  dotenv.config();
+}
 
 /**
  * Executes a DevRev CLI command.
@@ -12,10 +19,20 @@ async function executeDevrevCommand(
   subcommand: string,
   args: string[] = []
 ): Promise<string> {
+  const commandArgs = [...args];
+
+  // Read DEVREV_PAT and DEVREV_ORG from .env file if available
+  if (process.env.DEVREV_PAT) {
+    commandArgs.push("--token", process.env.DEVREV_PAT);
+  }
+  if (process.env.DEVREV_ORG) {
+    commandArgs.push("--org", process.env.DEVREV_ORG);
+  }
+
   try {
     const { stdout, stderr, exitCode } = await execa("devrev", [
       subcommand,
-      ...args,
+      ...commandArgs,
     ]);
 
     if (exitCode !== 0) {
@@ -27,6 +44,80 @@ async function executeDevrevCommand(
     return stdout;
   } catch (error) {
     console.error(`Error executing DevRev CLI command: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Validates a Snap-in manifest file.
+ *
+ * @param manifestPath - Path to the manifest file.
+ * @returns A promise that resolves with the validation result.
+ * @throws If the command fails or the output cannot be parsed.
+ */
+export async function validateManifest(manifestPath: string): Promise<any> {
+  try {
+    const output = await executeDevrevCommand("snap_in_version", [
+      "validate-manifest",
+      manifestPath,
+    ]);
+    return JSON.parse(output);
+  } catch (error) {
+    console.error(`Error validating manifest ${manifestPath}: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Upgrades a Snap-in version.
+ *
+ * @param versionId - ID of the Snap-in version to upgrade.
+ * @param packageId - Optional ID of the package.
+ * @returns A promise that resolves with the upgrade result.
+ * @throws If the command fails or the output cannot be parsed.
+ */
+export async function upgradeSnapInVersion(
+  versionId: string,
+  packageId?: string
+): Promise<any> {
+  const args = ["upgrade", versionId];
+  if (packageId) {
+    args.push("--package", packageId);
+  }
+  try {
+    const output = await executeDevrevCommand("snap_in_version", args);
+    return JSON.parse(output);
+  } catch (error) {
+    console.error(`Error upgrading Snap-in version ${versionId}: ${error}`);
+    throw error;
+  }
+}
+
+/**
+ * Updates a Snap-in.
+ *
+ * @param snapInId - ID of the Snap-in to update.
+ * @param versionId - ID of the Snap-in version to update to.
+ * @returns A promise that resolves with the update result.
+ * @throws If the command fails or the output cannot be parsed.
+ */
+export async function updateSnapIn(
+  snapInId: string,
+  versionId: string
+): Promise<any> {
+  try {
+    const output = await executeDevrevCommand("snap_in", [
+      "update",
+      "--id",
+      snapInId,
+      "--version",
+      versionId,
+    ]);
+    return JSON.parse(output);
+  } catch (error) {
+    console.error(
+      `Error updating Snap-in ${snapInId} to version ${versionId}: ${error}`
+    );
     throw error;
   }
 }

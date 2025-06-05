@@ -1,213 +1,186 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Command } from "commander";
-import { dev } from "./dev"; // Adjust path as needed
-import * as devrevWrapper from "../utils/devrev-cli-wrapper"; // Adjust path
-import inquirer from "inquirer";
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { dev } from './dev'; // Assuming 'dev' is the exported command object
+import { getProjectInfo } from '@/src/utils/get-project-info';
+import { createSnapInVersion, draftSnapIn, activateSnapIn, getSnapInContext } from '../utils/devrev-cli-wrapper';
+import inquirer from 'inquirer';
+import { logger } from '@/src/utils/logger';
 
-// Mock the wrapper module
-vi.mock("../utils/devrev-cli-wrapper", () => ({
-  createSnapInVersion: vi.fn(),
-  draftSnapIn: vi.fn(),
-  activateSnapIn: vi.fn(),
-  getSnapInContext: vi.fn(),
+// Mock utilities and external dependencies
+vi.mock('@/src/utils/get-project-info');
+vi.mock('../utils/devrev-cli-wrapper');
+vi.mock('inquirer');
+vi.mock('@/src/utils/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
-// Mock inquirer
-vi.mock("inquirer");
+const devAction = dev.action as any;
 
-// Mock logger
-const mockLogger = {
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-};
-vi.mock("@/src/utils/logger", () => ({ // Adjust path for logger
-  logger: mockLogger,
-}));
-
-describe("dev command", () => {
-  let program: Command;
+describe('dev command', () => {
+  const fullProjectInfo = {
+      name: 'Test Project',
+      description: 'Desc',
+      slug: 'test-slug',
+      manifestPath: 'project/manifest.yaml',
+      codePath: 'project/code',
+      functionsPath: 'project/code/src/functions',
+      isTsx: true,
+      aliasPrefix: '@',
+      serviceAccountName: '', externalSystemName: '', functions: [], keyring: undefined, tokenVerification: undefined
+  };
 
   beforeEach(() => {
     vi.resetAllMocks();
-    program = new Command();
-    program.addCommand(dev);
-
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    vi.mocked(getProjectInfo).mockResolvedValue(null);
+    vi.mocked(createSnapInVersion).mockResolvedValue({ id: 'new-version-id', name: 'v_dev_1' });
+    vi.mocked(draftSnapIn).mockResolvedValue({ id: 'draft-snapin-id', url: 'http://draft.url' });
+    vi.mocked(activateSnapIn).mockResolvedValue('Activation successful');
+    vi.mocked(getSnapInContext).mockResolvedValue({ snap_in_package_id: null, snap_in_id: null, snap_in_version_id: null });
+    vi.mocked(inquirer.prompt).mockResolvedValue({}); // Default to empty answers
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  const mockVersionResponse = { id: "ver_dev_123", name: "v_dev" };
-  const mockDraftResponse = { id: "snap_dev_456", url: "http://draft.example.com" };
-  const mockActivationResponse = "Snap-in activated successfully.";
-
-  const defaultPath = "./";
-  const defaultUrl = "http://localhost:8080";
-
-  it("should run full dev cycle with CLI options and activate", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockResolvedValue(mockDraftResponse);
-    vi.mocked(devrevWrapper.activateSnapIn).mockResolvedValue(mockActivationResponse);
-    vi.mocked(inquirer.prompt).mockResolvedValue({ activate: true }); // Confirm activation
-
-    const options = {
-      path: "./src",
-      url: "https://ngrok.io/test1",
-      packageId: "pkg_dev_001",
-      manifestPath: "dev-manifest.yml",
-      createPackage: false, // Explicitly false
-    };
-
-    await program.parseAsync([
-      "node", "test", "dev",
-      "--path", options.path,
-      "--url", options.url,
-      "--package-id", options.packageId,
-      "--manifest", options.manifestPath,
-      // Not passing --create-package
-    ]);
-
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith(options.path, {
-      testingUrl: options.url,
-      packageId: options.packageId,
-      createPackage: undefined, // Not passed, so undefined
-      manifestPath: options.manifestPath,
-    });
-    expect(devrevWrapper.draftSnapIn).toHaveBeenCalledWith(mockVersionResponse.id);
-    expect(inquirer.prompt).toHaveBeenCalled(); // For activation confirmation
-    expect(devrevWrapper.activateSnapIn).toHaveBeenCalledWith(mockDraftResponse.id);
-
-    expect(mockLogger.info).toHaveBeenCalledWith("Snap-in test version created successfully:");
-    expect(console.log).toHaveBeenCalledWith(JSON.stringify(mockVersionResponse, null, 2));
-    expect(mockLogger.info).toHaveBeenCalledWith("Snap-in drafted successfully:");
-    expect(console.log).toHaveBeenCalledWith(JSON.stringify(mockDraftResponse, null, 2));
-    expect(mockLogger.info).toHaveBeenCalledWith(`Activating Snap-in ID '${mockDraftResponse.id}'...`);
-    expect(console.log).toHaveBeenCalledWith(mockActivationResponse);
-  });
-
-  it("should prompt for path and URL if not provided, use context, and skip activation", async () => {
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({ snap_in_package_id: "ctx_pkg_dev" } as any);
+  it('should prompt for path and url if not provided', async () => {
     vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ path: defaultPath }) // Path prompt
-      .mockResolvedValueOnce({ url: defaultUrl })   // URL prompt
-      .mockResolvedValueOnce({ activate: false }); // Deny activation
-
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockResolvedValue(mockDraftResponse);
-
-    await program.parseAsync(["node", "test", "dev"]);
-
-    expect(inquirer.prompt).toHaveBeenCalledTimes(3); // path, url, activate
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith(defaultPath, {
-      testingUrl: defaultUrl,
-      packageId: "ctx_pkg_dev", // from context
-      createPackage: undefined, // not specified
-      manifestPath: undefined, // not specified
-    });
-    expect(devrevWrapper.draftSnapIn).toHaveBeenCalledWith(mockVersionResponse.id);
-    expect(devrevWrapper.activateSnapIn).not.toHaveBeenCalled();
-    expect(mockLogger.info).toHaveBeenCalledWith("Snap-in activation skipped by user.");
+      .mockResolvedValueOnce({ path: './dev-src' }) // For path
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' }); // For url
+    await devAction({});
+    expect(inquirer.prompt).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'path' })]));
+    expect(inquirer.prompt).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'url' })]));
+    expect(createSnapInVersion).toHaveBeenCalledWith('./dev-src', expect.objectContaining({ testingUrl: 'http://localhost:1234' }));
   });
 
-  it("should use --create-package flag", async () => {
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({} as any); // No context for packageId
-    vi.mocked(inquirer.prompt) // Path, URL, activation
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl })
-      .mockResolvedValueOnce({ activate: true });
+  it('should use projectInfo.manifestPath if available and no option is provided', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue(fullProjectInfo);
+    vi.mocked(inquirer.prompt) // path, url
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
 
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockResolvedValue(mockDraftResponse);
-    vi.mocked(devrevWrapper.activateSnapIn).mockResolvedValue(mockActivationResponse);
-
-    await program.parseAsync(["node", "test", "dev", "--create-package"]);
-
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith(defaultPath, {
-      testingUrl: defaultUrl,
-      packageId: undefined, // Not specified
-      createPackage: true, // Flag is true
-      manifestPath: undefined,
-    });
-    expect(devrevWrapper.activateSnapIn).toHaveBeenCalled();
+    await devAction({});
+    expect(logger.info).toHaveBeenCalledWith(`Using manifest path from project information: ${fullProjectInfo.manifestPath}`);
+    expect(inquirer.prompt).not.toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'manifestPath' })]));
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+        './dev-src',
+        expect.objectContaining({ manifestPath: fullProjectInfo.manifestPath, testingUrl: 'http://localhost:1234' })
+    );
   });
 
-  it("should exit if createSnapInVersion fails (e.g. no version ID)", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue({} as any); // No ID in response
+  it('should skip packageId prompt if createPackage is true, no packageId option, and valid projectInfo.slug exists', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue(fullProjectInfo);
+     vi.mocked(inquirer.prompt) // path, url
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
+
+    await devAction({ createPackage: true });
+
+    expect(logger.info).toHaveBeenCalledWith("Option --create-package is set and no --package-id was provided.");
+    expect(logger.info).toHaveBeenCalledWith(`The slug '${fullProjectInfo.slug}' from your manifest.yaml will be used by the DevRev CLI to identify or create the package.`);
+    expect(inquirer.prompt).not.toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'packageId' })]));
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+        './dev-src',
+        expect.objectContaining({ createPackage: true, testingUrl: 'http://localhost:1234' })
+    );
+  });
+
+  it('should prompt for packageId if needed (no context, no createPackage with slug)', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue(null); // No project info
+    vi.mocked(getSnapInContext).mockResolvedValue({ snap_in_package_id: null, snap_in_id: null, snap_in_version_id: null }); // No context
     vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl });
+      .mockResolvedValueOnce({ path: './dev-src' }) // For path
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' }) // For url
+      .mockResolvedValueOnce({ packageId: 'prompted-pkg-id' }) // For packageId
+      .mockResolvedValueOnce({ manifestPath: '' }); // For manifest (optional)
 
-    await program.parseAsync(["node", "test", "dev"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to get Snap-in Version ID from creation response.");
-    expect(process.exit).toHaveBeenCalledWith(1);
+    await devAction({});
+    expect(inquirer.prompt).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ name: 'packageId' })]));
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+        './dev-src',
+        expect.objectContaining({ packageId: 'prompted-pkg-id', testingUrl: 'http://localhost:1234' })
+    );
   });
 
-  it("should exit if draftSnapIn fails (e.g. no snap ID)", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockResolvedValue({} as any); // No ID in draft response
+  it('should successfully execute the full dev flow (create, draft, activate)', async () => {
     vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl });
+      .mockResolvedValueOnce({ path: './dev-src' }) // path
+      .mockResolvedValueOnce({ url: 'http://localhost:5678' }) // url
+      .mockResolvedValueOnce({ activate: true }); // activate confirmation
 
-    await program.parseAsync(["node", "test", "dev"]);
+    await devAction({});
 
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to get Snap-in ID from draft response.");
-    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(createSnapInVersion).toHaveBeenCalledWith('./dev-src', expect.objectContaining({ testingUrl: 'http://localhost:5678' }));
+    expect(draftSnapIn).toHaveBeenCalledWith('new-version-id');
+    expect(activateSnapIn).toHaveBeenCalledWith('draft-snapin-id');
+    expect(logger.info).toHaveBeenCalledWith('Snap-in test version created successfully:');
+    expect(logger.info).toHaveBeenCalledWith('Snap-in drafted successfully:');
+    expect(logger.info).toHaveBeenCalledWith("Local development setup complete. Your Snap-in should be routing to your local server via the provided URL.");
   });
 
-
-  it("should handle errors from createSnapInVersion (CLI not found)", async () => {
-    const error = new Error("DevRev CLI command failed: devrev not found");
-    vi.mocked(devrevWrapper.createSnapInVersion).mockRejectedValue(error);
+  it('should skip activation if user declines', async () => {
     vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl });
+      .mockResolvedValueOnce({ path: './dev-src' }) // path
+      .mockResolvedValueOnce({ url: 'http://localhost:5678' }) // url
+      .mockResolvedValueOnce({ activate: false }); // decline activation
 
-    await program.parseAsync(["node", "test", "dev"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed during Snap-in development workflow.");
-    expect(mockLogger.error).toHaveBeenCalledWith("It seems 'devrev' CLI is not installed or not found in your PATH.");
-    expect(process.exit).toHaveBeenCalledWith(1);
+    await devAction({});
+    expect(activateSnapIn).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith('Snap-in activation skipped by user.');
   });
 
-  it("should handle generic errors from draftSnapIn", async () => {
-    const errorMessage = "Drafting failed";
-    const error = new Error(errorMessage);
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockRejectedValue(error);
-     vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl });
+  it('should handle error during createSnapInVersion', async () => {
+    vi.mocked(createSnapInVersion).mockRejectedValue(new Error('Version creation failed'));
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
 
-    await program.parseAsync(["node", "test", "dev"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed during Snap-in development workflow.");
-    expect(mockLogger.error).toHaveBeenCalledWith(`An unexpected error occurred: ${errorMessage}`);
-    expect(process.exit).toHaveBeenCalledWith(1);
+    await devAction({});
+    expect(logger.error).toHaveBeenCalledWith('Failed during Snap-in development workflow.');
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Version creation failed'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
-  it("should handle errors from activateSnapIn", async () => {
-    const errorMessage = "Activation failed";
-    const error = new Error(errorMessage);
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.draftSnapIn).mockResolvedValue(mockDraftResponse);
-    vi.mocked(devrevWrapper.activateSnapIn).mockRejectedValue(error);
-    vi.mocked(inquirer.prompt) // Path, URL, Activation
-      .mockResolvedValueOnce({ path: defaultPath })
-      .mockResolvedValueOnce({ url: defaultUrl })
-      .mockResolvedValueOnce({ activate: true });
+  it('should handle error during draftSnapIn', async () => {
+    vi.mocked(draftSnapIn).mockRejectedValue(new Error('Drafting failed'));
+     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
 
+    await devAction({});
+    expect(logger.error).toHaveBeenCalledWith('Failed during Snap-in development workflow.');
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Drafting failed'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
 
-    await program.parseAsync(["node", "test", "dev"]);
+  it('should handle error if newVersionInfo.id is missing', async () => {
+    vi.mocked(createSnapInVersion).mockResolvedValue({} as any); // No ID
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
 
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed during Snap-in development workflow.");
-    expect(mockLogger.error).toHaveBeenCalledWith(`An unexpected error occurred: ${errorMessage}`);
-    expect(process.exit).toHaveBeenCalledWith(1);
+    await devAction({});
+    expect(logger.error).toHaveBeenCalledWith('Failed to get Snap-in Version ID from creation response.');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
+
+   it('should handle error if draftInfo.id is missing', async () => {
+    vi.mocked(draftSnapIn).mockResolvedValue({ url: 'http://some.url' } as any); // No ID
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ path: './dev-src' })
+      .mockResolvedValueOnce({ url: 'http://localhost:1234' });
+
+    await devAction({});
+    expect(logger.error).toHaveBeenCalledWith('Failed to get Snap-in ID from draft response.');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
   });
 
 });

@@ -1,118 +1,120 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Command } from "commander";
-import { logs } from "./logs"; // Adjust path as needed
-import * as devrevWrapper from "../utils/devrev-cli-wrapper"; // Adjust path
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { logs } from './logs'; // Assuming 'logs' is the exported command object
+import { getProjectInfo } from '@/src/utils/get-project-info';
+import { getSnapInLogs } from '../utils/devrev-cli-wrapper';
+import { logger } from '@/src/utils/logger';
 
-// Mock the wrapper module
-vi.mock("../utils/devrev-cli-wrapper", () => ({
-  getSnapInLogs: vi.fn(),
+// Mock utilities and external dependencies
+vi.mock('@/src/utils/get-project-info');
+vi.mock('../utils/devrev-cli-wrapper');
+vi.mock('@/src/utils/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
-// Mock logger
-const mockLogger = {
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-  break: vi.fn(), // if used
-};
-vi.mock("@/src/utils/logger", () => ({ // Adjust path for logger
-  logger: mockLogger,
-}));
+// Mock console.log as the command uses it directly for outputting logs
+const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
 
-describe("logs command", () => {
-  let program: Command;
+const logsAction = logs.action as any;
+
+describe('logs command', () => {
+  const mockProjectInfo = {
+    name: 'Test SnapIn',
+    description: 'A test SnapIn',
+    slug: 'test-snapin-slug',
+    manifestPath: 'valid/manifest.yaml',
+    codePath: './src',
+    functionsPath: './src/functions',
+    isTsx: true,
+    aliasPrefix: '@',
+    serviceAccountName: '', externalSystemName: '', functions: [], keyring: undefined, tokenVerification: undefined
+  };
 
   beforeEach(() => {
-    vi.resetAllMocks(); // Reset mocks before each test
-
-    program = new Command();
-    program.addCommand(logs);
-
-    // Suppress actual console output during tests
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.resetAllMocks();
+    vi.mocked(getProjectInfo).mockResolvedValue(mockProjectInfo); // Default to having project info
+    vi.mocked(getSnapInLogs).mockResolvedValue([]); // Default to no logs
+    consoleLogSpy.mockClear(); // Clear spy calls before each test
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks(); // Restore console.log
+  it('should call getProjectInfo for consistency', async () => {
+    await logsAction({});
+    expect(getProjectInfo).toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(`Project Name (context): ${mockProjectInfo.name}`);
   });
 
-  it("should call getSnapInLogs with default limit and display logs", async () => {
-    const mockLogData = [{ timestamp: "2024-01-01T00:00:00Z", message: "Log entry 1" }];
-    vi.mocked(devrevWrapper.getSnapInLogs).mockResolvedValue(mockLogData);
-
-    await program.parseAsync(["node", "test", "logs"]);
-
-    expect(devrevWrapper.getSnapInLogs).toHaveBeenCalledWith({ limit: 100 }); // Default limit
-    expect(mockLogger.info).toHaveBeenCalledWith("Fetching Snap-in logs using devrev-cli...");
-    expect(mockLogger.info).toHaveBeenCalledWith("Logs retrieved successfully:");
-    expect(console.log).toHaveBeenCalledWith(JSON.stringify(mockLogData[0], null, 2));
+  it('should call getSnapInLogs with default options if none are provided', async () => {
+    await logsAction({});
+    // Default limit is 100, others are undefined. The wrapper will pass these along.
+    expect(getSnapInLogs).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
   });
 
-  it("should call getSnapInLogs with all provided options", async () => {
+  it('should call getSnapInLogs with provided options', async () => {
     const options = {
-      after: "1h",
-      before: "30m",
-      filters: '{"level":"info"}',
+      after: '1h',
+      before: '10m',
+      filters: '{"level":"error"}',
       limit: 50,
     };
-    vi.mocked(devrevWrapper.getSnapInLogs).mockResolvedValue([]);
-
-    await program.parseAsync([
-      "node",
-      "test",
-      "logs",
-      "--after", options.after,
-      "--before", options.before,
-      "--filters", options.filters,
-      "--limit", options.limit.toString(),
-    ]);
-
-    expect(devrevWrapper.getSnapInLogs).toHaveBeenCalledWith(options);
+    await logsAction(options);
+    expect(getSnapInLogs).toHaveBeenCalledWith({
+      after: '1h',
+      before: '10m',
+      filters: '{"level":"error"}',
+      limit: 50,
+    });
   });
 
-  it("should display 'No logs found' if getSnapInLogs returns empty", async () => {
-    vi.mocked(devrevWrapper.getSnapInLogs).mockResolvedValue([]);
-    await program.parseAsync(["node", "test", "logs"]);
-    expect(mockLogger.info).toHaveBeenCalledWith("No logs found for the given criteria.");
+  it('should log "No logs found" if getSnapInLogs returns empty array or null', async () => {
+    vi.mocked(getSnapInLogs).mockResolvedValue([]);
+    await logsAction({});
+    expect(logger.info).toHaveBeenCalledWith("No logs found for the given criteria.");
+
+    vi.mocked(getSnapInLogs).mockResolvedValue(null as any); // Simulate null response
+    await logsAction({});
+    expect(logger.info).toHaveBeenCalledWith("No logs found for the given criteria.");
   });
 
-  it("should display 'No logs found' if getSnapInLogs returns null", async () => {
-    vi.mocked(devrevWrapper.getSnapInLogs).mockResolvedValue(null as any); // Simulate null response
-    await program.parseAsync(["node", "test", "logs"]);
-    expect(mockLogger.info).toHaveBeenCalledWith("No logs found for the given criteria.");
+  it('should output logs if retrieved', async () => {
+    const mockLogEntries = [
+      { timestamp: '2023-01-01T00:00:00Z', message: 'Log 1' },
+      "Plain string log",
+    ];
+    vi.mocked(getSnapInLogs).mockResolvedValue(mockLogEntries);
+    await logsAction({});
+    expect(logger.info).toHaveBeenCalledWith("Logs retrieved successfully:");
+    // Check console.log calls
+    expect(consoleLogSpy).toHaveBeenCalledWith(JSON.stringify(mockLogEntries[0], null, 2));
+    expect(consoleLogSpy).toHaveBeenCalledWith(mockLogEntries[1]);
   });
 
-
-  it("should handle errors from getSnapInLogs (devrev CLI not found)", async () => {
-    const error = new Error("DevRev CLI command failed: devrev not found");
-    vi.mocked(devrevWrapper.getSnapInLogs).mockRejectedValue(error);
-
-    await program.parseAsync(["node", "test", "logs"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
-    expect(mockLogger.error).toHaveBeenCalledWith("It seems 'devrev' CLI is not installed or not found in your PATH.");
+  it('should handle DevRev CLI error from getSnapInLogs', async () => {
+    const cliError = new Error('DevRev CLI command failed: Some CLI issue');
+    vi.mocked(getSnapInLogs).mockRejectedValue(cliError);
+    await logsAction({});
+    expect(logger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
+    expect(logger.error).toHaveBeenCalledWith("It seems 'devrev' CLI is not installed or not found in your PATH.");
   });
 
-  it("should handle errors from getSnapInLogs (snap_in_package_id not found)", async () => {
-    const error = new Error("DevRev CLI command failed: snap_in_package_id not found in context");
-    vi.mocked(devrevWrapper.getSnapInLogs).mockRejectedValue(error);
-
-    await program.parseAsync(["node", "test", "logs"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
-    expect(mockLogger.error).toHaveBeenCalledWith("Snap-in package ID not found in the current DevRev context.");
+  it('should handle snap_in_package_id not found error from getSnapInLogs', async () => {
+    const contextError = new Error('snap_in_package_id not found in context');
+    vi.mocked(getSnapInLogs).mockRejectedValue(contextError);
+    await logsAction({});
+    expect(logger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
+    expect(logger.error).toHaveBeenCalledWith("Snap-in package ID not found in the current DevRev context.");
   });
 
-
-  it("should handle generic errors from getSnapInLogs", async () => {
-    const errorMessage = "Some other error";
-    const error = new Error(errorMessage);
-    vi.mocked(devrevWrapper.getSnapInLogs).mockRejectedValue(error);
-
-    await program.parseAsync(["node", "test", "logs"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
-    expect(mockLogger.error).toHaveBeenCalledWith(`An unexpected error occurred: ${errorMessage}`);
+  it('should handle other unexpected errors from getSnapInLogs', async () => {
+    const unexpectedError = new Error('Some unexpected network issue');
+    vi.mocked(getSnapInLogs).mockRejectedValue(unexpectedError);
+    await logsAction({});
+    expect(logger.error).toHaveBeenCalledWith("Failed to fetch Snap-in logs.");
+    expect(logger.error).toHaveBeenCalledWith(`An unexpected error occurred: ${unexpectedError.message}`);
   });
+
 });

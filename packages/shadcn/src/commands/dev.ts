@@ -6,6 +6,7 @@ import {
   activateSnapIn,
   getSnapInContext,
 } from "../utils/devrev-cli-wrapper";
+import { getProjectInfo } from "@/src/utils/get-project-info";
 import inquirer from "inquirer";
 
 export const dev = new Command()
@@ -23,9 +24,26 @@ export const dev = new Command()
     createPackage?: boolean;
     manifestPath?: string;
   }) => {
+    logger.info("Attempting to retrieve project information...");
+    const projectInfo = await getProjectInfo(process.cwd());
+
+    if (projectInfo) {
+      logger.info(`Project Name: ${projectInfo.name}`);
+      logger.info(`Project Slug: ${projectInfo.slug}`);
+      logger.info(`Manifest Path: ${projectInfo.manifestPath}`);
+    } else {
+      logger.warn("Could not retrieve project information from manifest.yaml. Proceeding with prompts or defaults.");
+    }
+
     logger.info("Starting Snap-in development and testing workflow using devrev-cli...");
 
     let { path, url, packageId, createPackage, manifestPath } = options;
+
+    // Use manifestPath from projectInfo if available and not overridden by options
+    if (projectInfo?.manifestPath && !manifestPath) {
+      logger.info(`Using manifest path from project information: ${projectInfo.manifestPath}`);
+      manifestPath = projectInfo.manifestPath;
+    }
 
     if (!path) {
       const pathAnswers = await inquirer.prompt([
@@ -40,7 +58,7 @@ export const dev = new Command()
       path = pathAnswers.path;
     }
 
-    if (!url) {
+    if (!url) { // URL is specific to dev command, always prompt if not given
       const urlAnswers = await inquirer.prompt([
         {
           type: "input",
@@ -58,24 +76,61 @@ export const dev = new Command()
       url = urlAnswers.url;
     }
 
-    if (!packageId && !createPackage) {
-        try {
-            const context = await getSnapInContext();
-            if (context.snap_in_package_id) {
-                logger.info(`Using Snap-in package ID from current context: ${context.snap_in_package_id}`);
-                packageId = context.snap_in_package_id;
+    // Handle packageId and createPackage logic
+    if (!packageId && createPackage && projectInfo?.slug && projectInfo.slug !== "unknown-snapin-slug") {
+      logger.info(`Option --create-package is set and no --package-id was provided.`);
+      logger.info(`The slug '${projectInfo.slug}' from your manifest.yaml will be used by the DevRev CLI to identify or create the package.`);
+      // No need to prompt for packageId, CLI will use the slug.
+    } else if (!packageId && !createPackage) {
+      try {
+        const context = await getSnapInContext();
+        if (context.snap_in_package_id) {
+          logger.info(`Using Snap-in package ID from current context: ${context.snap_in_package_id}`);
+          packageId = context.snap_in_package_id;
+        } else {
+          // Prompt only if not creating a package with a slug
+          const pkgAnswers = await inquirer.prompt([
+            {
+              type: "input",
+              name: "packageId",
+              message: "Enter the Snap-in package ID (leave blank if --create-package is used with a manifest slug):",
             }
-        } catch (error: any) {
-            logger.warn("Could not automatically determine Snap-in package ID from context. You may need to use --package-id or --create-package.");
+          ]);
+          if (pkgAnswers.packageId) packageId = pkgAnswers.packageId;
+          else if (!createPackage) {
+             logger.warn("No package ID provided and --create-package is not set. The CLI might require a package context or slug in manifest.");
+          }
         }
+      } catch (error: any) {
+        logger.warn("Could not automatically determine Snap-in package ID from context. You may need to use --package-id or --create-package.");
+      }
+    } else if (packageId && createPackage) {
+        logger.info(`Both --package-id ('${packageId}') and --create-package are specified. DevRev CLI will attempt to use the ID, and create if not found.`);
+    }
+
+    // Prompt for manifestPath only if not provided by options and not found via projectInfo
+    if (!manifestPath) { // manifestPath would be set if projectInfo.manifestPath existed
+        const manifestAnswers = await inquirer.prompt([
+            {
+                type: "input",
+                name: "manifestPath",
+                message: "Enter the path to your Snap-in manifest file (e.g., manifest.yaml, default is auto-detected by CLI if left blank):",
+                default: "", // CLI will auto-detect if empty
+            }
+        ]);
+        if (manifestAnswers.manifestPath) manifestPath = manifestAnswers.manifestPath;
+    } else {
+        logger.info(`Using manifest path: ${manifestPath}`);
     }
 
     try {
       // 1. Create a Snap-in Version with testing URL
       logger.info(`Creating Snap-in version with path '${path}' and testing URL '${url}'...`);
-      const versionOptions: any = { testingUrl: url, createPackage };
+      const versionOptions: any = { testingUrl: url };
       if (packageId) versionOptions.packageId = packageId;
       if (manifestPath) versionOptions.manifestPath = manifestPath;
+      if (createPackage) versionOptions.createPackage = createPackage;
+
 
       const versionInfo = await createSnapInVersion(path!, versionOptions);
       logger.info("Snap-in test version created successfully:");
