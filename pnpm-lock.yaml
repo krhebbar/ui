@@ -41,6 +41,9 @@ importers:
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
+      dotenv:
+        specifier: ^16.5.0
+        version: 16.5.0
       enquirer:
         specifier: ^2.4.1
         version: 2.4.1
@@ -105,6 +108,9 @@ importers:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@20.17.57)(jsdom@20.0.3)(lightningcss@1.30.1)(msw@2.9.0(@types/node@20.17.57)(typescript@5.8.3))(terser@5.40.0)
     devDependencies:
+      '@types/dotenv':
+        specifier: ^8.2.3
+        version: 8.2.3
       '@types/hast':
         specifier: ^3.0.4
         version: 3.0.4
@@ -4343,6 +4349,10 @@ packages:
 
   '@types/doctrine@0.0.9':
     resolution: {integrity: sha512-eOIHzCUSH7SMfonMG1LsC2f8vxBFtho6NGBznK41R84YzPuvSBzrhEps33IsQiOW9+VL6NQ9DbjQJznk/S4uRA==}
+
+  '@types/dotenv@8.2.3':
+    resolution: {integrity: sha512-g2FXjlDX/cYuc5CiQvyU/6kkbP1JtmGzh0obW50zD7OKeILVL0NSpPWLXVfqoAGQjom2/SLLx9zHq0KXvD6mbw==}
+    deprecated: This is a stub types definition. dotenv provides its own type definitions, so you do not need this installed.
 
   '@types/estree-jsx@1.0.5':
     resolution: {integrity: sha512-52CcUVNFyfb1A2ALocQw/Dd1BQFNmSdkuC3BkZ6iqhdMfQz7JWOFRuJFloOzjk+6WijU56m9oKXFAXc7o3Towg==}
@@ -15667,6 +15677,10 @@ snapshots:
   '@types/diff@5.2.3': {}
 
   '@types/doctrine@0.0.9': {}
+
+  '@types/dotenv@8.2.3':
+    dependencies:
+      dotenv: 16.5.0
 
   '@types/estree-jsx@1.0.5':
     dependencies:
