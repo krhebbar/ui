@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs-extra";
+import yaml from "yaml";
 import { AirdropProjectConfig } from "../../types/airdrop-config";
 import { writeSnapInConfig } from "../../utils/airdrop-config";
 import { copyConfigTypes, generateTypeDefinitions } from "../../utils/type-generator";
@@ -65,18 +66,42 @@ async function updateManifestYamlFile(
     manifestExists = false;
   }
 
-  if (!manifestExists) {
-    logger.info(`manifest.yaml not found at ${manifestPath}. A new one will be created with default values if applicable, or this step might be skipped if template doesn't include it.`);
-  }
+  if (manifestExists) {
+    // Update existing manifest with new configuration values
+    try {
+      const existingContent = await fs.readFile(manifestPath, "utf8");
+      const existingManifest = yaml.parse(existingContent);
+      
+      // Update relevant fields while preserving existing structure
+      if (projectConfig.externalSystem?.name && existingManifest.name !== projectConfig.externalSystem.slug) {
+        existingManifest.name = projectConfig.externalSystem.slug;
+        logger.info(`Updated manifest name to: ${projectConfig.externalSystem.slug}`);
+      }
+      
+      if (projectConfig.externalSystem?.name && (!existingManifest.description || existingManifest.description.includes("DevRev CLI"))) {
+        existingManifest.description = `${projectConfig.externalSystem.name} integration created with DevRev CLI`;
+        logger.info(`Updated manifest description`);
+      }
 
-  // Create basic manifest structure if it doesn't exist
-  if (!manifestExists) {
+      // Add airdrop-specific fields if it's an airdrop project
+      if (projectConfig.projectType === 'airdrop') {
+        existingManifest.type = 'airdrop';
+        if (projectConfig.syncDirection) {
+          existingManifest.sync_direction = projectConfig.syncDirection;
+        }
+      }
+
+      const updatedContent = yaml.stringify(existingManifest, { indent: 2 });
+      await fs.writeFile(manifestPath, updatedContent, "utf8");
+      logger.info(`manifest.yaml updated successfully at ${manifestPath}`);
+    } catch (error) {
+      logger.warn(`Failed to update existing manifest.yaml: ${error}. Keeping original.`);
+    }
+  } else {
+    // Create basic manifest structure if it doesn't exist
     const basicManifest = generateBasicManifest(projectConfig);
     await fs.writeFile(manifestPath, basicManifest, "utf8");
-    logger.info(`manifest.yaml updated successfully at ${manifestPath}`);
-  } else {
-    // If manifest exists, we could enhance it here, but for now just log
-    logger.info(`Using existing manifest.yaml at ${manifestPath}`);
+    logger.info(`manifest.yaml created successfully at ${manifestPath}`);
   }
 }
 
@@ -84,18 +109,47 @@ async function updateManifestYamlFile(
  * Generate basic manifest content
  */
 function generateBasicManifest(config: AirdropProjectConfig): string {
-  const manifestContent = `version: "2"
-name: "${config.externalSystem?.slug || 'my-snapin'}"
-description: "A snap-in created with the DevRev CLI"
+  const isAirdrop = config.projectType === 'airdrop';
+  const systemName = config.externalSystem?.name || 'External System';
+  const systemSlug = config.externalSystem?.slug || 'my-snapin';
+  
+  let manifestContent = `version: "2"
+name: "${systemSlug}"
+description: "${systemName} integration created with DevRev CLI"
+`;
 
+  // Add airdrop-specific fields
+  if (isAirdrop) {
+    manifestContent += `type: airdrop
+`;
+    if (config.syncDirection) {
+      manifestContent += `sync_direction: ${config.syncDirection}
+`;
+    }
+  }
+
+  // Add basic structure
+  manifestContent += `
 app:
   - name: main
 
 functions:
-  - name: example_function
-    description: "Example function"
-
+  - name: ${isAirdrop ? 'extraction' : 'example_function'}
+    description: "${isAirdrop ? 'Extraction function for the snap-in' : 'Example function'}"
 `;
+
+  // Add airdrop-specific imports section
+  if (isAirdrop) {
+    manifestContent += `
+imports:
+  - slug: ${systemSlug}
+    display_name: ${systemName}
+    description: ${systemName} integration for importing data into DevRev
+    extractor_function: extraction
+    allowed_connection_types:
+      - ${config.connection?.id || 'example-connection'}
+`;
+  }
 
   return manifestContent;
 } 

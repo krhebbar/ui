@@ -66,8 +66,9 @@ export async function runInit(
   // Gather configuration - always initialized to avoid undefined issues
   let airdropConfigResult = await gatherAirdropConfiguration(options);
 
-  // Handle new project setup
-  if (options.isNewProject) {
+  // Handle new project setup (only if not already initialized or if explicitly new)
+  const needsTemplateCloning = options.isNewProject && !preflightCheckResult?.manifestFileExists;
+  if (needsTemplateCloning) {
     await handleNewProjectSetup(options, airdropConfigResult, shouldGenerateManifest);
   }
 
@@ -140,16 +141,20 @@ async function handleNewProjectSetup(
     }
   }
 
-  // Always clone template for new projects (both empty directories and new subdirectories)
-  const cloneSuccess = await cloneProjectTemplate(
-    airdropConfigResult.projectTypeFromPrompt,
-    options.cwd,
-    airdropConfigResult.selectedSnapInTemplateName
-  );
+  // Clone template for new projects only (skip if template name is undefined for existing projects)
+  if (airdropConfigResult.selectedSnapInTemplateName || airdropConfigResult.projectTypeFromPrompt === 'airdrop') {
+    const cloneSuccess = await cloneProjectTemplate(
+      airdropConfigResult.projectTypeFromPrompt,
+      options.cwd,
+      airdropConfigResult.selectedSnapInTemplateName
+    );
 
-  if (!cloneSuccess) {
-    logger.error(`Failed to clone ${airdropConfigResult.projectTypeFromPrompt} template. Aborting initialization.`);
-    process.exit(1);
+    if (!cloneSuccess) {
+      logger.error(`Failed to clone ${airdropConfigResult.projectTypeFromPrompt} template. Aborting initialization.`);
+      process.exit(1);
+    }
+  } else {
+    logger.info("Skipping template cloning for existing project.");
   }
 }
 

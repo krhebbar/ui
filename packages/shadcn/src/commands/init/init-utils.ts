@@ -1,4 +1,9 @@
 import { AirdropProjectConfig, OAuth2Connection, SecretConnection } from "../../types/airdrop-config";
+import path from "path";
+import fs from "fs-extra";
+import yaml from "yaml";
+import { getSnapInConfig } from "../../utils/airdrop-config";
+import { logger } from "../../utils/logger";
 
 /**
  * Extract core configuration for file generation
@@ -14,6 +19,134 @@ export function extractCoreConfigForGeneration(
 ): AirdropProjectConfig {
   const { projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName, ...coreConfig } = augmentedConfig;
   return coreConfig;
+}
+
+/**
+ * Auto-detect project type based on folder name patterns
+ */
+export function autoDetectProjectType(cwd: string): 'airdrop' | 'snap-in' | null {
+  const folderName = path.basename(cwd);
+  
+  // Check for airdrop pattern
+  if (folderName.startsWith('airdrop-')) {
+    return 'airdrop';
+  }
+  
+  // Check for snap-in pattern
+  if (folderName.endsWith('-snap-in')) {
+    return 'snap-in';
+  }
+  
+  return null;
+}
+
+/**
+ * Check if project is already initialized (has manifest.yaml)
+ */
+export async function isProjectInitialized(cwd: string): Promise<boolean> {
+  const manifestPathYaml = path.join(cwd, "manifest.yaml");
+  const manifestPathYml = path.join(cwd, "manifest.yml");
+  
+  return (await fs.pathExists(manifestPathYaml)) || (await fs.pathExists(manifestPathYml));
+}
+
+/**
+ * Read existing manifest.yaml file and extract configuration
+ */
+export async function readExistingManifest(cwd: string): Promise<Partial<AirdropProjectConfig> | null> {
+  const manifestPathYaml = path.join(cwd, "manifest.yaml");
+  const manifestPathYml = path.join(cwd, "manifest.yml");
+  
+  let manifestPath: string;
+  if (await fs.pathExists(manifestPathYaml)) {
+    manifestPath = manifestPathYaml;
+  } else if (await fs.pathExists(manifestPathYml)) {
+    manifestPath = manifestPathYml;
+  } else {
+    return null;
+  }
+
+  try {
+    const manifestContent = await fs.readFile(manifestPath, "utf8");
+    const manifestData = yaml.parse(manifestContent);
+    
+    // Extract relevant configuration from manifest
+    const config: Partial<AirdropProjectConfig> = {};
+    
+    // Try to determine project type from manifest structure
+    if (manifestData.type === 'airdrop' || manifestData.imports) {
+      config.projectType = 'airdrop';
+      config.syncDirection = manifestData.sync_direction || "two-way";
+    } else {
+      config.projectType = 'snap-in';
+    }
+
+    // Extract external system info from imports or keyring_types
+    if (manifestData.imports && manifestData.imports[0]) {
+      const importItem = manifestData.imports[0];
+      config.externalSystem = {
+        name: importItem.display_name || manifestData.name || "External System",
+        slug: importItem.slug || "external-system",
+        apiBaseUrl: "https://api.example.com/v1",
+        testEndpoint: "https://api.example.com/v1/me",
+        supportedObjects: []
+      };
+    } else if (manifestData.keyring_types && manifestData.keyring_types[0]) {
+      const keyringType = manifestData.keyring_types[0];
+      config.externalSystem = {
+        name: keyringType.external_system_name || manifestData.name || "External System",
+        slug: manifestData.name?.toLowerCase().replace(/\s+/g, '-') || "external-system",
+        apiBaseUrl: keyringType.api_base_url || "https://api.example.com/v1",
+        testEndpoint: keyringType.token_verification?.url || "https://api.example.com/v1/me",
+        supportedObjects: []
+      };
+    }
+
+    // Extract DevRev objects (this is harder to determine from manifest alone)
+    config.devrevObjects = ["account"]; // Default fallback
+
+    logger.info(`Found existing manifest at ${manifestPath}, extracted configuration.`);
+    return config;
+  } catch (error) {
+    logger.warn(`Failed to parse existing manifest: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Read existing snap-in.config.mjs and extract configuration
+ */
+export async function readExistingSnapInConfig(cwd: string): Promise<Partial<AirdropProjectConfig> | null> {
+  try {
+    const configResult = await getSnapInConfig(cwd);
+    if (configResult.validatedConfig) {
+      logger.info("Found existing snap-in.config.mjs, extracted configuration.");
+      return configResult.validatedConfig;
+    } else if (configResult.rawConfig) {
+      logger.info("Found snap-in.config.mjs but validation failed, using raw config as fallback.");
+      return configResult.rawConfig;
+    }
+  } catch (error) {
+    // No snap-in.config.mjs found or error reading it
+  }
+  
+  return null;
+}
+
+/**
+ * Merge existing configurations with precedence: snap-in.config > manifest > defaults
+ */
+export function mergeExistingConfigurations(
+  manifestConfig: Partial<AirdropProjectConfig> | null,
+  snapInConfig: Partial<AirdropProjectConfig> | null,
+  defaultConfig: AirdropProjectConfig
+): AirdropProjectConfig {
+  // Start with defaults, then overlay manifest, then snap-in config
+  return {
+    ...defaultConfig,
+    ...(manifestConfig || {}),
+    ...(snapInConfig || {}),
+  };
 }
 
 /**
