@@ -5,10 +5,11 @@
     "isolatedModules": false,
     "resolveJsonModule": true,
     "baseUrl": ".",
+    "skipLibCheck": true,
     "paths": {
       "@/*": ["./*"]
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "test/fixtures"]
+  "exclude": ["node_modules", "test/fixtures", "dist", "**/*.d.ts"]
 }

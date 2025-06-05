@@ -243,7 +243,7 @@ export async function runInit(
         // If gatherAirdropConfiguration's projectName implies a *subfolder*, that needs adjustment.
         // For now, assume options.cwd from preflight is the root where project should be initialized.
         // The `projectName` from `gatherAirdropConfiguration` will be used for config values, not necessarily folder creation here.
-        if (path.basename(options.cwd) !== airdropConfigResult.projectName && projectTypeFromPrompt !== 'snap-in') { // For snap-ins, folder name can differ from snapInBaseName
+        if (path.basename(options.cwd) !== airdropConfigResult.projectName && airdropConfigResult.projectTypeFromPrompt !== 'snap-in') { // For snap-ins, folder name can differ from snapInBaseName
              // This case is tricky: preflight gave a root, prompts gave a name.
              // If options.cwd is truly empty, maybe we should create options.cwd/projectName?
              // For now, let's stick to options.cwd from preflight as the true root.
@@ -750,7 +750,7 @@ async function gatherAirdropConfiguration(
                                   Array.isArray(responses.externalSyncUnits)
                                     ? responses.externalSyncUnits.map((s: string) => s.trim()).filter(Boolean)
                                     : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean)
-                                 ).filter(unit => unit.length > 0) // Ensure empty strings after split are removed
+                                 ).filter((unit: string) => unit.length > 0) // Ensure empty strings after split are removed
                                : []; // Default to empty array if not needed or no response
 
   // Additional check for the case where externalSyncUnits is an empty string from the prompt

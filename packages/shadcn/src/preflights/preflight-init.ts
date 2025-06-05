@@ -20,16 +20,10 @@ export async function preFlightInit(
   // Ensure target directory exists.
   // Check for empty project. We assume if no manifest.yaml or manifest.yml exists, the project is empty.
   const manifestYamlPath = path.resolve(options.cwd, "manifest.yaml");
-  const manifestYmlPath = path.resolve(options.cwd, "manifest.yml");
-
-  // Check for empty project. We assume if no manifest.yaml or manifest.yml exists, the project is empty.
-  const manifestYamlPath = path.resolve(options.cwd, "manifest.yaml");
-  const manifestYmlPath = path.resolve(options.cwd, "manifest.yml");
 
   if (
     !fs.existsSync(options.cwd) ||
-    (!fs.existsSync(manifestYamlPath) && !fs.existsSync(manifestYmlPath))
-    (!fs.existsSync(manifestYamlPath) && !fs.existsSync(manifestYmlPath))
+    (!fs.existsSync(manifestYamlPath))
   ) {
     errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
     projectSpinner?.fail("Target directory does not exist.")
