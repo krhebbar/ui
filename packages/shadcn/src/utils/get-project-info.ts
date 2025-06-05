@@ -290,7 +290,7 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
     return {
       name: manifest.name,
       description: manifest.description,
-      slug: manifest.imports?.[0]?.slug || "airdrop-project", // Use first import slug or default
+      slug: manifest.imports?.[0]?.slug || "unknown-snapin-slug", // Use first import slug or default
       serviceAccountName: manifest.service_account?.display_name,
       externalSystemName: manifest.keyring_types?.[0]?.external_system_name,
       functions: manifest.functions,

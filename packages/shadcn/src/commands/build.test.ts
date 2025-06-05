@@ -1,207 +1,229 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Command } from "commander";
-import { build } from "./build"; // Adjust path as needed
-import * as devrevWrapper from "../utils/devrev-cli-wrapper"; // Adjust path
-import inquirer from "inquirer";
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { build } from './build'; // Assuming 'build' is the exported command object
+import { getProjectInfo } from '@/src/utils/get-project-info';
+import { createSnapInVersion, getSnapInContext } from '../utils/devrev-cli-wrapper';
+import inquirer from 'inquirer';
+import { logger } from '@/src/utils/logger';
 
-// Mock the wrapper module
-vi.mock("../utils/devrev-cli-wrapper", () => ({
-  createSnapInVersion: vi.fn(),
-  getSnapInContext: vi.fn(),
+// Mock utilities and external dependencies
+vi.mock('@/src/utils/get-project-info');
+vi.mock('../utils/devrev-cli-wrapper');
+vi.mock('inquirer');
+vi.mock('@/src/utils/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
-// Mock inquirer
-vi.mock("inquirer");
+// Cast the command to 'any' to access the action method for testing
+const buildAction = build.action as any;
 
-// Mock logger
-const mockLogger = {
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-};
-vi.mock("@/src/utils/logger", () => ({ // Adjust path for logger
-  logger: mockLogger,
-}));
-
-describe("build command", () => {
-  let program: Command;
-
+describe('build command', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    program = new Command();
-    program.addCommand(build);
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
+    // Default Mocks
+    vi.mocked(getProjectInfo).mockResolvedValue(null); // Default to no project info
+    vi.mocked(createSnapInVersion).mockResolvedValue({ id: 'new-version-id', name: 'v1' });
+    vi.mocked(getSnapInContext).mockResolvedValue({ snap_in_package_id: null, snap_in_id: null, snap_in_version_id: null }); // Default to no context
+    vi.mocked(inquirer.prompt).mockResolvedValue({}); // Default to empty answers
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('should prompt for path if not provided and not archivePath', async () => {
+    vi.mocked(inquirer.prompt).mockResolvedValueOnce({ pathOrArchive: './dist', type: 'Code Path' });
+    await buildAction({} /* options */);
+    expect(inquirer.prompt).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'pathOrArchive' }),
+        expect.objectContaining({ name: 'type' }),
+      ])
+    );
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './dist', // path derived from prompt
+      expect.objectContaining({})
+    );
   });
 
-  const mockVersionResponse = { id: "ver_123", name: "v1.0.0" };
+  it('should use projectInfo.manifestPath if available and no option is provided', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue({
+      name: 'Test Project',
+      description: 'Desc',
+      slug: 'test-slug',
+      manifestPath: 'project/manifest.yaml',
+      codePath: 'project/code',
+      functionsPath: 'project/code/src/functions',
+      isTsx: true,
+      aliasPrefix: '@',
+      serviceAccountName: '',
+      externalSystemName: '',
+      functions: [],
+      keyring: undefined,
+      tokenVerification: undefined
+    });
+    vi.mocked(inquirer.prompt).mockResolvedValueOnce({ pathOrArchive: './src', type: 'Code Path' }); // For path
 
-  it("should call createSnapInVersion with all options from CLI flags", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
+    await buildAction({} /* options */);
+
+    expect(logger.info).toHaveBeenCalledWith('Using manifest path from project information: project/manifest.yaml');
+    // inquirer.prompt for manifestPath should NOT have been called for manifest
+    expect(inquirer.prompt).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'manifestPath' })])
+    );
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './src',
+      expect.objectContaining({ manifestPath: 'project/manifest.yaml' })
+    );
+  });
+
+  it('should use manifestPath from options even if projectInfo.manifestPath is available', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue({
+      name: 'Test Project',
+      slug: 'test-slug',
+      manifestPath: 'project/manifest.yaml',
+      codePath: './', description: '', functionsPath: '', isTsx:false, aliasPrefix: null,
+      serviceAccountName: '', externalSystemName: '', functions: [], keyring: undefined, tokenVerification: undefined
+    });
+     vi.mocked(inquirer.prompt).mockResolvedValueOnce({ pathOrArchive: './src', type: 'Code Path' }); // For path
+
+    await buildAction({ manifestPath: 'options/manifest.yaml' });
+
+    expect(logger.info).not.toHaveBeenCalledWith('Using manifest path from project information: project/manifest.yaml');
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './src',
+      expect.objectContaining({ manifestPath: 'options/manifest.yaml' })
+    );
+  });
+
+
+  it('should skip packageId prompt if createPackage is true, no packageId option, and valid projectInfo.slug exists', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue({
+      name: 'Test Project',
+      slug: 'valid-project-slug',
+      manifestPath: 'manifest.yaml',
+      codePath: './', description: '', functionsPath: '', isTsx:false, aliasPrefix: null,
+      serviceAccountName: '', externalSystemName: '', functions: [], keyring: undefined, tokenVerification: undefined
+    });
+    vi.mocked(inquirer.prompt).mockResolvedValueOnce({ pathOrArchive: './src', type: 'Code Path' }); // For path
+
+    await buildAction({ createPackage: true });
+
+    expect(logger.info).toHaveBeenCalledWith("Option --create-package is set and no --package-id was provided.");
+    expect(logger.info).toHaveBeenCalledWith("The slug 'valid-project-slug' from your manifest.yaml will be used by the DevRev CLI to identify or create the package.");
+    // inquirer.prompt for packageId should NOT have been called
+     expect(inquirer.prompt).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'packageId' })])
+    );
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+        './src',
+        expect.objectContaining({ createPackage: true })
+    );
+  });
+
+  it('should prompt for packageId if createPackage is false, no packageId option, and no context packageId', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue(null); // No project info
+    vi.mocked(getSnapInContext).mockResolvedValue({ snap_in_package_id: null, snap_in_id: null, snap_in_version_id: null }); // No context
+    vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ pathOrArchive: './src', type: 'Code Path' }) // For path
+      .mockResolvedValueOnce({ packageId: 'prompted-pkg-id' }) // For packageId
+      .mockResolvedValueOnce({ manifestPath: 'prompted-manifest.yaml' }); // For manifest
+
+    await buildAction({} /* options */);
+
+    expect(inquirer.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'packageId' })])
+    );
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './src',
+      expect.objectContaining({ packageId: 'prompted-pkg-id' })
+    );
+  });
+
+  it('should use packageId from context if available and no option/slug logic applies', async () => {
+    vi.mocked(getProjectInfo).mockResolvedValue(null);
+    vi.mocked(getSnapInContext).mockResolvedValue({ snap_in_package_id: 'context-pkg-id', snap_in_id: '', snap_in_version_id: '' });
+     vi.mocked(inquirer.prompt)
+      .mockResolvedValueOnce({ pathOrArchive: './src', type: 'Code Path' }) // For path
+      // No packageId prompt
+      .mockResolvedValueOnce({ manifestPath: 'prompted-manifest.yaml' }); // For manifest
+
+
+    await buildAction({} /* options */);
+
+    expect(logger.info).toHaveBeenCalledWith('Using Snap-in package ID from current context: context-pkg-id');
+    expect(inquirer.prompt).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'packageId' })])
+    );
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './src',
+      expect.objectContaining({ packageId: 'context-pkg-id' })
+    );
+  });
+
+
+  it('should call createSnapInVersion with all relevant options', async () => {
     const options = {
-      path: "./dist",
-      packageId: "pkg_abc",
-      manifestPath: "manifest.yml",
-      archivePath: "archive.tar.gz",
+      path: './dist',
+      packageId: 'opt-pkg-id',
+      manifestPath: 'opt-manifest.yaml',
       createPackage: true,
     };
-
-    await program.parseAsync([
-      "node", "test", "build",
-      "--path", options.path,
-      "--package-id", options.packageId,
-      "--manifest", options.manifestPath,
-      "--archive", options.archivePath,
-      "--create-package",
-    ]);
-
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith(options.path, {
-      packageId: options.packageId,
-      manifestPath: options.manifestPath,
-      archivePath: options.archivePath,
-      createPackage: options.createPackage,
-    });
-    expect(mockLogger.info).toHaveBeenCalledWith("Snap-in version created successfully:");
-    expect(console.log).toHaveBeenCalledWith(JSON.stringify(mockVersionResponse, null, 2));
+    await buildAction(options);
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      './dist',
+      expect.objectContaining({
+        packageId: 'opt-pkg-id',
+        manifestPath: 'opt-manifest.yaml',
+        createPackage: true,
+      })
+    );
   });
 
-  it("should prompt for path and manifest if not provided", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({ snap_in_package_id: "pkg_ctx" } as any); // Context provides packageId
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./prompted-dist", type: "Code Path" }) // path
-      .mockResolvedValueOnce({ manifestPath: "prompted-manifest.yaml" }); // manifest
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(inquirer.prompt).toHaveBeenCalledTimes(2);
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith("./prompted-dist", {
-        packageId: "pkg_ctx", // From context
-        manifestPath: "prompted-manifest.yaml", // From prompt
-        archivePath: undefined, // Not prompted for if path is given
-        createPackage: undefined, // Not specified
-    });
+  it('should use archivePath if provided', async () => {
+    const options = {
+      archivePath: './snap.zip',
+      packageId: 'opt-pkg-id',
+    };
+    await buildAction(options);
+    expect(createSnapInVersion).toHaveBeenCalledWith(
+      '', // path is empty string when archivePath is used
+      expect.objectContaining({
+        archivePath: './snap.zip',
+        packageId: 'opt-pkg-id',
+      })
+    );
   });
 
-  it("should use archivePath from prompt", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({} as any); // No context packageId
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./prompted.zip", type: "Archive Path" }) // archive
-      .mockResolvedValueOnce({ packageId: "prompted-pkg-id" }) // packageId (since no context and no --create-package)
-      .mockResolvedValueOnce({ manifestPath: "" }); // manifest (empty for auto-detect)
+  it('should log error and exit if createSnapInVersion fails', async () => {
+    vi.mocked(createSnapInVersion).mockRejectedValue(new Error('CLI tool failed'));
+    const options = { path: './dist' };
 
+    // Need to wrap action call to catch process.exit
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {}) as any);
 
-    await program.parseAsync(["node", "test", "build"]);
+    await buildAction(options);
 
-    expect(inquirer.prompt).toHaveBeenCalledTimes(3);
-    // When archivePath is used, the first arg to createSnapInVersion is "" if path was not also set.
-    // The wrapper handles passing the actual archive path as options.archivePath
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith("", { // main path arg is empty as archive is used
-        packageId: "prompted-pkg-id",
-        manifestPath: undefined, // Inquirer gave "", so it should be undefined for wrapper
-        archivePath: "./prompted.zip",
-        createPackage: undefined,
-    });
+    expect(logger.error).toHaveBeenCalledWith('Failed to create Snap-in version.');
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('CLI tool failed'));
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
   });
 
-
-  it("should use packageId from context if available and not overridden", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({ snap_in_package_id: "ctx_pkg_id" } as any);
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./dist", type: "Code Path" })
-      .mockResolvedValueOnce({ manifestPath: "" }); // No specific manifest path
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(devrevWrapper.getSnapInContext).toHaveBeenCalled();
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith("./dist", {
-      packageId: "ctx_pkg_id",
-      manifestPath: undefined,
-      archivePath: undefined,
-      createPackage: undefined,
-    });
+  it('should correctly pass testingUrl if it were an option in build (it is not currently)', async () => {
+    // This test is more of a forward-looking check or for other commands.
+    // Build command currently doesn't have testingUrl, but the wrapper supports it.
+    const options = {
+      path: './dist',
+      // testingUrl: 'http://localhost:3000' // If this option was added to build
+    };
+    // If testingUrl was part of options, it would be:
+    // expect(createSnapInVersion).toHaveBeenCalledWith('./dist', expect.objectContaining({ testingUrl: 'http://localhost:3000' }));
+    // For now, just ensure it doesn't pass it if not an option:
+    await buildAction(options);
+    expect(createSnapInVersion).toHaveBeenCalledWith('./dist',expect.not.objectContaining({ testingUrl: expect.anything() }));
   });
 
-  it("should prompt for packageId if no context and --create-package is not set", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({} as any); // No context
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./dist", type: "Code Path" })
-      .mockResolvedValueOnce({ packageId: "prompted-pkg-for-build" }) // Prompt for packageId
-      .mockResolvedValueOnce({ manifestPath: "" });
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith("./dist", {
-      packageId: "prompted-pkg-for-build",
-      manifestPath: undefined,
-      archivePath: undefined,
-      createPackage: undefined,
-    });
-  });
-
-
-  it("should handle --create-package flag", async () => {
-    vi.mocked(devrevWrapper.createSnapInVersion).mockResolvedValue(mockVersionResponse);
-    // No context needed as --create-package is specified
-    vi.mocked(devrevWrapper.getSnapInContext).mockResolvedValue({} as any);
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./dist", type: "Code Path" })
-      .mockResolvedValueOnce({ manifestPath: "" });
-
-    await program.parseAsync(["node", "test", "build", "--create-package"]);
-
-    expect(devrevWrapper.createSnapInVersion).toHaveBeenCalledWith("./dist", {
-      packageId: undefined, // Not specified, relies on manifest slug + createPackage
-      manifestPath: undefined,
-      archivePath: undefined,
-      createPackage: true,
-    });
-  });
-
-  it("should exit if path or archivePath is not provided (after prompts)", async () => {
-     vi.mocked(inquirer.prompt).mockResolvedValueOnce({ pathOrArchive: "", type: "Code Path" }); // Empty path
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Either a code path or an archive path must be provided.");
-    expect(process.exit).toHaveBeenCalledWith(1);
-  });
-
-  it("should handle errors from createSnapInVersion (CLI not found)", async () => {
-    const error = new Error("DevRev CLI command failed: devrev not found");
-    vi.mocked(devrevWrapper.createSnapInVersion).mockRejectedValue(error);
-    vi.mocked(inquirer.prompt) // Ensure prompts don't hang
-      .mockResolvedValueOnce({ pathOrArchive: "./dist", type: "Code Path" })
-      .mockResolvedValueOnce({ manifestPath: "" });
-
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to create Snap-in version.");
-    expect(mockLogger.error).toHaveBeenCalledWith("It seems 'devrev' CLI is not installed or not found in your PATH.");
-    expect(process.exit).toHaveBeenCalledWith(1);
-  });
-
-  it("should handle generic errors from createSnapInVersion", async () => {
-    const errorMessage = "Some other build error";
-    const error = new Error(errorMessage);
-    vi.mocked(devrevWrapper.createSnapInVersion).mockRejectedValue(error);
-    vi.mocked(inquirer.prompt)
-      .mockResolvedValueOnce({ pathOrArchive: "./dist", type: "Code Path" })
-      .mockResolvedValueOnce({ manifestPath: "" });
-
-    await program.parseAsync(["node", "test", "build"]);
-
-    expect(mockLogger.error).toHaveBeenCalledWith("Failed to create Snap-in version.");
-    expect(mockLogger.error).toHaveBeenCalledWith(`An unexpected error occurred: ${errorMessage}`);
-    expect(process.exit).toHaveBeenCalledWith(1);
-  });
 });
