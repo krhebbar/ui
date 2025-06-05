@@ -1,4 +1,6 @@
 import path from "path"
+import prompts from "prompts"
+import { findProjectRoot } from "@/src/utils/preflight/project-root"
 import { initOptionsSchema } from "@/src/commands/init"
 import * as ERRORS from "@/src/utils/errors"
 import { highlighter } from "@/src/utils/highlighter"
@@ -13,11 +15,7 @@ export async function preFlightInit(
   const errors: Record<string, boolean> = {}
 
   // Ensure target directory exists.
-  // Check for empty project. We assume if no manifest.yml exists, the project is empty.
-  if (
-    !fs.existsSync(options.cwd) ||
-    !fs.existsSync(path.resolve(options.cwd, "manifest.yml"))
-  ) {
+  if (!fs.existsSync(options.cwd)) {
     errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
     return {
       errors,
@@ -29,31 +27,49 @@ export async function preFlightInit(
     silent: options.silent,
   }).start()
 
-  projectSpinner?.succeed()
+  const projectRoot = findProjectRoot(options.cwd)
 
-  const manifestSpinner = spinner(`Verifying airdrop project.`, {
-    silent: options.silent,
-  }).start()
-  
-  // Check if this is a valid airdrop project by looking for manifest.yml and code directory
-  const manifestPath = path.resolve(options.cwd, "manifest.yml")
-  const codePath = path.resolve(options.cwd, "code")
-  
+  if (projectRoot && projectRoot !== options.cwd) {
+    projectSpinner?.stop() // Stop spinner before prompting
+    const response = await prompts({
+      type: "confirm",
+      name: "switchDir",
+      message: `We found a valid Snap-in/Editor project at: ${projectRoot}. Do you want to switch to this directory and run the command from there? (y/N)`,
+      initial: false,
+    })
+
+    if (response.switchDir) {
+      logger.info(
+        `This command should be run from the root of your Snap-in/Editor project.`
+      )
+      logger.info(
+        `Please change your current directory to ${projectRoot} and try again.`
+      )
+      process.exit(0)
+    }
+    // If user says no, continue in current dir, spinner can be restarted or kept stopped.
+    // For now, let's assume we want to restart it if other checks follow.
+    projectSpinner?.start()
+  }
+
+  // Verify if the current or resolved projectRoot is a valid project directory
+  const currentPathToCheck = projectRoot || options.cwd
+  const manifestPath = path.join(currentPathToCheck, "manifest.yml")
+  const codePath = path.join(currentPathToCheck, "code")
+
   if (!fs.existsSync(manifestPath) || !fs.existsSync(codePath)) {
-    manifestSpinner?.fail()
-    logger.break()
+    projectSpinner?.fail()
     logger.error(
-      `This does not appear to be a valid airdrop project at ${highlighter.info(
-        options.cwd
-      )}.\n` +
-        `Expected to find ${highlighter.info("manifest.yml")} and ${highlighter.info("code/")} directory.`
+      `This command must be run from the root of a Snap-in or Editor project (i.e., where manifest.yml and code/ directory exist).`
     )
-    logger.break()
+    logger.info(
+      `This command should be run from the root of your Snap-in/Editor project.`
+    )
     process.exit(1)
   }
   
-  manifestSpinner?.succeed(
-    `Verifying airdrop project. Found ${highlighter.info("manifest.yml")}.`
+  projectSpinner?.succeed(
+    `Preflight checks passed. Found ${highlighter.info("manifest.yml")} and ${highlighter.info("code/")} at ${currentPathToCheck}.`
   )
 
   return {
