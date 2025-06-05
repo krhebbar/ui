@@ -1,11 +1,5 @@
 import { execa } from "execa";
-import dotenv from "dotenv";
 import fs from "fs";
-
-// Initialize dotenv to load environment variables from .env file
-if (fs.existsSync(".env")) {
-  dotenv.config();
-}
 
 /**
  * Executes a DevRev CLI command.
