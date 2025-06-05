@@ -1,6 +1,5 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path if necessary
-import { logger } from "@/src/utils/logger";
 import { getAirdropProjectValidation } from "@/src/utils/get-project-info";
 import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info";
 import { validateEnv, EnvValidationResult } from "../validation/env";

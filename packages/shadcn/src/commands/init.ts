@@ -447,7 +447,7 @@ async function gatherAirdropConfiguration(
       validate: (value: string) => value.trim().length > 0 ? true : "Name cannot be empty."
     });
     snapInBaseName = nameResponse.snapInBaseName;
-    projectName = generateAirdropSnapInFolderName(snapInBaseName); // This will be the folder name
+    projectName = snapInBaseName ? generateAirdropSnapInFolderName(snapInBaseName) : "my-snap-in"; // This will be the folder name
 
     // Snap-in template selection
     const initConf = getInitConfig(); // Re-fetch or ensure it's in scope

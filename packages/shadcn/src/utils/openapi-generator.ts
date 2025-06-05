@@ -2,7 +2,7 @@ import fs from "fs/promises"
 import path from "path"
 import { parse as parseYaml } from "yaml"
 import { logger } from "@/src/utils/logger"
-import { AirdropProjectConfig } from "@/src/type/airdrop-config"
+import { AirdropProjectConfig } from "@/src/types/airdrop-config"
 
 interface OpenAPISpec {
   components?: {
