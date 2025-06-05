@@ -3,7 +3,7 @@ import { logger } from "@/src/utils/logger"; // Adjust path
 // import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
 // import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
 // import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
-// import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+// import { getConfig } from "@/src/utils/get-config"; // To load snapin.config.mjs
 import { createSnapInVersion, getSnapInContext } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
 import prompts from "prompts";

@@ -15,9 +15,9 @@ export const info = new Command()
     process.cwd()
   )
   .action(async (opts) => {
-    logger.info("> Project info") // Updated message
-    console.log(await getProjectInfo(opts.cwd))
-    logger.break()
+    // logger.info("> Project info") // Updated message
+    // console.log(await getProjectInfo(opts.cwd))
+    // logger.break()
     
     logger.info("> Project configuration (snapin.config.mjs)") // Updated message
     const configResult = await getSnapInConfig(opts.cwd);

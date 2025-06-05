@@ -21,7 +21,7 @@ export async function validateDevRev(
   // More advanced checks could involve:
   // - Checking `devrev profiles list` or `devrev profiles current`
   // - Verifying `DEV_ORG` from .env corresponds to an actual org the user has access to.
-  // - If projectInfo and airdrop.config.mjs are available, check service account details or connection IDs.
+  // - If projectInfo and snapin.config.mjs are available, check service account details or connection IDs.
 
   logger.warn("DevRev specific validation (e.g., API access, config sanity) is a stub and not yet implemented.");
 

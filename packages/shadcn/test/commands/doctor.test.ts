@@ -56,7 +56,7 @@ describe("CLI Command: doctor", () => {
   beforeEach(async () => {
     originalCwd = process.cwd();
     // Assuming "fixtures/airdrop-template" contains a basic valid structure
-    // For doctor, we might need a manifest.yaml and an empty airdrop.config.mjs for some tests.
+    // For doctor, we might need a manifest.yaml and an empty snapin.config.mjs for some tests.
     // Let's ensure setupTestProject can copy from a fixture.
     // If not, we might need to manually create these files in projectPath for some tests.
     projectPath = await setupTestProject(testProjectName);
@@ -174,7 +174,7 @@ describe("CLI Command: doctor", () => {
   // Add more tests:
   // - Project with incomplete .env (missing DEV_ORG)
   // - Project with invalid manifest.yml (using populateProjectFromRegistryItem with a bad manifest)
-  // - Project with missing airdrop.config.mjs when it's expected
+  // - Project with missing snapin.config.mjs when it's expected
   // - Running doctor from a subdirectory (isAtRoot: false)
   // - Different --project-type flags
 });

@@ -87,7 +87,7 @@ describe("CLI Command: init (Airdrop Projects)", () => {
     const expectedProjectDir = path.join(projectPath, "airdrop-my-test-connector");
     expect(await fs.pathExists(expectedProjectDir)).toBe(true);
 
-    // 2. Verify airdrop.config.mjs was created
+    // 2. Verify snapin.config.mjs was created
     const configFilePath = path.join(expectedProjectDir, AIRDROP_CONFIG_FILE);
     expect(await fs.pathExists(configFilePath)).toBe(true);
 
@@ -100,7 +100,7 @@ describe("CLI Command: init (Airdrop Projects)", () => {
     // or that the test setup should create one if `init` doesn't.
     // For now, we'll just check if the config file is there.
 
-    // 4. Verify content of airdrop.config.mjs (simplified check)
+    // 4. Verify content of snapin.config.mjs (simplified check)
     const configFileContent = await fs.readFile(configFilePath, "utf-8");
     expect(configFileContent).toContain("projectType: 'airdrop'");
     expect(configFileContent).toContain("syncDirection: 'two-way'");
@@ -147,7 +147,7 @@ describe("CLI Command: init (Airdrop Projects)", () => {
   // Add more test cases:
   // - Invalid Airdrop project name (e.g., "myproject" instead of "airdrop-myproject")
   // - Init with Secret connection type
-  // - Init with --force when airdrop.config.mjs exists
+  // - Init with --force when snapin.config.mjs exists
   // - Init in an existing non-empty directory (not a new project)
 
 });

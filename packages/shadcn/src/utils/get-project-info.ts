@@ -179,9 +179,9 @@ export async function validateAirdropProjectStructure(
         structureIsValid = false;
       }
       // Optional: code/src/functions/factory.ts
-      const factoryFilePath = path.join(functionsDirPath, "factory.ts");
+      const factoryFilePath = path.join(functionsDirPath, "function-factory.ts");
       if (!(await fs.pathExists(factoryFilePath))) {
-        projectInfo.reasons.push("Optional: 'code/src/functions/factory.ts' is recommended but not found.");
+        projectInfo.reasons.push("Optional: 'code/src/functions/function-factory.ts' is recommended but not found.");
         // Not setting structureIsValid = false as it's optional
       }
 
@@ -205,7 +205,7 @@ export async function validateAirdropProjectStructure(
   const manifestFilePath = await findManifestFile(rootPath); // Re-use helper from getProjectRoot
   if (!manifestFilePath) {
     // This case should have been caught by getProjectRoot if it's a prerequisite
-    projectInfo.reasons.push("Manifest file (manifest.yml or manifest.yaml) not found at project root.");
+    projectInfo.reasons.push("Manifest file manifest.yaml not found at project root.");
     structureIsValid = false;
   } else {
     try {

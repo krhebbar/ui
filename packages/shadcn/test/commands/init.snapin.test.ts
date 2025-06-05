@@ -142,5 +142,5 @@ describe("CLI Command: init (Snap-in Projects)", () => {
   // Add more test cases:
   // - Snap-in init with OAuth2 connection type
   // - What happens if template cloning fails (cloneTemplateSpy.mockResolvedValue(false))
-  // - Test with --force when airdrop.config.mjs exists for a snap-in
+  // - Test with --force when snapin.config.mjs exists for a snap-in
 });

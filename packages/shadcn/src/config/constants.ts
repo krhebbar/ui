@@ -10,7 +10,7 @@ export const DOCS_URL_AIA_CONFIG_REFERENCE = "https://developer.devrev.ai/airdro
 // Default file names
 export const MANIFEST_FILE_YML = "manifest.yml";
 export const MANIFEST_FILE_YAML = "manifest.yaml";
-export const AIRDROP_CONFIG_FILE = "airdrop.config.mjs";
+export const AIRDROP_CONFIG_FILE = "snapin.config.mjs";
 export const ENV_FILE = ".env";
 
 // Project patterns
@@ -27,7 +27,7 @@ export const REQUIRED_DEV_TOOLS: DevTool[] = [
   {
     name: "DevRev CLI",
     command: "devrev --version",
-    installLink: "https://developer.devrev.ai/cli-beta#installation",
+    installLink: "https://developer.devrev.ai/public/snapin-development/references/cli-install",
     purpose: "Interacting with the DevRev platform."
   },
   {
@@ -43,9 +43,9 @@ export const REQUIRED_DEV_TOOLS: DevTool[] = [
     purpose: "Secure introspectable tunnels to localhost, useful for webhook development."
   },
   {
-    name: "Chef CLI (adaas-chef-cli)",
-    command: "adaas-chef-cli --version", // Assuming this is the command
-    installLink: "https://developer.devrev.ai/adaas-chef/installation", // Example link
+    name: "Chef CLI (chef-cli)",
+    command: "chef-cli --version", // Assuming this is the command
+    installLink: "https://github.com/devrev/adaas-chef-cli", // Example link
     purpose: "Tool for Airdrop development and deployment."
   },
   // Node and a package manager are also required but checked differently (e.g. via process.version and checking npm/pnpm/yarn)

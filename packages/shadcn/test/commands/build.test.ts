@@ -38,7 +38,7 @@ describe("CLI Command: build (Stub)", () => {
 
     await fs.ensureDir(path.join(projectPath, "code", "src"));
     await fs.writeFile(path.join(projectPath, MANIFEST_FILE_YAML), "name: test-project\nslug: test-project\nversion: 1.0.0\ndescription: test\nserviceAccount: {}\nfunctions:\n  - name: testFn");
-    // airdrop.config.mjs is optional for build stub, but good to have for consistency
+    // snapin.config.mjs is optional for build stub, but good to have for consistency
     await fs.writeFile(path.join(projectPath, AIRDROP_CONFIG_FILE), "export default { projectType: 'airdrop' };");
     await fs.writeFile(path.join(projectPath, "code", "src", "main.ts"), "// main.ts");
     await fs.writeFile(path.join(projectPath, "code", "src", "index.ts"), "// index.ts");
@@ -116,7 +116,7 @@ describe("CLI Command: build (Stub)", () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
-  it("should warn but not fail if airdrop.config.mjs cannot be loaded (as per stub logic)", async () => {
+  it("should warn but not fail if snapin.config.mjs cannot be loaded (as per stub logic)", async () => {
     const validProjectInfo: ProjectInfo = {
       isValid: true,
       rootPath: projectPath,
@@ -130,7 +130,7 @@ describe("CLI Command: build (Stub)", () => {
     process.chdir(projectPath);
     await buildCommand.parseAsync([], { from: "user" });
 
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("Continuing build without airdrop.config.mjs"));
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("Continuing build without snapin.config.mjs"));
     expect(logger.info).toHaveBeenCalledWith(COMMAND_PLACEHOLDERS.build); // Still prints placeholder
     expect(process.exit).not.toHaveBeenCalled(); // Build stub doesn't exit on config load failure
   });

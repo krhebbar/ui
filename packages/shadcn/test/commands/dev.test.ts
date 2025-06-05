@@ -126,7 +126,7 @@ describe("CLI Command: dev (Stub)", () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
-  it("should fail if airdrop.config.mjs cannot be loaded", async () => {
+  it("should fail if snapin.config.mjs cannot be loaded", async () => {
     const validProjectInfo: ProjectInfo = {
       isValid: true,
       rootPath: projectPath,
@@ -140,7 +140,7 @@ describe("CLI Command: dev (Stub)", () => {
     process.chdir(projectPath);
     await devCommand.parseAsync([], { from: "user" });
 
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Error loading airdrop.config.mjs"));
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Error loading snapin.config.mjs"));
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 

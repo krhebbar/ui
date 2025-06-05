@@ -307,7 +307,7 @@ async function gatherSnapInProjectConfiguration(
   // Use existing config as base or create default
   const defaultConfig = createDefaultAirdropConfig('snap-in');
   const mergedConfig = isInitialized 
-    ? mergeExistingConfigurations(existingManifestConfig, existingSnapInConfig, defaultConfig)
+    ? mergeExistingConfigurations(existingManifestConfig || {}, existingSnapInConfig || {}, defaultConfig)
     : defaultConfig;
 
   const config: AirdropProjectConfig & { 

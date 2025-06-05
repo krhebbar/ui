@@ -94,25 +94,25 @@ export const doctor = new Command()
       logger.break();
     }
 
-    // 5. Check airdrop.config.mjs
+    // 5. Check snapin.config.mjs
     if (identifiedProjectRoot) { // Use identifiedProjectRoot
-        logger.info("Checking airdrop.config.mjs...");
-        const configPath = path.join(identifiedProjectRoot, "airdrop.config.mjs"); // Use path.join
+        logger.info("Checking snapin.config.mjs...");
+        const configPath = path.join(identifiedProjectRoot, "snapin.config.mjs"); // Use path.join
         try {
             if (await fs.pathExists(configPath)) { // Check existence first
                  await import(configPath); // Dynamic import to check loadability
-                 logger.success("airdrop.config.mjs exists and is loadable.");
+                 logger.success("snapin.config.mjs exists and is loadable.");
             } else {
-                logger.warn("airdrop.config.mjs not found at project root. This may be expected for some project types or if not yet configured.");
+                logger.warn("snapin.config.mjs not found at project root. This may be expected for some project types or if not yet configured.");
                 // Optionally make this an error for 'airdrop' type if projectInfo.isValid was true
                 if (options.projectType === 'airdrop' && projectInfo.isValid) {
-                    // issuesFound.push("Config: airdrop.config.mjs not found for a valid Airdrop project.");
+                    // issuesFound.push("Config: snapin.config.mjs not found for a valid Airdrop project.");
                     // overallSuccess = false; // Decide if this is a failure condition
                 }
             }
         } catch (e: any) {
-            logger.error(`Failed to load airdrop.config.mjs: ${e.message}`);
-            issuesFound.push(`Config: Failed to load airdrop.config.mjs - ${e.message}`);
+            logger.error(`Failed to load snapin.config.mjs: ${e.message}`);
+            issuesFound.push(`Config: Failed to load snapin.config.mjs - ${e.message}`);
             overallSuccess = false;
         }
         logger.break();

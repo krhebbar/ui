@@ -116,7 +116,7 @@ describe("CLI Command: release (Stub)", () => {
     expect(process.exit).not.toHaveBeenCalled();
   });
 
-  it("should fail if airdrop.config.mjs cannot be loaded (critical for release)", async () => {
+  it("should fail if snapin.config.mjs cannot be loaded (critical for release)", async () => {
     const validProjectInfo: ProjectInfo = {
       isValid: true,
       rootPath: projectPath,
@@ -130,11 +130,11 @@ describe("CLI Command: release (Stub)", () => {
     process.chdir(projectPath);
     await releaseCommand.parseAsync([], { from: "user" });
 
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Error loading airdrop.config.mjs: Failed to load config"));
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Error loading snapin.config.mjs: Failed to load config"));
     expect(process.exit).toHaveBeenCalledWith(1); // Release command stub exits on config load failure
   });
 
-  it("should fail if airdrop.config.mjs is loaded but returns null/undefined (critical for release)", async () => {
+  it("should fail if snapin.config.mjs is loaded but returns null/undefined (critical for release)", async () => {
     const validProjectInfo: ProjectInfo = {
       isValid: true,
       rootPath: projectPath,
@@ -148,7 +148,7 @@ describe("CLI Command: release (Stub)", () => {
     process.chdir(projectPath);
     await releaseCommand.parseAsync([], { from: "user" });
 
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Failed to load airdrop.config.mjs. This file is crucial for release information."));
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("Failed to load snapin.config.mjs. This file is crucial for release information."));
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 
