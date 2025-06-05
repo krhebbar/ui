@@ -658,6 +658,7 @@ async function gatherAirdropConfiguration(
         name: "externalSyncUnits",
         message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
         initial: "",
+        initial: "",
         separator: ",",
       },
       {
@@ -691,6 +692,7 @@ async function gatherAirdropConfiguration(
   if (Object.keys(responses).length === 0 && promptsList.length > 0 && !options.yes && !options.silent) {
     // This condition might indicate that prompts were exited early (e.g. Ctrl+C)
     // Check some key expected responses
+    if (typeof responses.devrevObjects === 'undefined') {
     if (typeof responses.devrevObjects === 'undefined') {
         logger.error("Project configuration was not completed (essential prompts skipped). Aborting.");
         process.exit(0);
@@ -757,6 +759,18 @@ async function gatherAirdropConfiguration(
   if (needsExternalSystem && responses.externalSyncUnits === "") {
     externalSyncUnitsList = [];
   }
+  let externalSyncUnitsList = (needsExternalSystem && responses.externalSyncUnits)
+                               ? (
+                                  Array.isArray(responses.externalSyncUnits)
+                                    ? responses.externalSyncUnits.map((s: string) => s.trim()).filter(Boolean)
+                                    : (responses.externalSyncUnits || "").split(',').map((s: string) => s.trim()).filter(Boolean)
+                                 ).filter(unit => unit.length > 0) // Ensure empty strings after split are removed
+                               : []; // Default to empty array if not needed or no response
+
+  // Additional check for the case where externalSyncUnits is an empty string from the prompt
+  if (needsExternalSystem && responses.externalSyncUnits === "") {
+    externalSyncUnitsList = [];
+  }
 
   return {
     projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName,
@@ -774,6 +788,8 @@ async function gatherAirdropConfiguration(
         }
       : undefined,
     connection: needsExternalSystem && connectionDetails ? connectionDetails : undefined,
+    devrevPatEnvVarName: "DEVREV_PAT",
+    devrevOrgEnvVarName: "DEVREV_ORG",
     devrevPatEnvVarName: "DEVREV_PAT",
     devrevOrgEnvVarName: "DEVREV_ORG",
   };
@@ -847,6 +863,10 @@ function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, 
     }
   }
 
+  // Add DevRev PAT and Org slug environment variables directly
+  // These names are now fixed due to changes in gatherAirdropConfiguration
+  envVars["DEVREV_PAT"] = "your-devrev-pat-here";
+  envVars["DEVREV_ORG"] = "your-devrev-org-slug-here";
   // Add DevRev PAT and Org slug environment variables directly
   // These names are now fixed due to changes in gatherAirdropConfiguration
   envVars["DEVREV_PAT"] = "your-devrev-pat-here";
@@ -933,10 +953,14 @@ async function updateManifestYaml(
   }
 
   // Explicitly delete type, slug, and connection from the root of yamlData
+  // Explicitly delete type, slug, and connection from the root of yamlData
   delete yamlData.type;
+  delete yamlData.slug;
   delete yamlData.slug;
   delete yamlData.connection;
 
+  // The rest of the function continues, but these fields (type, slug, connection)
+  // should not be reintroduced at the root level.
   // The rest of the function continues, but these fields (type, slug, connection)
   // should not be reintroduced at the root level.
 
