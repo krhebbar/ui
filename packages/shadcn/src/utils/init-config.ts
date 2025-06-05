@@ -29,16 +29,17 @@ const initConfig: InitConfig = {
     {
       name: "default-snapin-template",
       description: "Default Snap-in template",
-      url: "https://github.com/krhebbar/snapin-template.git", // Example URL
+      url: "https://github.com/devrev/snap-in-examples.git",
       branch: "main",
+      path: "1-starter",
     },
     // Future templates can be added here
     {
       name: "custom-webhook-snapin-template",
       description: "Custom Webhook Snap-in template",
-      url: "https://github.com/krhebbar/snapin-custom-webhook-template.git",
+      url: "https://github.com/devrev/snap-in-examples.git",
       branch: "main",
-      path: "custom-webhook",
+      path: "5-custom-webhook",
     },
   ],
 };

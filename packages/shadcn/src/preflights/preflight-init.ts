@@ -17,23 +17,22 @@ export async function preFlightInit(
     silent: options.silent,
   }).start()
 
-  // Ensure target directory exists.
-  // Check for empty project. We assume if no manifest.yaml or manifest.yml exists, the project is empty.
-  const manifestYamlPath = path.resolve(options.cwd, "manifest.yaml");
-
-  if (
-    !fs.existsSync(options.cwd) ||
-    (!fs.existsSync(manifestYamlPath))
-  ) {
-    errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
-    projectSpinner?.fail("Target directory does not exist.")
-    return {
-      errors,
-      projectRootPath: options.cwd,
-      isExistingProjectStructure: false,
-      manifestFileExists: false,
-      configFileExists: false,
-      isDirectoryEmpty: false, // Or true, depending on desired default for non-existent dir
+  // Check if the target directory exists, if not we might need to create it
+  if (!fs.existsSync(options.cwd)) {
+    // For init command, we should allow creating the directory
+    try {
+      await fs.ensureDir(options.cwd);
+    } catch (error) {
+      errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT] = true
+      projectSpinner?.fail("Cannot create target directory.")
+      return {
+        errors,
+        projectRootPath: options.cwd,
+        isExistingProjectStructure: false,
+        manifestFileExists: false,
+        configFileExists: false,
+        isDirectoryEmpty: true,
+      }
     }
   }
 

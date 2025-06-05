@@ -60,8 +60,14 @@ export async function cloneTemplate(options: CloneOptions): Promise<boolean> {
           await fs.move(path.join(sourcePath, item), path.join(tempPath, item), { overwrite: true });
         }
 
-        // Remove the now empty original sourcePath directory
-        await fs.remove(sourcePath);
+        // Clear out the entire target directory (except temp directory)
+        const allItems = await fs.readdir(targetPath);
+        for (const item of allItems) {
+          const itemPath = path.join(targetPath, item);
+          if (item !== path.basename(tempPath)) { // Don't remove the temp directory
+            await fs.remove(itemPath);
+          }
+        }
 
         // Move contents from tempPath to targetPath
         const tempItemsToMove = await fs.readdir(tempPath);

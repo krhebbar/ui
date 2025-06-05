@@ -1,22 +1,42 @@
-import { highlighter } from "@/src/utils/highlighter"
+import { red, yellow, cyan, green } from "kleur/colors"
+
+// Global state for logger configuration
+let isLoggerSilent = false
 
 export const logger = {
+  // Configure logger silence mode
+  setSilent(silent: boolean) {
+    isLoggerSilent = silent
+  },
+  
   error(...args: unknown[]) {
-    console.log(highlighter.error(args.join(" ")))
+    // Always show errors, even in silent mode
+    console.log(red(args.join(" ")))
   },
   warn(...args: unknown[]) {
-    console.log(highlighter.warn(args.join(" ")))
+    // Always show warnings, even in silent mode
+    console.log(yellow(args.join(" ")))
   },
   info(...args: unknown[]) {
-    console.log(highlighter.info(args.join(" ")))
+    // Show info messages unless in silent mode
+    if (!isLoggerSilent) {
+      console.log(cyan(args.join(" ")))
+    }
   },
   success(...args: unknown[]) {
-    console.log(highlighter.success(args.join(" ")))
+    // Always show success messages
+    console.log(green(args.join(" ")))
   },
   log(...args: unknown[]) {
-    console.log(args.join(" "))
+    // Show general logs unless in silent mode
+    if (!isLoggerSilent) {
+      console.log(args.join(" "))
+    }
   },
   break() {
-    console.log("")
+    // Show line breaks unless in silent mode
+    if (!isLoggerSilent) {
+      console.log("")
+    }
   },
 }

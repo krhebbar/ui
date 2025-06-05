@@ -46,6 +46,9 @@ config
         ...opts,
       })
 
+      // Configure logger based on silent flag
+      logger.setSilent(options.silent)
+
       // Check if project config exists
       if (!(await hasSnapInConfig(options.cwd))) { // Renamed
         logger.error("No project configuration found. Run 'init' first.") // Updated message
@@ -126,6 +129,9 @@ config
         cwd: path.resolve(opts.cwd),
         ...opts,
       })
+
+      // Configure logger based on silent flag
+      logger.setSilent(options.silent)
 
       // Check if project config exists
       if (!(await hasSnapInConfig(options.cwd))) { // Renamed

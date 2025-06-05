@@ -46,6 +46,9 @@ export const add = new Command()
         ...opts,
       })
 
+      // Configure logger based on silent flag
+      logger.setSilent(options.silent)
+
       if (!options.components?.length) {
         options.components = await promptForRegistryComponents(options)
       }
