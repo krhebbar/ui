@@ -1,59 +1,126 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path
-import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
-import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
-import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
-import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+// import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
+// import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
+// import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
+// import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+import { createSnapInVersion, getSnapInContext } from "../utils/devrev-cli-wrapper";
+import inquirer from "inquirer";
 
 export const build = new Command()
   .name("build")
-  .description("Perform a local build of your Airdrop project or Snap-in.")
-  .action(async (options) => {
-    logger.info(`Running ${CLI_NAME} build...`);
-    logger.break();
+  .description("Creates a new Snap-in version using devrev-cli.")
+  .option("-p, --path <path_to_code>", "Path to the Snap-in code (e.g., './build', './dist', or './').")
+  .option("--package-id <id>", "ID of the Snap-in package to associate this version with.")
+  .option("--manifest <path_to_manifest>", "Path to the Snap-in manifest file (if not in the root of code path).")
+  .option("--archive <path_to_archive>", "Path to a pre-built archive (e.g., .zip, .tar.gz) instead of a code path.")
+  .option("--create-package", "Create a new package if the specified package ID or slug is not found.")
+  .action(async (options: {
+    path?: string;
+    packageId?: string;
+    manifestPath?: string;
+    archivePath?: string;
+    createPackage?: boolean;
+  }) => {
+    logger.info("Creating Snap-in version using devrev-cli...");
 
-    const projectValidationCwd = process.cwd();
-    const projectInfo: ValidationProjectInfo = await getAirdropProjectValidation(projectValidationCwd);
+    let { path, packageId, manifestPath, archivePath, createPackage } = options;
 
-    if (!projectInfo.isValid || !projectInfo.rootPath) {
-      logger.error("Failed to validate project or project root not found.");
-      projectInfo.reasons.forEach(reason => logger.error(`- ${reason}`));
-      logger.info(`Please ensure you are in a valid Airdrop project or run '${CLI_NAME} doctor' for diagnostics.`);
+    if (!path && !archivePath) {
+      const answers = await inquirer.prompt([
+        {
+          type: "input",
+          name: "pathOrArchive",
+          message: "Enter the path to your Snap-in code/distributables or a pre-built archive:",
+          validate: (input) => input ? true : "Path or archive cannot be empty.",
+        },
+        {
+            type: "list",
+            name: "type",
+            message: "Is this a path to code/distributables or a pre-built archive?",
+            choices: ["Code Path", "Archive Path"],
+        }
+      ]);
+      if (answers.type === "Code Path") {
+        path = answers.pathOrArchive;
+      } else {
+        archivePath = answers.pathOrArchive;
+      }
+    }
+
+    if (!packageId && !createPackage) {
+        try {
+            const context = await getSnapInContext();
+            if (context.snap_in_package_id) {
+                logger.info(`Using Snap-in package ID from current context: ${context.snap_in_package_id}`);
+                packageId = context.snap_in_package_id;
+            } else if (!createPackage) {
+                 const pkgAnswers = await inquirer.prompt([
+                    {
+                        type: "input",
+                        name: "packageId",
+                        message: "Enter the Snap-in package ID (or leave blank to use --create-package if you provide a slug via manifest):",
+                    }
+                ]);
+                if (pkgAnswers.packageId) packageId = pkgAnswers.packageId;
+            }
+        } catch (error: any) {
+            logger.warn("Could not automatically determine Snap-in package ID from context. Proceeding without it or with --create-package if specified.");
+        }
+    }
+
+
+    if (!manifestPath) {
+        const manifestAnswers = await inquirer.prompt([
+            {
+                type: "input",
+                name: "manifestPath",
+                message: "Enter the path to your Snap-in manifest file (e.g., manifest.yaml, default is auto-detected by CLI):",
+                default: "", // CLI will auto-detect if empty
+            }
+        ]);
+        if (manifestAnswers.manifestPath) manifestPath = manifestAnswers.manifestPath;
+    }
+
+
+    try {
+      const versionOptions: {
+        packageId?: string;
+        manifestPath?: string;
+        archivePath?: string;
+        createPackage?: boolean;
+        testingUrl?: string; // Not used in build, but part of the wrapper's options
+      } = {};
+
+      if (packageId) versionOptions.packageId = packageId;
+      if (manifestPath) versionOptions.manifestPath = manifestPath;
+      if (archivePath) versionOptions.archivePath = archivePath;
+      if (createPackage) versionOptions.createPackage = createPackage;
+
+      // Path is a mandatory first argument for createSnapInVersion if not archivePath
+      const finalPath = archivePath ? "" : path!; // Path must be defined if archivePath is not
+
+      if (!finalPath && !archivePath) {
+        logger.error("Either a code path or an archive path must be provided.");
+        process.exit(1);
+      }
+
+      logger.info(`Calling devrev snap_in_version create-one with path: '${finalPath || archivePath}'...`);
+      const versionInfo = await createSnapInVersion(finalPath, versionOptions);
+
+      logger.info("Snap-in version created successfully:");
+      console.log(JSON.stringify(versionInfo, null, 2));
+    } catch (error: any) {
+      logger.error("Failed to create Snap-in version.");
+      if (error.message.includes("DevRev CLI command failed")) {
+        logger.error("It seems 'devrev' CLI is not installed or not found in your PATH.");
+        logger.error("Please install it and try again. Visit https://docs.devrev.ai/product/cli for installation instructions.");
+      } else {
+        logger.error(`An unexpected error occurred: ${error.message}`);
+        if (error.stderr) {
+            logger.error(`DevRev CLI Error Output: ${error.stderr}`);
+        }
+      }
       process.exit(1);
     }
-
-    if (projectInfo.isAtRoot === false) {
-        logger.warn(`You are running '${CLI_NAME} build' from a subdirectory. Executing in the context of the project root: ${projectInfo.rootPath}`);
-        // Ensure build scripts are run from projectInfo.rootPath
-    }
-
-    logger.info(`Project root identified at: ${projectInfo.rootPath}`);
-
-    // Attempt to load airdrop.config.mjs
-    try {
-      const airdropConfig = await getConfig(projectInfo.rootPath);
-      if (!airdropConfig) {
-        logger.error("Failed to load airdrop.config.mjs. This file might be needed for build configurations.");
-        // Decide if this is a fatal error for build; for now, just a warning
-        logger.warn("Continuing build without airdrop.config.mjs, but it might be required.");
-      } else {
-        logger.info("Successfully loaded airdrop.config.mjs.");
-        // You can now use airdropConfig if needed by the build logic
-      }
-    } catch (e: any) {
-      logger.error(`Error loading airdrop.config.mjs: ${e.message}`);
-      // Decide if this is fatal; for now, just a warning
-      logger.warn("Continuing build despite error loading airdrop.config.mjs, but it might be required.");
-    }
-
-    logger.info(COMMAND_PLACEHOLDERS.build);
-    logger.break();
-    logger.info("This is a stub command. Actual build functionality will be implemented here.");
-    logger.info("For example, this might involve running a bundler (like tsc, esbuild, webpack) and creating a distributable archive.");
-
-    // Future implementation:
-    // - Read build scripts from package.json or airdrop.config.mjs
-    // - Execute build commands (e.g., `npm run build` or custom bundling logic)
-    // - Output artifacts to a 'dist' or 'build' folder
-    // - Create a compressed archive (e.g., .zip or .tar.gz) for release
   });

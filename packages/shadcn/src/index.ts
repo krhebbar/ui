@@ -12,6 +12,9 @@ import { dev } from "@/src/commands/dev";
 import { build } from "@/src/commands/build";
 import { release } from "@/src/commands/release";
 import { logs } from "@/src/commands/logs";
+// New command group imports
+import { packageCommands } from "@/src/commands/package";
+import { contextCommands } from "@/src/commands/context";
 
 import packageJson from "../package.json"
 
@@ -38,7 +41,10 @@ async function main() {
     .addCommand(dev)
     .addCommand(build)
     .addCommand(release)
-    .addCommand(logs);
+    .addCommand(logs)
+    // Register new command groups
+    .addCommand(packageCommands)
+    .addCommand(contextCommands);
 
   // Registry commands
   program.addCommand(registryMcp);

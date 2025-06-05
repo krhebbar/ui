@@ -1,59 +1,68 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path
-import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
-import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
-import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
-import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+// import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
+// import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
+// import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
+// import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+import { getSnapInLogs } from "../utils/devrev-cli-wrapper";
 
 export const logs = new Command()
   .name("logs")
-  .description("Fetch execution logs or event traces for your Airdrop project or Snap-in.")
-  .option("-n, --lines <number>", "Number of log lines to retrieve.", "100")
-  .option("--since <time>", "Fetch logs since a specific time (e.g., 1h, 10m, 2023-10-26T10:00:00Z).")
-  .option("--follow", "Follow log output (stream logs).", false)
-  .action(async (options) => {
-    logger.info(`Running ${CLI_NAME} logs...`);
-    logger.info(`Options: lines=${options.lines}, since=${options.since || 'not set'}, follow=${options.follow}`);
-    logger.break();
+  .description("Fetch execution logs for your Snap-in using devrev-cli.")
+  .option("--after <timestamp>", "Fetch logs after a specific timestamp (e.g., 2023-10-26T10:00:00Z or 1h, 10m).")
+  .option("--before <timestamp>", "Fetch logs before a specific timestamp (e.g., 2023-10-26T10:00:00Z or 1h, 10m).")
+  .option("--filters <json_string>", "JSON string for filtering logs (e.g., '{\"key\":\"value\"}').")
+  .option("-l, --limit <number>", "Number of log entries to retrieve.", (value) => parseInt(value, 10), 100)
+  .action(async (options: {
+    after?: string;
+    before?: string;
+    filters?: string;
+    limit?: number;
+  }) => {
+    logger.info("Fetching Snap-in logs using devrev-cli...");
 
-    const projectValidationCwd = process.cwd();
-    const projectInfo: ValidationProjectInfo = await getAirdropProjectValidation(projectValidationCwd);
-
-    if (!projectInfo.isValid || !projectInfo.rootPath) {
-      logger.error("Failed to validate project or project root not found.");
-      projectInfo.reasons.forEach(reason => logger.error(`- ${reason}`));
-      logger.info(`Please ensure you are in a valid Airdrop project or run '${CLI_NAME} doctor' for diagnostics.`);
-      process.exit(1);
-    }
-
-    if (projectInfo.isAtRoot === false) {
-        logger.warn(`You are running '${CLI_NAME} logs' from a subdirectory. Fetching logs in the context of project root: ${projectInfo.rootPath}`);
-    }
-
-    logger.info(`Project root identified at: ${projectInfo.rootPath}`);
-
-    // Attempt to load airdrop.config.mjs to potentially get identifiers for log fetching
     try {
-      const airdropConfig = await getConfig(projectInfo.rootPath);
-      if (!airdropConfig) {
-        logger.warn("airdrop.config.mjs not found or failed to load. Some log sources might require it.");
-        // Depending on implementation, this might not be fatal if other means of identifying log sources exist
+      const logOptions: {
+        after?: string;
+        before?: string;
+        filters?: string;
+        limit?: number;
+      } = {};
+
+      if (options.after) logOptions.after = options.after;
+      if (options.before) logOptions.before = options.before;
+      if (options.filters) logOptions.filters = options.filters;
+      if (options.limit !== undefined) logOptions.limit = options.limit;
+
+      const logsOutput = await getSnapInLogs(logOptions);
+
+      if (logsOutput && logsOutput.length > 0) {
+        logger.info("Logs retrieved successfully:");
+        // Assuming logsOutput is an array of log entries (JSON objects or strings)
+        // Adjust formatting as needed based on the actual structure of logsOutput
+        logsOutput.forEach((logEntry: any, index: number) => {
+          if (typeof logEntry === 'object') {
+            console.log(JSON.stringify(logEntry, null, 2));
+          } else {
+            console.log(logEntry);
+          }
+        });
       } else {
-        logger.info("Successfully loaded airdrop.config.mjs.");
-        // Use airdropConfig if it contains IDs for DevRev functions or Snap-in versions
+        logger.info("No logs found for the given criteria.");
       }
-    } catch (e: any) {
-      logger.warn(`Error loading airdrop.config.mjs: ${e.message}. This might impact log fetching capabilities.`);
+    } catch (error: any) {
+      logger.error("Failed to fetch Snap-in logs.");
+      if (error.message.includes("DevRev CLI command failed")) {
+        logger.error("It seems 'devrev' CLI is not installed or not found in your PATH.");
+        logger.error("Please install it and try again. Visit https://docs.devrev.ai/product/cli for installation instructions.");
+      } else if (error.message.includes("snap_in_package_id not found in context")) {
+        logger.error("Snap-in package ID not found in the current DevRev context.");
+        logger.error("Please ensure you are in a directory with a valid DevRev Snap-in project or configure your context.");
+      }
+      else {
+        logger.error(`An unexpected error occurred: ${error.message}`);
+      }
+      // Optionally, re-throw or exit if it's a critical failure
+      // process.exit(1);
     }
-
-    logger.info(COMMAND_PLACEHOLDERS.logs);
-    logger.break();
-    logger.info("This is a stub command. Actual log fetching functionality will be implemented here.");
-    logger.info("For example, this could involve using DevRev CLI to fetch logs for a deployed Snap-in, or tailing local ngrok logs.");
-
-    // Future implementation:
-    // - Determine log source based on project type and configuration (local ngrok, DevRev platform).
-    // - If ngrok is used locally, could attempt to connect to ngrok API or parse its output.
-    // - If deployed to DevRev, use DevRev CLI or APIs to fetch logs (e.g., `devrev snap_in_package logs`).
-    // - Implement options for lines, since, follow.
   });

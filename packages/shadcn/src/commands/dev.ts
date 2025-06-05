@@ -1,55 +1,140 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path
-import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
-import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
-import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
-import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+import {
+  createSnapInVersion,
+  draftSnapIn,
+  activateSnapIn,
+  getSnapInContext,
+} from "../utils/devrev-cli-wrapper";
+import inquirer from "inquirer";
 
 export const dev = new Command()
   .name("dev")
-  .description("Start the local development server for your Airdrop project or Snap-in.")
-  .action(async (options) => {
-    logger.info(`Running ${CLI_NAME} dev...`);
-    logger.break();
+  .description("Develop and test your Snap-in with a local forwarding URL using devrev-cli.")
+  .option("-p, --path <path_to_code>", "Path to the Snap-in code (e.g., './src', './dist').")
+  .option("-u, --url <testing_url>", "The ngrok or similar forwarding URL for local testing.")
+  .option("--package-id <id>", "ID of the Snap-in package; context will be used if not provided.")
+  .option("--create-package", "Create a new package if the specified package ID or slug (from manifest) is not found.")
+  .option("--manifest <path_to_manifest>", "Path to the Snap-in manifest file.")
+  .action(async (options: {
+    path?: string;
+    url?: string;
+    packageId?: string;
+    createPackage?: boolean;
+    manifestPath?: string;
+  }) => {
+    logger.info("Starting Snap-in development and testing workflow using devrev-cli...");
 
-    const projectValidationCwd = process.cwd();
-    const projectInfo: ValidationProjectInfo = await getAirdropProjectValidation(projectValidationCwd);
+    let { path, url, packageId, createPackage, manifestPath } = options;
 
-    if (!projectInfo.isValid || !projectInfo.rootPath) {
-      logger.error("Failed to validate project or project root not found.");
-      projectInfo.reasons.forEach(reason => logger.error(`- ${reason}`));
-      logger.info(`Please ensure you are in a valid Airdrop project or run '${CLI_NAME} doctor' for diagnostics.`);
-      process.exit(1);
+    if (!path) {
+      const pathAnswers = await inquirer.prompt([
+        {
+          type: "input",
+          name: "path",
+          message: "Enter the path to your Snap-in code/distributables:",
+          default: "./",
+          validate: (input) => input ? true : "Path cannot be empty.",
+        },
+      ]);
+      path = pathAnswers.path;
     }
 
-    if (projectInfo.isAtRoot === false) {
-        logger.warn(`You are running '${CLI_NAME} dev' from a subdirectory. Executing in the context of the project root: ${projectInfo.rootPath}`);
-        // Potentially change CWD for the dev server process or inform the user to navigate to root.
+    if (!url) {
+      const urlAnswers = await inquirer.prompt([
+        {
+          type: "input",
+          name: "url",
+          message: "Enter your ngrok or other forwarding URL for testing:",
+          validate: (input) => {
+            if (!input) return "URL cannot be empty.";
+            if (!input.startsWith("http://") && !input.startsWith("https://")) {
+                return "URL must start with http:// or https://";
+            }
+            return true;
+          }
+        },
+      ]);
+      url = urlAnswers.url;
     }
 
-    logger.info(`Project root identified at: ${projectInfo.rootPath}`);
+    if (!packageId && !createPackage) {
+        try {
+            const context = await getSnapInContext();
+            if (context.snap_in_package_id) {
+                logger.info(`Using Snap-in package ID from current context: ${context.snap_in_package_id}`);
+                packageId = context.snap_in_package_id;
+            }
+        } catch (error: any) {
+            logger.warn("Could not automatically determine Snap-in package ID from context. You may need to use --package-id or --create-package.");
+        }
+    }
 
-    // Attempt to load airdrop.config.mjs
     try {
-      const airdropConfig = await getConfig(projectInfo.rootPath); // getConfig expects root path
-      if (!airdropConfig) {
-        logger.error("Failed to load airdrop.config.mjs. This file is required for the dev command.");
+      // 1. Create a Snap-in Version with testing URL
+      logger.info(`Creating Snap-in version with path '${path}' and testing URL '${url}'...`);
+      const versionOptions: any = { testingUrl: url, createPackage };
+      if (packageId) versionOptions.packageId = packageId;
+      if (manifestPath) versionOptions.manifestPath = manifestPath;
+
+      const versionInfo = await createSnapInVersion(path!, versionOptions);
+      logger.info("Snap-in test version created successfully:");
+      console.log(JSON.stringify(versionInfo, null, 2));
+
+      const snapInVersionId = versionInfo.id;
+      if (!snapInVersionId) {
+        logger.error("Failed to get Snap-in Version ID from creation response.");
         process.exit(1);
       }
-      logger.info("Successfully loaded airdrop.config.mjs.");
-      // You can now use airdropConfig if needed by the dev server logic
-    } catch (e: any) {
-      logger.error(`Error loading airdrop.config.mjs: ${e.message}`);
+
+      // 2. Draft the Snap-in using the new version
+      logger.info(`Drafting Snap-in with version ID '${snapInVersionId}'...`);
+      const draftInfo = await draftSnapIn(snapInVersionId);
+      logger.info("Snap-in drafted successfully:");
+      console.log(JSON.stringify(draftInfo, null, 2));
+      logger.info(`You can view the drafted interface at: ${draftInfo.url}`);
+
+      const snapInId = draftInfo.id;
+      if (!snapInId) {
+        logger.error("Failed to get Snap-in ID from draft response.");
+        process.exit(1);
+      }
+
+      // 3. Activate the Snap-in
+      const activationPrompt = await inquirer.prompt([
+        {
+            type: "confirm",
+            name: "activate",
+            message: `Do you want to activate this Snap-in (ID: ${snapInId}) for testing?`,
+            default: true,
+        }
+      ]);
+
+      if (activationPrompt.activate) {
+        logger.info(`Activating Snap-in ID '${snapInId}'...`);
+        const activationResult = await activateSnapIn(snapInId);
+        logger.info("Snap-in activation status:");
+        console.log(activationResult); // Output might be a simple string confirmation
+        logger.info(`Snap-in (ID: ${snapInId}) associated with version ${snapInVersionId} should now be active with testing URL: ${url}`);
+      } else {
+        logger.info("Snap-in activation skipped by user.");
+        logger.info(`To activate later, run: devrev snap_in activate ${snapInId}`);
+      }
+
+      logger.info("Local development setup complete. Your Snap-in should be routing to your local server via the provided URL.");
+      logger.info("Remember to keep your local server and forwarding service (e.g., ngrok) running.");
+
+    } catch (error: any) {
+      logger.error("Failed during Snap-in development workflow.");
+      if (error.message.includes("DevRev CLI command failed")) {
+        logger.error("It seems 'devrev' CLI is not installed or not found in your PATH.");
+        logger.error("Please install it and try again. Visit https://docs.devrev.ai/product/cli for installation instructions.");
+      } else {
+        logger.error(`An unexpected error occurred: ${error.message}`);
+         if (error.stderr) {
+            logger.error(`DevRev CLI Error Output: ${error.stderr}`);
+        }
+      }
       process.exit(1);
     }
-
-    logger.info(COMMAND_PLACEHOLDERS.dev);
-    logger.break();
-    logger.info("This is a stub command. Actual dev server functionality will be implemented here.");
-    logger.info("For example, this might start a Chef server or a custom Node.js server based on your project type.");
-
-    // Future implementation:
-    // - Determine project type (Airdrop, Snap-in) from manifest or airdrop.config.mjs
-    // - Start the appropriate local development server (e.g., using adaas-chef-cli for Airdrops)
-    // - Handle port forwarding, hot reloading, etc.
   });
