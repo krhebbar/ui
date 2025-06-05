@@ -1,66 +1,117 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path
-import { getAirdropProjectValidation } from "@/src/utils/get-project-info"; // Adjust path
-import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info"; // Adjust path
-import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
-import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
+import {
+  draftSnapIn,
+  activateSnapIn,
+  getSnapInContext,
+  showSnapInVersion,
+} from "../utils/devrev-cli-wrapper";
+import inquirer from "inquirer";
 
 export const release = new Command()
   .name("release")
-  .description("Release the Airdrop project or Snap-in to the DevRev platform.")
-  .action(async (options) => {
-    logger.info(`Running ${CLI_NAME} release...`);
-    logger.break();
+  .description("Drafts and activates a Snap-in version on the DevRev platform using devrev-cli.")
+  .option("-v, --version-id <id>", "ID of the Snap-in version to release. If not provided, context or prompt will be used.")
+  .action(async (options: { versionId?: string }) => {
+    logger.info("Starting Snap-in release process using devrev-cli...");
 
-    const projectValidationCwd = process.cwd();
-    const projectInfo: ValidationProjectInfo = await getAirdropProjectValidation(projectValidationCwd);
+    let { versionId } = options;
 
-    if (!projectInfo.isValid || !projectInfo.rootPath) {
-      logger.error("Failed to validate project or project root not found.");
-      projectInfo.reasons.forEach(reason => logger.error(`- ${reason}`));
-      logger.info(`Please ensure you are in a valid Airdrop project, have built it, and run '${CLI_NAME} doctor' for diagnostics.`);
-      process.exit(1);
-    }
-
-    if (projectInfo.isAtRoot === false) {
-        logger.warn(`You are running '${CLI_NAME} release' from a subdirectory. Executing in the context of the project root: ${projectInfo.rootPath}`);
-        // Ensure release process operates from projectInfo.rootPath
-    }
-
-    logger.info(`Project root identified at: ${projectInfo.rootPath}`);
-
-    // Attempt to load airdrop.config.mjs
     try {
-      const airdropConfig = await getConfig(projectInfo.rootPath);
-      if (!airdropConfig) {
-        logger.error("Failed to load airdrop.config.mjs. This file is crucial for release information.");
+      if (!versionId) {
+        logger.info("Attempting to get Snap-in version from context...");
+        const context = await getSnapInContext();
+        if (context.snap_in_version_id) {
+          versionId = context.snap_in_version_id;
+          logger.info(`Using Snap-in version ID from context: ${versionId}`);
+
+          const confirmContextVersion = await inquirer.prompt([
+            {
+                type: "confirm",
+                name: "useContextVersion",
+                message: `Context reports current version ID as ${versionId}. Do you want to release this version?`,
+                default: true,
+            }
+          ]);
+          if (!confirmContextVersion.useContextVersion) {
+            versionId = undefined; // Clear to prompt user below
+          } else {
+            // Optionally show details of this version
+            try {
+                const versionDetails = await showSnapInVersion(versionId);
+                logger.info("Details of the version from context:");
+                console.log(JSON.stringify(versionDetails, null, 2));
+            } catch (e:any) {
+                logger.warn(`Could not fetch details for version ${versionId}: ${e.message}`);
+            }
+          }
+        } else {
+          logger.info("No Snap-in version ID found in context.");
+        }
+      }
+
+      if (!versionId) {
+        const answers = await inquirer.prompt([
+          {
+            type: "input",
+            name: "versionId",
+            message: "Enter the ID of the Snap-in version you want to release (e.g., from 'devrev snap_in_version list' or the output of the 'build' command):",
+            validate: (input) => input ? true : "Snap-in version ID cannot be empty.",
+          },
+        ]);
+        versionId = answers.versionId;
+      }
+
+      logger.info(`Proceeding to draft Snap-in version ID: ${versionId}`);
+
+      // 1. Draft the Snap-in using the specified version
+      logger.info("Drafting Snap-in...");
+      const draftInfo = await draftSnapIn(versionId);
+      logger.info("Snap-in drafted successfully:");
+      console.log(JSON.stringify(draftInfo, null, 2));
+      logger.info(`You can view the drafted interface at: ${draftInfo.url}`);
+
+      const snapInIdToActivate = draftInfo.id;
+      if (!snapInIdToActivate) {
+        logger.error("Failed to get Snap-in ID from draft response.");
         process.exit(1);
       }
-      logger.info("Successfully loaded airdrop.config.mjs.");
-      // Use airdropConfig for release details (e.g., snap-in slug, version)
-    } catch (e: any) {
-      logger.error(`Error loading airdrop.config.mjs: ${e.message}`);
+
+      // 2. Prompt for activation
+      const activationPrompt = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "activate",
+          message: `Do you want to activate this drafted Snap-in (ID: ${snapInIdToActivate})? This will make it live.`,
+          default: false, // Default to false for safety in a release command
+        },
+      ]);
+
+      if (activationPrompt.activate) {
+        logger.info(`Activating Snap-in ID '${snapInIdToActivate}'...`);
+        const activationResult = await activateSnapIn(snapInIdToActivate);
+        logger.info("Snap-in activation status:");
+        // Assuming activationResult is a string or simple JSON. Adjust if it's more complex.
+        console.log(typeof activationResult === 'object' ? JSON.stringify(activationResult, null, 2) : activationResult);
+        logger.info(`Snap-in (ID: ${snapInIdToActivate}) associated with version ${versionId} is now active.`);
+      } else {
+        logger.info("Snap-in activation skipped by user.");
+        logger.info(`To activate later, run: devrev snap_in activate ${snapInIdToActivate}`);
+      }
+
+      logger.info("Snap-in release process complete.");
+
+    } catch (error: any) {
+      logger.error("Failed during Snap-in release process.");
+      if (error.message.includes("DevRev CLI command failed")) {
+        logger.error("It seems 'devrev' CLI is not installed or not found in your PATH.");
+        logger.error("Please install it and try again. Visit https://docs.devrev.ai/product/cli for installation instructions.");
+      } else {
+        logger.error(`An unexpected error occurred: ${error.message}`);
+        if (error.stderr) {
+            logger.error(`DevRev CLI Error Output: ${error.stderr}`);
+        }
+      }
       process.exit(1);
     }
-
-    // Placeholder: Check if project has been built (e.g., check for a dist folder or build artifact)
-    // This would typically be a prerequisite for release.
-    logger.info("Verifying build artifacts (stub)...");
-    // const buildArtifactPath = path.join(projectInfo.rootPath, "dist", "bundle.zip"); // Example
-    // if (!fs.existsSync(buildArtifactPath)) {
-    //    logger.error("Build artifact not found. Please run 'shadcn build' before releasing.");
-    //    process.exit(1);
-    // }
-    logger.warn("Skipping build artifact check (stub). Ensure your project is built before releasing.");
-
-
-    logger.info(COMMAND_PLACEHOLDERS.release);
-    logger.break();
-    logger.info("This is a stub command. Actual release functionality will be implemented here.");
-    logger.info("For example, this would involve packaging the project (if not done by 'build') and uploading it to the DevRev platform using DevRev APIs or CLI.");
-
-    // Future implementation:
-    // - Interact with DevRev CLI or APIs (e.g., `devrev snap_in_version create-one`, `devrev snap_in activate`)
-    // - Handle versioning, changelogs, etc.
-    // - May require authentication with DevRev platform.
   });
