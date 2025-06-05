@@ -5,6 +5,7 @@ import { logger } from "@/src/utils/logger"; // Adjust path
 // import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants"; // Adjust path
 // import { getConfig } from "@/src/utils/get-config"; // To load airdrop.config.mjs
 import { getSnapInLogs } from "../utils/devrev-cli-wrapper";
+import { getProjectInfo } from "@/src/utils/get-project-info";
 
 export const logs = new Command()
   .name("logs")
@@ -19,6 +20,17 @@ export const logs = new Command()
     filters?: string;
     limit?: number;
   }) => {
+    logger.info("Attempting to retrieve project information (for consistency)...");
+    const projectInfo = await getProjectInfo(process.cwd());
+
+    if (projectInfo) {
+      logger.info(`Project Name (context): ${projectInfo.name}`);
+      // Slug and manifestPath are not directly used by getSnapInLogs wrapper,
+      // but good to show they are accessible if needed for other commands.
+    } else {
+      logger.warn("Could not retrieve local project information from manifest.yaml. This is usually not critical for 'logs' command.");
+    }
+
     logger.info("Fetching Snap-in logs using devrev-cli...");
 
     try {
