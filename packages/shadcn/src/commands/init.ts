@@ -404,8 +404,8 @@ async function gatherAirdropConfiguration(
       name: "projectType",
       message: "What type of project are you creating?",
       choices: [
-        { title: "Airdrop Project", value: "airdrop" },
-        { title: "Snap-in (from template)", value: "snap-in" },
+        { title: "Airdrop Project (from template)", value: "airdrop" },
+        { title: "snap-in Project (from template)", value: "snap-in" },
       ],
       initial: 0,
     },
@@ -775,7 +775,7 @@ async function updateManifestYaml(
   projectConfig: AirdropProjectConfig,
   airdropConfigResultFromPrompts: AirdropProjectConfig & { projectName?: string; projectTypeFromPrompt?: 'airdrop' | 'snap-in'; airdropProjectName?: string; snapInBaseName?: string; selectedSnapInTemplateName?: string; }
 ): Promise<void> {
-  const PLACEHOLDERS_TO_REPLACE = ["Todo", "TODO", "snapin-template-description", "snapin-template-name", "example", "Example"];
+  const PLACEHOLDERS_TO_REPLACE = ["Todo", "TODO", "example", "Example"];
   const placeholderRegex = new RegExp(PLACEHOLDERS_TO_REPLACE.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi');
 
   const { projectType, externalSystem, connection } = projectConfig;
