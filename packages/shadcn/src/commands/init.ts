@@ -15,6 +15,10 @@ export const initOptionsSchema = z.object({
   force: z.boolean(),
   silent: z.boolean(),
   isNewProject: z.boolean(),
+  authType: z.enum(["oauth", "pat"]).optional().describe("Specify the authentication type for Airdrop projects (oauth or pat), or Snap-in authentication strategy if applicable."),
+  projectType: z.enum(["airdrop", "snapin"]).optional().describe("Specify the type of project to initialize (airdrop or snapin)."),
+  templateName: z.string().optional().describe("Specify the name of the Snap-in template to use."),
+  projectName: z.string().min(1, "Project name cannot be empty.").optional().describe("Specify the name for the project directory."),
 })
 
 export const init = new Command()

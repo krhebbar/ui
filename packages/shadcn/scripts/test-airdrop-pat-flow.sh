@@ -23,10 +23,10 @@ test_airdrop_pat() {
     # Similar to OAuth, we assume CLI flags or --yes behavior for PAT.
     # Adjust if specific flags are needed e.g. --auth-type pat
     # For PAT, the prompts would involve selecting 'API Token/Secret' and providing env var names.
-    # Example: node $CLI_PATH init --yes --project-type airdrop --auth-type pat --name "my-pat-airdrop"
+    # Example: node $CLI_PATH init --yes --project-type airdrop --auth-type pat --project-name "my-pat-airdrop"
 
-    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type airdrop --auth-type pat --name "my-pat-airdrop"; then
-        local project_name="my-pat-airdrop" # Matches --name or discovered if not matching
+    if run_with_timeout 120 node "$CLI_PATH" init --yes --auth-type pat --project-type airdrop --project-name "my-pat-airdrop"; then
+        local project_name="my-pat-airdrop" # Matches --project-name or discovered if not matching
         if [ ! -d "$TEST_DIR/$project_name" ]; then
             project_name=$(ls -td -- "$TEST_DIR"/*/ | head -n 1 | xargs -n 1 basename)
             if [ -z "$project_name" ] || [ ! -d "$TEST_DIR/$project_name" ]; then

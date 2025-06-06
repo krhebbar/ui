@@ -22,11 +22,11 @@ test_snapin_basic() {
 
     # For a basic snap-in, we might select the default template or a 'basic' template if available.
     # We assume --yes will pick a default snap-in template.
-    # Example: node $CLI_PATH init --yes --project-type snapin --template basic --name "my-basic-snapin"
+    # Example: node $CLI_PATH init --yes --project-type snapin --template basic --project-name "my-basic-snapin"
     # The CLI needs to support --project-type and --template or similar flags for non-interactive mode.
 
-    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type snapin --name "my-basic-snapin"; then
-        local project_name="my-basic-snapin" # Matches --name or discovered
+    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type snapin --project-name "my-basic-snapin"; then
+        local project_name="my-basic-snapin" # Matches --project-name or discovered
         if [ ! -d "$TEST_DIR/$project_name" ]; then
             project_name=$(ls -td -- "$TEST_DIR"/*/ | head -n 1 | xargs -n 1 basename)
             if [ -z "$project_name" ] || [ ! -d "$TEST_DIR/$project_name" ]; then

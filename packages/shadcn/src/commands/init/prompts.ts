@@ -74,10 +74,13 @@ export async function gatherAirdropConfiguration(
 
   console.log("Let's configure your project:");
 
-  // Determine if we should skip project type selection
+  // Determine project type, giving precedence to the --projectType flag
   let projectType: 'airdrop' | 'snap-in';
-  
-  if (isInitialized && (existingManifestConfig?.projectType || existingSnapInConfig?.projectType)) {
+
+  if (options.projectType) {
+    projectType = options.projectType;
+    logger.info(`Project type determined by --projectType flag: ${projectType}`);
+  } else if (isInitialized && (existingManifestConfig?.projectType || existingSnapInConfig?.projectType)) {
     // Use existing project type for initialized projects
     projectType = existingManifestConfig?.projectType || existingSnapInConfig?.projectType || 'snap-in';
     logger.info(`Detected existing ${projectType} project. Continuing with update flow...`);
@@ -86,6 +89,7 @@ export async function gatherAirdropConfiguration(
     projectType = autoDetectedType;
     logger.info(`Auto-detected project type: ${projectType} (based on folder name)`);
     
+    // For auto-detected type, confirm unless --yes is passed
     if (!options.yes) {
       const { confirmType } = await prompts({
         type: "confirm",
@@ -95,7 +99,7 @@ export async function gatherAirdropConfiguration(
       });
       
       if (!confirmType) {
-        // Fallback to manual selection
+        // Fallback to manual selection if auto-detection is not confirmed
         const response = await prompts({
           type: "select",
           name: "projectType",
@@ -104,13 +108,14 @@ export async function gatherAirdropConfiguration(
             { title: "Airdrop Project (from template)", value: "airdrop" },
             { title: "Snap-in Project (from template)", value: "snap-in" },
           ],
-          initial: projectType === 'airdrop' ? 0 : 1,
+          initial: projectType === 'airdrop' ? 0 : 1, // Default to current auto-detected or 'airdrop'
         });
         projectType = response.projectType;
       }
+      // If options.yes is true with autoDetectedType, we proceed with autoDetectedType
     }
   } else {
-    // Manual project type selection
+    // Manual project type selection if no flag, not initialized, and no auto-detection
     const response = await prompts({
       type: "select",
       name: "projectType",
@@ -125,9 +130,9 @@ export async function gatherAirdropConfiguration(
   }
 
   if (projectType === "airdrop") {
-    return await gatherAirdropProjectConfiguration(existingManifestConfig, existingSnapInConfig);
+    return await gatherAirdropProjectConfiguration(options, existingManifestConfig, existingSnapInConfig); // Pass options here
   } else {
-    return await gatherSnapInProjectConfiguration(existingManifestConfig, existingSnapInConfig, isInitialized);
+    return await gatherSnapInProjectConfiguration(options, existingManifestConfig, existingSnapInConfig, isInitialized); // Pass options here for snap-in as well
   }
 }
 
@@ -135,6 +140,7 @@ export async function gatherAirdropConfiguration(
  * Gather configuration for Airdrop projects
  */
 async function gatherAirdropProjectConfiguration(
+  options: z.infer<typeof initOptionsSchema>, // Added options here
   existingManifestConfig?: Partial<AirdropProjectConfig> | null,
   existingSnapInConfig?: Partial<AirdropProjectConfig> | null
 ): Promise<AirdropProjectConfig & { 
@@ -143,13 +149,20 @@ async function gatherAirdropProjectConfiguration(
   airdropProjectName?: string; 
 }> {
   // Project name
-  const { airdropProjectName } = await prompts({
-    type: "text",
-    name: "airdropProjectName",
-    message: "Enter a name for your Airdrop project (e.g., airdrop-notion):",
-    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "airdrop-",
-    validate: (value) => value.trim().length > 0 || "Project name is required",
-  });
+  let airdropProjectNameResolved: string;
+  if (options.projectName) {
+    airdropProjectNameResolved = options.projectName;
+    logger.info(`Using Airdrop project name from --projectName flag: ${airdropProjectNameResolved}`);
+  } else {
+    const { airdropProjectName: promptedName } = await prompts({
+      type: "text",
+      name: "airdropProjectName",
+      message: "Enter a name for your Airdrop project (e.g., airdrop-notion):",
+      initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "airdrop-",
+      validate: (value) => value.trim().length > 0 || "Project name is required",
+    });
+    airdropProjectNameResolved = promptedName;
+  }
 
   // Sync direction
   const { syncDirection } = await prompts({
@@ -206,17 +219,25 @@ async function gatherAirdropProjectConfiguration(
   const objectTypes = objectTypesString ? objectTypesString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
 
   // Connection type
+  let connectionTypeResolved: 'oauth2' | 'secret';
   const existingConnectionType = existingSnapInConfig?.connection?.type || existingManifestConfig?.connection?.type;
-  const { connectionType } = await prompts({
-    type: "select",
-    name: "connectionType",
-    message: "What type of connection will the snap-in use?",
-    choices: [
-      { title: "OAuth2", value: "oauth2" },
-      { title: "API Token/Secret", value: "secret" },
-    ],
-    initial: existingConnectionType === "secret" ? 1 : 0,
-  });
+
+  if (options.authType) {
+    connectionTypeResolved = options.authType === 'oauth' ? 'oauth2' : 'secret';
+    logger.info(`Connection type determined by --authType flag: ${options.authType} (resolved to ${connectionTypeResolved})`);
+  } else {
+    const { connectionType: promptedConnectionType } = await prompts({
+      type: "select",
+      name: "connectionType",
+      message: "What type of connection will the Airdrop project use?", // Clarified message for Airdrop
+      choices: [
+        { title: "OAuth2", value: "oauth2" },
+        { title: "API Token/Secret", value: "secret" },
+      ],
+      initial: existingConnectionType === "secret" ? 1 : 0,
+    });
+    connectionTypeResolved = promptedConnectionType;
+  }
 
   // DevRev objects
   const existingDevRevObjects = existingSnapInConfig?.devrevObjects || existingManifestConfig?.devrevObjects || ["account"];
@@ -234,10 +255,10 @@ async function gatherAirdropProjectConfiguration(
 
   let connection: OAuth2Connection | SecretConnection;
 
-  if (connectionType === "oauth2") {
-    connection = await gatherOAuth2Configuration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection);
+  if (connectionTypeResolved === "oauth2") {
+    connection = await gatherOAuth2Configuration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection, options);
   } else {
-    connection = await gatherSecretConfiguration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection);
+    connection = await gatherSecretConfiguration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection, options);
   }
 
   const config: AirdropProjectConfig & { 
@@ -256,9 +277,9 @@ async function gatherAirdropProjectConfiguration(
     },
     connection,
     devrevObjects,
-    projectName: airdropProjectName,
+    projectName: airdropProjectNameResolved, // This is often used for directory creation
     projectTypeFromPrompt: "airdrop",
-    airdropProjectName,
+    airdropProjectName: airdropProjectNameResolved, // Specific attribute if needed
   };
 
   return config;
@@ -268,6 +289,7 @@ async function gatherAirdropProjectConfiguration(
  * Gather configuration for Snap-in projects
  */
 async function gatherSnapInProjectConfiguration(
+  options: z.infer<typeof initOptionsSchema>, // Added options here
   existingManifestConfig?: Partial<AirdropProjectConfig> | null,
   existingSnapInConfig?: Partial<AirdropProjectConfig> | null,
   isInitialized: boolean = false
@@ -278,15 +300,24 @@ async function gatherSnapInProjectConfiguration(
   selectedSnapInTemplateName?: string; 
 }> {
   const initConf = getInitConfig();
-
   let selectedSnapInTemplateName: string | undefined;
-  
-  // Skip template selection for existing projects
+
   if (isInitialized) {
-    logger.info("Existing snap-in project detected. Skipping template selection...");
+    logger.info("Existing snap-in project detected. Skipping template selection.");
     selectedSnapInTemplateName = undefined; // Will not clone template for existing projects
-  } else {
-    // Template selection for new projects only
+  } else if (options.templateName) {
+    const isValidTemplate = initConf.snapInTemplates.some(template => template.name === options.templateName);
+    if (isValidTemplate) {
+      selectedSnapInTemplateName = options.templateName;
+      logger.info(`Using Snap-in template from --templateName flag: ${selectedSnapInTemplateName}`);
+    } else {
+      logger.warn(`Invalid template name '${options.templateName}' provided via --templateName flag. Falling back to interactive selection.`);
+      // Fall through to prompt by not setting selectedSnapInTemplateName here
+    }
+  }
+
+  // Prompt for template only if not initialized, and no valid templateName flag was provided
+  if (!isInitialized && !selectedSnapInTemplateName) {
     const response = await prompts({
       type: "select",
       name: "selectedSnapInTemplateName",
@@ -295,22 +326,29 @@ async function gatherSnapInProjectConfiguration(
         title: `${template.name} - ${template.description || "No description"}`,
         value: template.name,
       })),
-      initial: 0,
+      initial: 0, // You might want to find a better initial if possible or leave as 0
     });
     selectedSnapInTemplateName = response.selectedSnapInTemplateName;
   }
 
   // Snap-in base name
-  const existingName = existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name;
-  const { snapInBaseName } = await prompts({
-    type: "text",
-    name: "snapInBaseName",
-    message: "Enter a base name for your Snap-in:",
-    initial: existingName || "my-snapin",
-    validate: (value) => value.trim().length > 0 || "Snap-in name is required",
-  });
+  let snapInBaseNameResolved: string;
+  if (options.projectName) {
+    snapInBaseNameResolved = options.projectName;
+    logger.info(`Using Snap-in base name from --projectName flag: ${snapInBaseNameResolved}`);
+  } else {
+    const existingName = existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name;
+    const { snapInBaseName: promptedName } = await prompts({
+      type: "text",
+      name: "snapInBaseName",
+      message: "Enter a base name for your Snap-in:",
+      initial: existingName || "my-snapin",
+      validate: (value) => value.trim().length > 0 || "Snap-in name is required",
+    });
+    snapInBaseNameResolved = promptedName;
+  }
 
-  const projectName = isInitialized ? undefined : generateAirdropSnapInFolderName(snapInBaseName);
+  const projectName = isInitialized ? undefined : generateAirdropSnapInFolderName(snapInBaseNameResolved);
 
   // Use existing config as base or create default
   const defaultConfig = createDefaultAirdropConfig('snap-in');
@@ -325,9 +363,9 @@ async function gatherSnapInProjectConfiguration(
     selectedSnapInTemplateName?: string; 
   } = {
     ...mergedConfig,
-    projectName,
+    projectName, // This is the directory name
     projectTypeFromPrompt: "snap-in",
-    snapInBaseName,
+    snapInBaseName: snapInBaseNameResolved, // This is the conceptual name
     selectedSnapInTemplateName,
   };
 
@@ -340,7 +378,8 @@ async function gatherSnapInProjectConfiguration(
 async function gatherOAuth2Configuration(
   systemSlug: string, 
   existingSnapInConnection?: OAuth2Connection | SecretConnection, 
-  existingManifestConnection?: OAuth2Connection | SecretConnection
+  existingManifestConnection?: OAuth2Connection | SecretConnection,
+  options?: z.infer<typeof initOptionsSchema> // Added options here, optional
 ): Promise<OAuth2Connection> {
   const existingOAuth = (existingSnapInConnection?.type === 'oauth2' ? existingSnapInConnection : 
                         existingManifestConnection?.type === 'oauth2' ? existingManifestConnection : null) as OAuth2Connection | null;
@@ -417,7 +456,8 @@ async function gatherOAuth2Configuration(
 async function gatherSecretConfiguration(
   systemSlug: string,
   existingSnapInConnection?: OAuth2Connection | SecretConnection, 
-  existingManifestConnection?: OAuth2Connection | SecretConnection
+  existingManifestConnection?: OAuth2Connection | SecretConnection,
+  options?: z.infer<typeof initOptionsSchema> // Added options here, optional
 ): Promise<SecretConnection> {
   const existingSecret = (existingSnapInConnection?.type === 'secret' ? existingSnapInConnection : 
                          existingManifestConnection?.type === 'secret' ? existingManifestConnection : null) as SecretConnection | null;
