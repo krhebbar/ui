@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import { logger } from "@/src/utils/logger"; // Adjust path if necessary
-import { ENV_FILE, DEFAULT_ENV_CONTENT } from "@/src/config/constants"; // Adjust path
+import { ENV_FILE, DEFAULT_ENV_CONTENT } from "@/src/utils/validation/constants"; // Adjust path
 import prompts from "prompts";
 
 export interface EnvValidationResult {

@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import { logger } from "@/src/utils/logger"; // Adjust path
-import { REQUIRED_DEV_TOOLS, DevTool } from "@/src/config/constants"; // Adjust path
+import { REQUIRED_DEV_TOOLS, DevTool } from "@/src/utils/validation/constants"; // Adjust path
 import { spinner } from "@/src/utils/spinner"; // Adjust path
 
 export interface DepsValidationResult {

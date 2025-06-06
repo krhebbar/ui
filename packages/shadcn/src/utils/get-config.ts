@@ -4,6 +4,8 @@ import { resolveImport } from "@/src/utils/resolve-import"
 import { loadConfig } from "tsconfig-paths"
 import { z } from "zod"
 import fs from "fs-extra"
+import { getProjectState } from "@/src/utils/project-utils"
+import { readSnapinConfig } from "@/src/utils/project-config"
 
 export const DEFAULT_STYLE = "new-york"
 export const DEFAULT_COMPONENTS = "@/functions"
@@ -35,10 +37,30 @@ export const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 export async function getConfig(cwd: string): Promise<Config | null> {
-  const projectInfo = await getProjectInfo(cwd)
+  // First, check if this is a project with snapin.config.mjs (new approach)
+  const snapInConfigResult = await readSnapinConfig(cwd);
+  if (snapInConfigResult.validatedConfig || snapInConfigResult.rawConfig) {
+    // Use the new unified approach - try to get project info for TSX detection
+    const projectInfo = await getProjectInfo(cwd);
+    if (projectInfo) {
+      const config = {
+        style: DEFAULT_STYLE,
+        rsc: false,
+        tsx: projectInfo.isTsx,
+        aliases: {
+          components: `${projectInfo.aliasPrefix}/functions`,
+          utils: `${projectInfo.aliasPrefix}/lib/utils`,
+        },
+      };
+      
+      return await resolveConfigPaths(projectInfo.codePath, config);
+    }
+  }
 
+  // Fallback to legacy approach for projects without snapin.config.mjs
+  const projectInfo = await getProjectInfo(cwd);
   if (!projectInfo) {
-    return null
+    return null;
   }
 
   // Minimal CLI configuration for path resolution only

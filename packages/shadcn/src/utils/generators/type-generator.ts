@@ -1,8 +1,8 @@
 import fs from "fs/promises"
 import path from "path"
-import { AirdropProjectConfig } from "@/src/types/airdrop-config" // Updated path
+import { AirdropProjectConfig } from "@/src/types/snapin-config" // Updated path
 import { logger } from "@/src/utils/logger"
-import { generateFromOpenAPI, hasOpenAPISpec } from "@/src/utils/openapi-generator"
+import { generateFromOpenAPI, hasOpenAPISpec } from "@/src/utils/generators/openapi-generator"
 
 /**
  * Generate TypeScript definition files for the airdrop project

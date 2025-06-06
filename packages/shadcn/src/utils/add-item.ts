@@ -12,7 +12,7 @@ import { updateDependencies } from "@/src/utils/updaters/update-dependencies"
 import { updateFiles } from "@/src/utils/updaters/update-files"
 import { z } from "zod"
 
-export async function addComponents(
+export async function addItems(
   components: string[],
   config: Config,
   options: {
@@ -28,11 +28,11 @@ export async function addComponents(
     ...options,
   }
 
-  // Unified approach - use single project configuration
-  return await addProjectComponents(components, config, options)
+  // Use unified approach with single project configuration
+  return await addProjectItems(components, config, options)
 }
 
-async function addProjectComponents(
+async function addProjectItems(
   components: string[],
   config: z.infer<typeof configSchema>,
   options: {

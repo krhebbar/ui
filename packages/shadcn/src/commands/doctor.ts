@@ -2,10 +2,10 @@ import { Command } from "commander";
 import { logger } from "@/src/utils/logger"; // Adjust path if necessary
 import { getAirdropProjectValidation } from "@/src/utils/get-project-info";
 import { ProjectInfo as ValidationProjectInfo } from "@/src/types/project-info";
-import { validateEnv, EnvValidationResult } from "../validation/env";
-import { validateDependencies, DepsValidationResult } from "../validation/deps";
-import { validateDevRev, DevRevValidationResult } from "../validation/devrev";
-import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/config/constants";
+import { validateEnv, EnvValidationResult } from "../utils/validation/env";
+import { validateDependencies, DepsValidationResult } from "../utils/validation/deps";
+import { validateDevRev, DevRevValidationResult } from "../utils/validation/devrev";
+import { COMMAND_PLACEHOLDERS, CLI_NAME } from "@/src/utils/validation/constants";
 import path from "path"; // Ensure path is imported
 import fs from "fs-extra"; // Ensure fs-extra is imported
 

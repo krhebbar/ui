@@ -1,16 +1,16 @@
 import { z } from "zod";
 import prompts from "prompts";
-import { AirdropProjectConfig, OAuth2Connection, SecretConnection, SUPPORTED_DEVREV_OBJECTS } from "../../types/airdrop-config";
+import { AirdropProjectConfig, OAuth2Connection, SecretConnection, SUPPORTED_DEVREV_OBJECTS } from "../../types/snapin-config";
 import { initOptionsSchema } from "../init";
 import { 
   createDefaultAirdropConfig, 
   autoDetectProjectType, 
   isProjectInitialized, 
   readExistingManifest, 
-  readExistingSnapInConfig, 
   mergeExistingConfigurations 
-} from "./init-utils";
-import { getInitConfig } from "../../utils/init-config";
+} from "../../utils/project-utils";
+import { getInitConfig } from "../../utils/project-templates";
+import { readExistingSnapinConfig } from "../../utils/project-config";
 import { generateAirdropSnapInFolderName } from "../../utils/naming";
 import { logger } from "../../utils/logger";
 
@@ -41,7 +41,7 @@ export async function gatherAirdropConfiguration(
   if (isInitialized) {
     logger.info("Existing project detected. Reading current configuration...");
     existingManifestConfig = await readExistingManifest(options.cwd);
-    existingSnapInConfig = await readExistingSnapInConfig(options.cwd);
+    existingSnapInConfig = await readExistingSnapinConfig(options.cwd);
   }
 
   if (options.silent || options.yes) {
@@ -54,11 +54,19 @@ export async function gatherAirdropConfiguration(
       ? mergeExistingConfigurations(existingManifestConfig, existingSnapInConfig, defaultConfig)
       : defaultConfig;
     
+    // For airdrop type, we need template name for cloning
+    let selectedSnapInTemplateName: string | undefined;
+    if (projectType === 'snap-in' && !isInitialized) {
+      // Use default template for new snap-in projects in silent mode
+      const initConf = getInitConfig();
+      selectedSnapInTemplateName = initConf.snapInTemplates[0]?.name;
+    }
+    
     return {
       ...mergedConfig,
-      // Don't set projectName for empty directories - we want to clone directly into current directory
-      projectName: options.isNewProject ? undefined : 'default-project',
+      projectName: undefined,
       projectTypeFromPrompt: projectType,
+      selectedSnapInTemplateName,
       devrevPatEnvVarName: "DEVREV_PAT",
       devrevOrgEnvVarName: "DEVREV_ORG",
     };
@@ -138,8 +146,8 @@ async function gatherAirdropProjectConfiguration(
   const { airdropProjectName } = await prompts({
     type: "text",
     name: "airdropProjectName",
-    message: "Enter a name for your Airdrop project (e.g., airdrop-my-connector):",
-    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "airdrop-my-connector",
+    message: "Enter a name for your Airdrop project (e.g., airdrop-notion):",
+    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "airdrop-",
     validate: (value) => value.trim().length > 0 || "Project name is required",
   });
 
@@ -160,7 +168,7 @@ async function gatherAirdropProjectConfiguration(
     type: "text",
     name: "externalSystemName",
     message: "What is the name of your external system (e.g., Notion, Jira)?",
-    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "My External System",
+    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "Enter your external system name",
     validate: (value) => value.trim().length > 0 || "External system name is required",
   });
 

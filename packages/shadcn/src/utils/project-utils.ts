@@ -1,25 +1,9 @@
-import { AirdropProjectConfig, OAuth2Connection, SecretConnection } from "../../types/airdrop-config";
 import path from "path";
 import fs from "fs-extra";
 import yaml from "yaml";
-import { getSnapInConfig } from "../../utils/airdrop-config";
-import { logger } from "../../utils/logger";
-
-/**
- * Extract core configuration for file generation
- */
-export function extractCoreConfigForGeneration(
-  augmentedConfig: AirdropProjectConfig & { 
-    projectName?: string; 
-    projectTypeFromPrompt?: 'airdrop' | 'snap-in'; 
-    airdropProjectName?: string; 
-    snapInBaseName?: string; 
-    selectedSnapInTemplateName?: string; 
-  }
-): AirdropProjectConfig {
-  const { projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName, ...coreConfig } = augmentedConfig;
-  return coreConfig;
-}
+import { AirdropProjectConfig, OAuth2Connection, SecretConnection } from "../types/snapin-config";
+import { readExistingSnapinConfig as readSnapinConfigFromFile } from "./project-config";
+import { logger } from "./logger";
 
 /**
  * Auto-detect project type based on folder name patterns
@@ -51,18 +35,27 @@ export async function isProjectInitialized(cwd: string): Promise<boolean> {
 }
 
 /**
- * Read existing manifest.yaml file and extract configuration
+ * Find manifest file (supports both .yml and .yaml)
  */
-export async function readExistingManifest(cwd: string): Promise<Partial<AirdropProjectConfig> | null> {
+export async function findManifestFile(cwd: string): Promise<string | null> {
   const manifestPathYaml = path.join(cwd, "manifest.yaml");
   const manifestPathYml = path.join(cwd, "manifest.yml");
   
-  let manifestPath: string;
   if (await fs.pathExists(manifestPathYaml)) {
-    manifestPath = manifestPathYaml;
+    return manifestPathYaml;
   } else if (await fs.pathExists(manifestPathYml)) {
-    manifestPath = manifestPathYml;
-  } else {
+    return manifestPathYml;
+  }
+  
+  return null;
+}
+
+/**
+ * Read existing manifest.yaml file and extract configuration
+ */
+export async function readExistingManifest(cwd: string): Promise<Partial<AirdropProjectConfig> | null> {
+  const manifestPath = await findManifestFile(cwd);
+  if (!manifestPath) {
     return null;
   }
 
@@ -113,25 +106,6 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
   }
 }
 
-/**
- * Read existing snap-in.config.mjs and extract configuration
- */
-export async function readExistingSnapInConfig(cwd: string): Promise<Partial<AirdropProjectConfig> | null> {
-  try {
-    const configResult = await getSnapInConfig(cwd);
-    if (configResult.validatedConfig) {
-      logger.info("Found existing snap-in.config.mjs, extracted configuration.");
-      return configResult.validatedConfig;
-    } else if (configResult.rawConfig) {
-      logger.info("Found snap-in.config.mjs but validation failed, using raw config as fallback.");
-      return configResult.rawConfig;
-    }
-  } catch (error) {
-    // No snap-in.config.mjs found or error reading it
-  }
-  
-  return null;
-}
 
 /**
  * Merge existing configurations with precedence: snap-in.config > manifest > defaults
@@ -147,6 +121,76 @@ export function mergeExistingConfigurations(
     ...(manifestConfig || {}),
     ...(snapInConfig || {}),
   };
+}
+
+/**
+ * Get comprehensive project state and configuration
+ */
+export async function getProjectState(cwd: string): Promise<{
+  isInitialized: boolean;
+  autoDetectedType: 'airdrop' | 'snap-in' | null;
+  existingManifestConfig: Partial<AirdropProjectConfig> | null;
+  existingSnapInConfig: Partial<AirdropProjectConfig> | null;
+  manifestPath: string | null;
+  hasSnapInConfig: boolean;
+}> {
+  const isInitialized = await isProjectInitialized(cwd);
+  const autoDetectedType = autoDetectProjectType(cwd);
+  const manifestPath = await findManifestFile(cwd);
+  
+  let existingManifestConfig: Partial<AirdropProjectConfig> | null = null;
+  let existingSnapInConfig: Partial<AirdropProjectConfig> | null = null;
+  
+  if (isInitialized) {
+    existingManifestConfig = await readExistingManifest(cwd);
+    existingSnapInConfig = await readSnapinConfigFromFile(cwd);
+  }
+
+  // Check for snap-in config
+  const snapInConfigPath = path.join(cwd, "snapin.config.mjs");
+  const hasSnapInConfig = await fs.pathExists(snapInConfigPath);
+  
+  return {
+    isInitialized,
+    autoDetectedType,
+    existingManifestConfig,
+    existingSnapInConfig,
+    manifestPath,
+    hasSnapInConfig,
+  };
+}
+
+// Manifest operations have been moved to the unified updaters module
+// See: src/utils/updaters/update-manifest-file.ts
+
+/**
+ * Extract environment variables from configuration
+ */
+export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
+  const envVars: Record<string, string> = {};
+
+  if (config.connection?.type === "oauth2") {
+    const oauthConnection = config.connection;
+    if (typeof oauthConnection.clientId === 'string') {
+      const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
+      if (clientIdMatch && clientIdMatch[1]) {
+        envVars[clientIdMatch[1]] = "your-client-id-here";
+      }
+    }
+    if (typeof oauthConnection.clientSecret === 'string') {
+      const clientSecretMatch = oauthConnection.clientSecret.match(/process\.env\.([A-Z_0-9]+)/);
+      if (clientSecretMatch && clientSecretMatch[1]) {
+        envVars[clientSecretMatch[1]] = "your-client-secret-here";
+      }
+    }
+  } else if (config.connection?.type === "secret") {
+    const secretConnection = config.connection as SecretConnection;
+    if (secretConnection.tokenEnvVarName) {
+      envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
+    }
+  }
+
+  return envVars;
 }
 
 /**
@@ -211,31 +255,17 @@ export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 
 }
 
 /**
- * Extract environment variables from configuration
+ * Extract core configuration for file generation (removes UI-specific fields)
  */
-export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
-  const envVars: Record<string, string> = {};
-
-  if (config.connection?.type === "oauth2") {
-    const oauthConnection = config.connection;
-    if (typeof oauthConnection.clientId === 'string') {
-      const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
-      if (clientIdMatch && clientIdMatch[1]) {
-        envVars[clientIdMatch[1]] = "your-client-id-here";
-      }
-    }
-    if (typeof oauthConnection.clientSecret === 'string') {
-      const clientSecretMatch = oauthConnection.clientSecret.match(/process\.env\.([A-Z_0-9]+)/);
-      if (clientSecretMatch && clientSecretMatch[1]) {
-        envVars[clientSecretMatch[1]] = "your-client-secret-here";
-      }
-    }
-  } else if (config.connection?.type === "secret") {
-    const secretConnection = config.connection as SecretConnection;
-    if (secretConnection.tokenEnvVarName) {
-      envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
-    }
+export function extractCoreConfigForGeneration(
+  augmentedConfig: AirdropProjectConfig & { 
+    projectName?: string; 
+    projectTypeFromPrompt?: 'airdrop' | 'snap-in'; 
+    airdropProjectName?: string; 
+    snapInBaseName?: string; 
+    selectedSnapInTemplateName?: string; 
   }
-
-  return envVars;
+): AirdropProjectConfig {
+  const { projectName, projectTypeFromPrompt, airdropProjectName, snapInBaseName, selectedSnapInTemplateName, ...coreConfig } = augmentedConfig;
+  return coreConfig;
 } 

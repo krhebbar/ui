@@ -1,13 +1,12 @@
 import path from "path"
 import {
-  getSnapInConfig, // Renamed
-  hasSnapInConfig, // Renamed
-  addDevRevObjectsToSnapInConfig, // Renamed
-  addExternalSyncUnitsToSnapInConfig, // Renamed
-  updateSnapInConfig, // Renamed
-} from "@/src/utils/airdrop-config"
-import { generateTypeDefinitions } from "@/src/utils/type-generator"
-import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/types/airdrop-config" // Updated path
+  readSnapinConfig, 
+  hasSnapinConfig, 
+  addDevRevObjectsToSnapinConfig, 
+  addExternalSyncUnitsToSnapinConfig, 
+} from "@/src/utils/project-config"
+import { generateTypeDefinitions } from "@/src/utils/generators/type-generator"
+import { SUPPORTED_DEVREV_OBJECTS, AirdropProjectConfig } from "@/src/types/snapin-config" // Updated path
 import { ZodError } from "zod"; // Added ZodError import
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
@@ -50,7 +49,7 @@ config
       logger.setSilent(options.silent)
 
       // Check if project config exists
-      if (!(await hasSnapInConfig(options.cwd))) { // Renamed
+      if (!(await hasSnapinConfig(options.cwd))) { 
         logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
@@ -89,10 +88,10 @@ config
       }
 
       const configSpinner = spinner("Adding DevRev objects...").start()
-      await addDevRevObjectsToSnapInConfig(options.cwd, objectsToAdd) // Renamed
+      await addDevRevObjectsToSnapinConfig(options.cwd, objectsToAdd) 
       
       // Regenerate types
-      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const configResult = await readSnapinConfig(options.cwd)
       const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
@@ -134,7 +133,7 @@ config
       logger.setSilent(options.silent)
 
       // Check if project config exists
-      if (!(await hasSnapInConfig(options.cwd))) { // Renamed
+      if (!(await hasSnapinConfig(options.cwd))) { 
         logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
@@ -163,10 +162,10 @@ config
       }
 
       const configSpinner = spinner("Adding external sync units...").start()
-      await addExternalSyncUnitsToSnapInConfig(options.cwd, unitsToAdd) // Renamed
+      await addExternalSyncUnitsToSnapinConfig(options.cwd, unitsToAdd) 
       
       // Regenerate types
-      const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+      const configResult = await readSnapinConfig(options.cwd)
       const config = configResult.validatedConfig; // Extract validatedConfig
       if (config) {
         await generateTypeDefinitions(options.cwd, config)
@@ -199,12 +198,12 @@ config
       const cwd = path.resolve(opts.cwd)
 
       // Check if project config exists
-      if (!(await hasSnapInConfig(cwd))) { // Renamed
+      if (!(await hasSnapinConfig(cwd))) { 
         logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
-      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const configResult = await readSnapinConfig(cwd)
       const config = configResult.validatedConfig; // Extract validatedConfig
 
       if (!config) {
@@ -272,12 +271,12 @@ config
       const cwd = path.resolve(opts.cwd)
 
       // Check if project config exists
-      if (!(await hasSnapInConfig(cwd))) { // Renamed
+      if (!(await hasSnapinConfig(cwd))) { 
         logger.error("No project configuration found. Run 'init' first.") // Updated message
         process.exit(1)
       }
 
-      const configResult = await getSnapInConfig(cwd) // Renamed, get result object
+      const configResult = await readSnapinConfig(cwd)
       const config = configResult.validatedConfig; // Extract validatedConfig
       if (!config) {
         logger.error(`Failed to load project configuration. Cannot regenerate types. Error: ${configResult.error?.message}`) // Updated message
@@ -298,7 +297,7 @@ config
 async function promptForDevRevObjects(
   options: z.infer<typeof configOptionsSchema>
 ): Promise<string[]> {
-  const configResult = await getSnapInConfig(options.cwd) // Renamed, get result object
+  const configResult = await readSnapinConfig(options.cwd)
   const config = configResult.validatedConfig; // Extract validatedConfig
   if (!config) {
     logger.warn(`Could not load project configuration to suggest DevRev objects. Error: ${configResult.error?.message}`);

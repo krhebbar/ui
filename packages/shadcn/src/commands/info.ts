@@ -1,7 +1,7 @@
 import path from "path"
 import { getProjectInfo } from "@/src/utils/get-project-info"
 // Removed getAirdropConfig, added hasSnapInConfig and getSnapInConfig
-import { hasSnapInConfig, getSnapInConfig } from "@/src/utils/airdrop-config";
+import { hasSnapinConfig, readSnapinConfig } from "@/src/utils/project-config";
 import { ZodError } from "zod"; // Added ZodError import
 import { logger } from "@/src/utils/logger"
 import { Command } from "commander"
@@ -20,7 +20,7 @@ export const info = new Command()
     // logger.break()
     
     logger.info("> Project configuration (snapin.config.mjs)") // Updated message
-    const configResult = await getSnapInConfig(opts.cwd);
+    const configResult = await readSnapinConfig(opts.cwd);
 
     if (configResult.validatedConfig) {
       console.log(configResult.validatedConfig);

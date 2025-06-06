@@ -1,13 +1,10 @@
 import path from "path"
 import { runInit } from "@/src/commands/init"
 import { preFlightAdd } from "@/src/preflights/preflight-add"
-import { getRegistryIndex, getRegistryItem, isUrl } from "@/src/registry/api"
-import { registryItemTypeSchema } from "@/src/registry/schema"
-import { addComponents } from "@/src/utils/add-item"
-import { createProject } from "@/src/utils/create-project"
+import { getRegistryIndex } from "@/src/registry/api"
+import { addItems } from "@/src/utils/add-item"
+
 import * as ERRORS from "@/src/utils/errors"
-import { getConfig } from "@/src/utils/get-config"
-import { getProjectInfo } from "@/src/utils/get-project-info"
 import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
@@ -72,35 +69,29 @@ export const add = new Command()
         config = await runInit({
           cwd: options.cwd,
           yes: true,
-          force: true,
+          force: options.overwrite,
           skipPreflight: false,
           silent: true,
-          isNewProject: false,
+          isNewProject: true,
+          components: options.components,
         })
       }
 
       if (errors[ERRORS.MISSING_DIR_OR_EMPTY_PROJECT]) {
-        const { projectPath } = await createProject({
+        config = await runInit({
           cwd: options.cwd,
+          yes: true,
           force: options.overwrite,
+          skipPreflight: false,
+          silent: true,
+          isNewProject: true,
           components: options.components,
         })
-        if (!projectPath) {
-          logger.break()
-          process.exit(1)
-        }
-        options.cwd = projectPath
-
-        config = await getConfig(options.cwd)
+        
         if (!config) {
-          config = await runInit({
-            cwd: options.cwd,
-            yes: true,
-            force: true,
-            skipPreflight: true,
-            silent: true,
-            isNewProject: true,
-          })
+          logger.break()
+          logger.error("Failed to initialize project for adding components.")
+          process.exit(1)
         }
       }
 
@@ -110,7 +101,7 @@ export const add = new Command()
         )
       }
 
-      await addComponents(options.components, config, options)
+      await addItems(options.components, config, options)
     } catch (error) {
       logger.break()
       handleError(error)

@@ -62,9 +62,9 @@ export const airdropConfigSchema = z.object({
   devrevObjects: z.array(z.string()),
   externalSyncUnits: z.array(z.string()).optional(),
   externalSystem: externalSystemSchema.optional(),
-  connection: connectionSchema.optional(), // This connectionSchema will now include the updated secretConnectionSchema
-  devrevPatEnvVarName: z.string().optional(), // New field
-  devrevOrgEnvVarName: z.string().optional(), // New field
+  connection: connectionSchema.optional(), 
+  devrevPatEnvVarName: z.string().optional(), 
+  devrevOrgEnvVarName: z.string().optional(),
 })
 
 // Export types

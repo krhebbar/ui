@@ -1,21 +1,25 @@
 import { z } from "zod";
 import prompts from "prompts";
-import path from "path";
-import { addComponents } from "../../utils/add-item";
+import { addItems } from "../../utils/add-item";
 import { preFlightInit } from "../../preflights/preflight-init";
 import * as ERRORS from "../../utils/errors";
 import { initOptionsSchema } from "../init";
-import { hasSnapInConfig } from "../../utils/airdrop-config";
+import { hasSnapinConfig } from "../../utils/project-config";
 import { getConfig } from "../../utils/get-config";
 import { logger } from "../../utils/logger";
 import { highlighter } from "../../utils/highlighter";
 
 // Import modular components
-import { gatherAirdropConfiguration } from "./init-config-gathering";
-import { cloneProjectTemplate, createProjectDirectory } from "./init-template-cloning";
+import { gatherAirdropConfiguration } from "./prompts";
+import { cloneProjectTemplate, createProjectDirectory } from "../../utils/project-templates";
 import { writeProjectConfig, generateProjectTypes, updateManifestYaml } from "./init-file-generation";
-import { updateEnvFile, validateAndWarnEnvVars } from "./init-env-management";
-import { extractCoreConfigForGeneration, extractEnvVarsFromConfig, createDefaultAirdropConfig } from "./init-utils";
+import { extractCoreConfigForGeneration } from "../../utils/project-utils";
+import { 
+  updateEnvFile,
+  validateEnvFile,
+  logValidationResults,
+  extractEnvVarsFromConfig
+} from "../../utils/updaters/update-config-files";
 
 /**
  * Main init command orchestrator
@@ -50,7 +54,7 @@ export async function runInit(
       const { overwriteManifest } = await prompts({
         type: "confirm",
         name: "overwriteManifest",
-        message: `A manifest.yml (or .yaml) already exists at ${highlighter.info(options.cwd)}. Do you want to overwrite it with a new one? (y/N)`,
+        message: `A manifest.yaml already exists at ${highlighter.info(options.cwd)}. Do you want to overwrite it with a new one? (y/N)`,
         initial: false,
       });
       if (!overwriteManifest) {
@@ -108,7 +112,7 @@ export async function runInit(
   if (options.components?.length) {
     const finalConfigForComponents = await getConfig(options.cwd);
     if (finalConfigForComponents) {
-      await addComponents(options.components, finalConfigForComponents, {
+      await addItems(options.components, finalConfigForComponents, {
         overwrite: true,
         silent: options.silent,
         isNewProject: options.isNewProject,
@@ -129,7 +133,7 @@ async function handleNewProjectSetup(
   airdropConfigResult: any,
   shouldGenerateManifest: boolean
 ): Promise<void> {
-  // Create project directory if needed (only for interactive mode with specific project name)
+  // Create project directory if needed (only when we have a specific project name)
   if (airdropConfigResult.projectName) {
     try {
       const projectPath = await createProjectDirectory(options.cwd, airdropConfigResult.projectName);
@@ -141,8 +145,12 @@ async function handleNewProjectSetup(
     }
   }
 
-  // Clone template for new projects only (skip if template name is undefined for existing projects)
-  if (airdropConfigResult.selectedSnapInTemplateName || airdropConfigResult.projectTypeFromPrompt === 'airdrop') {
+  // Clone template for new projects - check if we have template name OR if it's airdrop
+  const shouldCloneTemplate = 
+    airdropConfigResult.selectedSnapInTemplateName || 
+    airdropConfigResult.projectTypeFromPrompt === 'airdrop';
+    
+  if (shouldCloneTemplate) {
     const cloneSuccess = await cloneProjectTemplate(
       airdropConfigResult.projectTypeFromPrompt,
       options.cwd,
@@ -154,7 +162,7 @@ async function handleNewProjectSetup(
       process.exit(1);
     }
   } else {
-    logger.info("Skipping template cloning for existing project.");
+    logger.info("Skipping template cloning - no template specified.");
   }
 }
 
@@ -165,7 +173,7 @@ async function handleConfigOverwritePrompt(
   options: z.infer<typeof initOptionsSchema>,
   configFromManifest: any
 ): Promise<void> {
-  const hasExistingSnapInConfig = await hasSnapInConfig(options.cwd);
+  const hasExistingSnapInConfig = await hasSnapinConfig(options.cwd);
   if (hasExistingSnapInConfig && !options.force && !options.isNewProject) {
     if (!options.yes) {
       const { overwrite } = await prompts({
@@ -177,7 +185,7 @@ async function handleConfigOverwritePrompt(
       if (!overwrite) {
         logger.info("Skipping snapin.config.mjs creation.");
         if (options.components?.length && configFromManifest) {
-          await addComponents(options.components, configFromManifest, {
+          await addItems(options.components, configFromManifest, {
             overwrite: true,
             silent: options.silent,
             isNewProject: false,
@@ -188,7 +196,7 @@ async function handleConfigOverwritePrompt(
     } else if (!options.force) {
       logger.info("Project configuration (snapin.config.mjs) already exists. Skipping overwrite due to --yes without --force.");
       if (options.components?.length && configFromManifest) {
-        await addComponents(options.components, configFromManifest, {
+        await addItems(options.components, configFromManifest, {
           overwrite: true,
           silent: options.silent,
           isNewProject: false,
@@ -216,13 +224,16 @@ async function generateProjectFiles(
   // Handle environment variables
   const envVars = extractEnvVarsFromConfig(coreConfig);
   if (Object.keys(envVars).length > 0) {
-    await updateEnvFile(cwd, envVars);
-    await validateAndWarnEnvVars(
+    await updateEnvFile(cwd, envVars, { createIfMissing: true });
+    const validationResult = await validateEnvFile(
       cwd,
       coreConfig,
-      airdropConfigResult.devrevPatEnvVarName,
-      airdropConfigResult.devrevOrgEnvVarName
+      {
+        pat: airdropConfigResult.devrevPatEnvVarName,
+        org: airdropConfigResult.devrevOrgEnvVarName
+      }
     );
+    logValidationResults([validationResult]);
   }
 
   // Generate type definitions
