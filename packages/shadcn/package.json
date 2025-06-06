@@ -58,7 +58,8 @@
     "test:dev": "REGISTRY_URL=http://localhost:4000/r vitest run",
     "test:airdrop": "bash scripts/test-airdrop-flow.sh",
     "test:snapin": "bash scripts/test-snapin-flow.sh",
-    "test:all": "bash scripts/run-all.sh"
+    "test:all": "bash scripts/run-all.sh",
+    "find-deadcode": "ts-prune"
   },
   "dependencies": {
     "@antfu/ni": "^23.2.0",
@@ -99,6 +100,7 @@
     "@types/stringify-object": "^4.0.5",
     "msw": "^2.7.1",
     "rimraf": "^6.0.1",
+    "ts-prune": "^0.10.3",
     "tsup": "^6.6.3",
     "type-fest": "^3.8.0",
     "typescript": "^4.9.3"
