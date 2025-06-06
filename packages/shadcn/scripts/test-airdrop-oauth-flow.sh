@@ -50,9 +50,9 @@ test_airdrop_oauth() {
     # If CLI `init` command can take parameters to specify these, that would be better.
     # Example: node $CLI_PATH init --type airdrop --auth oauth ...
 
-    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type airdrop --auth-type oauth --name "my-oauth-airdrop"; then
+    if run_with_timeout 120 node "$CLI_PATH" init --yes --auth-type oauth --project-type airdrop --project-name "my-oauth-airdrop"; then
         # Assuming the project is created in a subdirectory named "my-oauth-airdrop"
-        local project_name="my-oauth-airdrop" # This should match the --name flag if used, or default naming
+        local project_name="my-oauth-airdrop" # This should match the --project-name flag if used, or default naming
         # If --name doesn't create a dir with that name, find the created dir:
         if [ ! -d "$TEST_DIR/$project_name" ]; then
              # Find the directory created by the init command

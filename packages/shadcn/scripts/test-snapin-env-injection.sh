@@ -25,14 +25,14 @@ test_snapin_env_injection() {
     # The --yes flag should facilitate a setup where such environment variables are expected.
     # We might need specific flags if the CLI supports them e.g. --template env-heavy-template
     # For this example, we assume a snap-in that by default uses env vars for some critical config.
-    # Example: node $CLI_PATH init --yes --project-type snapin --name "my-env-snapin" --template "template-with-env-vars"
+    # Example: node $CLI_PATH init --yes --project-type snapin --project-name "my-env-snapin" --template "template-with-env-vars"
     # The validation for this test in `validate_env_file` might need to be more specific,
     # or `validate_config_file` needs to check for `process.env` usage.
 
     # For now, using "pat" as connection_type for validate_env_file to check for a token variable.
     # This implies the snap-in is configured for PAT auth, which typically uses env vars.
-    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type snapin --auth-type pat --name "my-env-snapin"; then
-        local project_name="my-env-snapin" # Matches --name or discovered
+    if run_with_timeout 120 node "$CLI_PATH" init --yes --project-type snapin --auth-type pat --project-name "my-env-snapin"; then
+        local project_name="my-env-snapin" # Matches --project-name or discovered
         if [ ! -d "$TEST_DIR/$project_name" ]; then
             project_name=$(ls -td -- "$TEST_DIR"/*/ | head -n 1 | xargs -n 1 basename)
             if [ -z "$project_name" ] || [ ! -d "$TEST_DIR/$project_name" ]; then
