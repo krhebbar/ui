@@ -82,8 +82,12 @@ export async function updateEnvFile(
     existingVars["DEVREV_PAT"] = "your-devrev-pat-here";
     hasChanges = true;
   }
-  if (!("DEVREV_ORG" in existingVars)) {
-    existingVars["DEVREV_ORG"] = "your-devrev-org-slug-here";
+  if (!("DEV_ORG" in existingVars)) {
+    existingVars["DEV_ORG"] = "your-devrev-org-slug-here";
+    hasChanges = true;
+  }
+  if (!("USER_EMAIL" in existingVars)) {
+    existingVars["USER_EMAIL"] = "your-email@example.com";
     hasChanges = true;
   }
 
@@ -111,7 +115,7 @@ export async function updateEnvFile(
 export async function validateEnvFile(
   cwd: string,
   config: AirdropProjectConfig,
-  requiredVars: { pat?: string; org?: string } = {}
+  requiredVars: { pat?: string; org?: string; email?: string } = {}
 ): Promise<ValidationResult> {
   const envFilePath = path.join(cwd, ".env");
   const result: ValidationResult = {
@@ -143,7 +147,8 @@ export async function validateEnvFile(
   });
 
   const patEnvVarName = requiredVars.pat || "DEVREV_PAT";
-  const orgEnvVarName = requiredVars.org || "DEVREV_ORG";
+  const orgEnvVarName = requiredVars.org || "DEV_ORG";
+  const emailEnvVarName = requiredVars.email || "USER_EMAIL";
 
   // Check required DevRev variables
   if (!envValues[patEnvVarName] || 
@@ -156,6 +161,12 @@ export async function validateEnvFile(
       envValues[orgEnvVarName] === "your-devrev-org-slug-here" || 
       envValues[orgEnvVarName] === "") {
     result.warnings.push(`${orgEnvVarName} is missing or has a placeholder value`);
+  }
+
+  if (!envValues[emailEnvVarName] || 
+      envValues[emailEnvVarName] === "your-email@example.com" || 
+      envValues[emailEnvVarName] === "") {
+    result.warnings.push(`${emailEnvVarName} is missing or has a placeholder value`);
   }
 
   // Check connection-specific variables

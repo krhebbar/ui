@@ -12,6 +12,7 @@ import { dev } from "@/src/commands/dev";
 import { build } from "@/src/commands/build";
 import { release } from "@/src/commands/release";
 import { logs } from "@/src/commands/logs";
+import { createKeyring } from "@/src/commands/keyring";
 // New command group imports
 import { packageCommands } from "@/src/commands/package";
 import { contextCommands } from "@/src/commands/context";
@@ -42,6 +43,7 @@ async function main() {
     .addCommand(build)
     .addCommand(release)
     .addCommand(logs)
+    .addCommand(createKeyring)
     // Register new command groups
     .addCommand(packageCommands)
     .addCommand(contextCommands);

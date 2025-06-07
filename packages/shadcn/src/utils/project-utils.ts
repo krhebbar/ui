@@ -98,10 +98,10 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
     } else if (manifestData.keyring_types && manifestData.keyring_types[0]) {
       const keyringType = manifestData.keyring_types[0];
       config.externalSystem = {
-        name: keyringType.external_system_name || manifestData.name || "External System",
+        name: keyringType.name || manifestData.name || "External System",
         slug: manifestData.name?.toLowerCase().replace(/\s+/g, '-') || "external-system",
-        apiBaseUrl: keyringType.api_base_url || "https://api.example.com/v1",
-        testEndpoint: keyringType.token_verification?.url || "https://api.example.com/v1/me",
+        apiBaseUrl: "https://api.example.com/v1", // No longer in keyring_type
+        testEndpoint: keyringType.secret_config?.token_verification?.url || "https://api.example.com/v1/me",
         externalObjects: [],
         accessMethod: "api" as const,
         connection: {
@@ -109,7 +109,7 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
           id: "external-system-secret",
           secretTransform: "Bearer {token}",
           tokenVerification: {
-            url: keyringType.token_verification?.url || "https://api.example.com/v1/me",
+            url: keyringType.secret_config?.token_verification?.url || "https://api.example.com/v1/me",
             method: "GET",
           },
           fields: [],

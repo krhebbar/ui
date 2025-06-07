@@ -67,8 +67,6 @@ export async function gatherAirdropConfiguration(
       projectName: undefined,
       projectTypeFromPrompt: projectType,
       selectedSnapInTemplateName,
-      devrevPatEnvVarName: "DEVREV_PAT",
-      devrevOrgEnvVarName: "DEVREV_ORG",
     };
   }
 

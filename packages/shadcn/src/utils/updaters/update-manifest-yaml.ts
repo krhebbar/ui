@@ -96,6 +96,8 @@ async function findManifestFile(cwd: string): Promise<string | null> {
   return null;
 }
 
+
+
 /**
  * Apply surgical updates to manifest content - preserves comments, formatting, and structure
  * 
@@ -265,23 +267,19 @@ function updateYamlNestedField(content: string, parentField: string, childField:
  * Update keyring_types section with correct structure based on connection type
  */
 function updateKeyringTypes(content: string, config: AirdropProjectConfig, connectionId: string): string {
-  const systemName = config.externalSystem?.name || 'External System';
-  const connectionType = config.externalSystem?.connection?.type || 'secret';
-  
   // Generate the complete keyring_types block based on connection type
   const newKeyringTypesBlock = generateKeyringTypesBlock(config, connectionId);
   
-  // More precise regex to match the entire keyring_types section
-  // This matches from "keyring_types:" until the next top-level section (or end of file)
+  // Check if keyring_types section already exists
   const keyringTypesRegex = /(keyring_types:\s*(?:#[^\n]*\n)?)((?:\s+[^\n]*\n)*?)(?=\n[a-zA-Z_][a-zA-Z0-9_]*:\s|\n*$)/;
   const match = content.match(keyringTypesRegex);
   
   if (match) {
-    // Replace only the keyring_types content, preserving the header and comments
+    // Replace only the keyring_types content, preserving the header  
     const beforeKeyring = content.substring(0, match.index!);
     const afterKeyring = content.substring(match.index! + match[0].length);
     
-    return beforeKeyring + match[1] + newKeyringTypesBlock + '\n' + afterKeyring;
+    return beforeKeyring + 'keyring_types:\n' + newKeyringTypesBlock + '\n' + afterKeyring;
   }
   
   // If keyring_types section doesn't exist, add it before imports section if it exists
@@ -379,14 +377,14 @@ function generateSecretKeyringBlock(config: AirdropProjectConfig, connectionId: 
   
   // Extract the base64 encoding pattern if it exists
   const isBase64Transform = secretTransform.includes('@base64');
-  const transformPattern = isBase64Transform ? '".token+":X" | @base64' : `"Bearer " + .token`;
+  const transformPattern = isBase64Transform ? '".token+":X" | @base64' : '"Bearer " + .token';
   
   return `  - id: ${connectionId}
     name: ${systemName} Connection
     description: ${systemName} connection
     kind: "Secret"${isSubdomain ? '\n    is_subdomain: true # The is_subdomain field is used to indicate that the subdomain is part of the URL' : ''}
     secret_config: # The secret_config section is used to define the fields in the secret
-      secret_transform: "${transformPattern}" # Transform data from input fields into the secret value
+      secret_transform: ${transformPattern} # Transform data from input fields into the secret value
       fields: # Data that the user shall provide in the input form when creating the connection
         - id: token
           name: Token
@@ -405,24 +403,12 @@ function generateImportsBlock(config: AirdropProjectConfig, connectionId: string
   const systemName = config.externalSystem?.name || 'External System';
   const systemSlug = config.externalSystem?.slug || 'my-snapin';
   
-  return `  # The slug is the machine-readable name for the import.
-  # In the example below, it's automatically taken from the repository name if you used the template.
-  - slug: ${systemSlug}
+  return `  - slug: ${systemSlug}
     display_name: ${systemName}
     description: Import data from ${systemName} using Airdrop
-
-    # The extractor and loader functions specify which functions from the section
-    # 'functions' above should be called when extracting data from an external
-    # system, or loading data into it.
-    # Make sure these are in sync with the function names in the 'functions' section above
-    # and with your code, if you changed the names.
     extractor_function: extraction
-
     # TODO: Uncomment the loader function once you have implemented loading.
     #loader_function: loading
-
-    # The list of connection types that are available for the external system.
-    # Make sure these are in sync with the keyring types in the 'keyring_types' section above.
     allowed_connection_types:
       - ${connectionId}`;
 }

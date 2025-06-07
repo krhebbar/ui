@@ -12,7 +12,6 @@ keyring_types:
   - id: minimal-pat-connection
     name: Minimal PAT Connection
     description: Minimal PAT connection for testing.
-    external_system_name: MinimalSystem
     kind: "Secret"
     is_subdomain: true
     secret_config:

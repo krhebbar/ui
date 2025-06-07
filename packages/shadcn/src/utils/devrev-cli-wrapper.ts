@@ -15,12 +15,12 @@ async function executeDevrevCommand(
 ): Promise<string> {
   const commandArgs = [...args];
 
-  // Read DEVREV_PAT and DEVREV_ORG from .env file if available
+  // Read DEVREV_PAT and DEV_ORG from .env file if available
   if (process.env.DEVREV_PAT) {
     commandArgs.push("--token", process.env.DEVREV_PAT);
   }
-  if (process.env.DEVREV_ORG) {
-    commandArgs.push("--org", process.env.DEVREV_ORG);
+  if (process.env.DEV_ORG) {
+    commandArgs.push("--org", process.env.DEV_ORG);
   }
 
   try {

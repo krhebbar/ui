@@ -25,6 +25,51 @@ const configOptionsSchema = z.object({
 export const config = new Command()
   .name("config")
   .description("manage project configuration") // Updated description
+  // Top-level fields
+  .option("--project-type <type>", "set project type (airdrop or snap-in)")
+  .option("--sync-direction <direction>", "set sync direction (one-way or two-way)")
+  // External system fields
+  .option("--name <name>", "set external system name")
+  .option("--slug <slug>", "set external system slug")
+  .option("--access-method <method>", "set access method (api or sdk)")
+  .option("--documentation-url <url>", "set documentation URL")
+  .option("--api-base-url <url>", "set API base URL")
+  .option("--test-endpoint <url>", "set test endpoint URL")
+  .option("--add-external-object <object>", "add external object to the list (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--remove-external-object <object>", "remove external object from the list (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  // Connection fields
+  .option("--connection-type <type>", "set connection type (oauth2 or secret)")
+  .option("--connection-id <id>", "set connection ID")
+  .option("--authorize-url <url>", "set OAuth2 authorization URL")
+  .option("--token-url <url>", "set OAuth2 token URL")
+  .option("--grant-type <type>", "set OAuth2 grant type")
+  .option("--scope <scope>", "set OAuth2 scope")
+  .option("--add-scope <scope>", "add OAuth2 scope (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--remove-scope <scope>", "remove OAuth2 scope (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--scope-delimiter <delimiter>", "set OAuth2 scope delimiter")
+  .option("--refresh-url <url>", "set OAuth2 refresh URL")
+  .option("--refresh-method <method>", "set OAuth2 refresh method")
+  .option("--revoke-url <url>", "set OAuth2 revoke URL")
+  .option("--revoke-method <method>", "set OAuth2 revoke method")
+  // DevRev objects
+  .option("--add-devrev-object <object>", "add DevRev object (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--remove-devrev-object <object>", "remove DevRev object (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  // Standard options
+  .option("-y, --yes", "skip confirmation prompt.", false)
+  .option("-s, --silent", "mute output.", false)
+  .option(
+    "-c, --cwd <cwd>",
+    "the working directory. defaults to the current directory.",
+    process.cwd()
+  )
+  .action(async (opts) => {
+    try {
+      await updateConfigFields(opts)
+    } catch (error) {
+      logger.break()
+      handleError(error)
+    }
+  })
 
 // Add DevRev objects subcommand
 config
@@ -341,4 +386,252 @@ async function promptForExternalSyncUnits(
   })
 
   return units || []
+}
+
+/**
+ * Update snapin.config.mjs fields based on CLI flags
+ */
+async function updateConfigFields(opts: any): Promise<void> {
+  const cwd = path.resolve(opts.cwd)
+  
+  // Configure logger based on silent flag
+  logger.setSilent(opts.silent)
+
+  // Check if project config exists
+  if (!(await hasSnapinConfig(cwd))) {
+    logger.error("No project configuration found. Run 'init' first.")
+    process.exit(1)
+  }
+
+  // Check if any update flags were provided
+  const hasUpdates = Object.keys(opts).some(key => 
+    !['cwd', 'yes', 'silent'].includes(key) && opts[key] !== undefined
+  )
+
+  if (!hasUpdates) {
+    logger.warn("No configuration updates specified. Use --help to see available options.")
+    return
+  }
+
+  // Read current config
+  const configResult = await readSnapinConfig(cwd)
+  if (!configResult.validatedConfig) {
+    logger.error(`Failed to load project configuration: ${configResult.error?.message}`)
+    process.exit(1)
+  }
+
+  const currentConfig = configResult.validatedConfig
+  const updates: any = {}
+
+  // Top-level field updates
+  if (opts.projectType) {
+    if (!['airdrop', 'snap-in'].includes(opts.projectType)) {
+      logger.error("Project type must be 'airdrop' or 'snap-in'")
+      process.exit(1)
+    }
+    updates.projectType = opts.projectType
+  }
+
+  if (opts.syncDirection) {
+    if (!['one-way', 'two-way'].includes(opts.syncDirection)) {
+      logger.error("Sync direction must be 'one-way' or 'two-way'")
+      process.exit(1)
+    }
+    updates.syncDirection = opts.syncDirection
+  }
+
+  // External system updates
+  if (opts.name || opts.slug || opts.accessMethod || opts.documentationUrl || 
+      opts.apiBaseUrl || opts.testEndpoint || opts.addExternalObject?.length || 
+      opts.removeExternalObject?.length) {
+    
+    const externalSystemUpdate: any = {
+      ...currentConfig.externalSystem,
+    }
+    
+    if (opts.name) externalSystemUpdate.name = opts.name
+    if (opts.slug) externalSystemUpdate.slug = opts.slug
+    if (opts.accessMethod) externalSystemUpdate.accessMethod = opts.accessMethod
+    if (opts.documentationUrl) externalSystemUpdate.documentationUrl = opts.documentationUrl
+    if (opts.apiBaseUrl) externalSystemUpdate.apiBaseUrl = opts.apiBaseUrl
+    if (opts.testEndpoint) externalSystemUpdate.testEndpoint = opts.testEndpoint
+    
+    updates.externalSystem = externalSystemUpdate
+
+    // Handle external objects array updates
+    if (opts.addExternalObject?.length || opts.removeExternalObject?.length) {
+      const currentObjects = new Set(currentConfig.externalSystem?.externalObjects || [])
+      
+      if (opts.addExternalObject?.length) {
+        opts.addExternalObject.forEach((obj: string) => currentObjects.add(obj))
+      }
+      
+      if (opts.removeExternalObject?.length) {
+        opts.removeExternalObject.forEach((obj: string) => currentObjects.delete(obj))
+      }
+      
+      updates.externalSystem!.externalObjects = Array.from(currentObjects)
+    }
+  }
+
+  // Connection updates
+  if (opts.connectionType || opts.connectionId || opts.authorizeUrl || opts.tokenUrl ||
+      opts.grantType || opts.scope || opts.addScope?.length || opts.removeScope?.length ||
+      opts.scopeDelimiter || opts.refreshUrl || opts.refreshMethod || opts.revokeUrl ||
+      opts.revokeMethod) {
+    
+    if (!updates.externalSystem) {
+      updates.externalSystem = { ...currentConfig.externalSystem }
+    }
+
+    const currentConnection = currentConfig.externalSystem?.connection || { type: "secret", id: "", fields: [] }
+    
+    if (opts.connectionType) {
+      if (!['oauth2', 'secret'].includes(opts.connectionType)) {
+        logger.error("Connection type must be 'oauth2' or 'secret'")
+        process.exit(1)
+      }
+      
+      if (opts.connectionType === 'oauth2') {
+        updates.externalSystem!.connection = {
+          type: "oauth2",
+          id: opts.connectionId || currentConnection.id || "",
+          clientId: (currentConnection as any).clientId || "",
+          clientSecret: (currentConnection as any).clientSecret || "",
+          authorize: {
+            url: opts.authorizeUrl || (currentConnection as any).authorize?.url || "",
+            tokenUrl: opts.tokenUrl || (currentConnection as any).authorize?.tokenUrl || "",
+            grantType: opts.grantType || (currentConnection as any).authorize?.grantType || "authorization_code",
+            scope: opts.scope || (currentConnection as any).authorize?.scope || "",
+            scopeDelimiter: opts.scopeDelimiter || (currentConnection as any).authorize?.scopeDelimiter || " ",
+          },
+          refresh: {
+            url: opts.refreshUrl || (currentConnection as any).refresh?.url || "",
+            method: opts.refreshMethod || (currentConnection as any).refresh?.method || "POST",
+          },
+          revoke: {
+            url: opts.revokeUrl || (currentConnection as any).revoke?.url || "",
+            method: opts.revokeMethod || (currentConnection as any).revoke?.method || "POST",
+          },
+        }
+
+        // Handle scope updates for OAuth2
+        if (opts.addScope?.length || opts.removeScope?.length) {
+          const currentScopes = new Set((updates.externalSystem!.connection as any).authorize.scope.split(' ').filter(Boolean))
+          
+          if (opts.addScope?.length) {
+            opts.addScope.forEach((scope: string) => currentScopes.add(scope))
+          }
+          
+          if (opts.removeScope?.length) {
+            opts.removeScope.forEach((scope: string) => currentScopes.delete(scope))
+          }
+          
+          (updates.externalSystem!.connection as any).authorize.scope = Array.from(currentScopes).join(' ')
+        }
+      } else {
+        updates.externalSystem!.connection = {
+          type: "secret",
+          id: opts.connectionId || currentConnection.id || "",
+          secretTransform: (currentConnection as any).secretTransform || "",
+          tokenVerification: (currentConnection as any).tokenVerification || { url: "", method: "GET" },
+          fields: (currentConnection as any).fields || [],
+        }
+      }
+    } else {
+      // Update existing connection fields without changing type
+      updates.externalSystem!.connection = { ...currentConnection } as any
+      
+      if (opts.connectionId) {
+        updates.externalSystem!.connection.id = opts.connectionId
+      }
+
+      if (currentConnection.type === 'oauth2') {
+        const oauthConnection = updates.externalSystem!.connection as any
+        if (opts.authorizeUrl) oauthConnection.authorize = { ...oauthConnection.authorize, url: opts.authorizeUrl }
+        if (opts.tokenUrl) oauthConnection.authorize = { ...oauthConnection.authorize, tokenUrl: opts.tokenUrl }
+        if (opts.grantType) oauthConnection.authorize = { ...oauthConnection.authorize, grantType: opts.grantType }
+        if (opts.scope) oauthConnection.authorize = { ...oauthConnection.authorize, scope: opts.scope }
+        if (opts.scopeDelimiter) oauthConnection.authorize = { ...oauthConnection.authorize, scopeDelimiter: opts.scopeDelimiter }
+        if (opts.refreshUrl) oauthConnection.refresh = { ...oauthConnection.refresh, url: opts.refreshUrl }
+        if (opts.refreshMethod) oauthConnection.refresh = { ...oauthConnection.refresh, method: opts.refreshMethod }
+        if (opts.revokeUrl) oauthConnection.revoke = { ...oauthConnection.revoke, url: opts.revokeUrl }
+        if (opts.revokeMethod) oauthConnection.revoke = { ...oauthConnection.revoke, method: opts.revokeMethod }
+
+        // Handle scope updates
+        if (opts.addScope?.length || opts.removeScope?.length) {
+          const currentScopes = new Set(oauthConnection.authorize.scope.split(' ').filter(Boolean))
+          
+          if (opts.addScope?.length) {
+            opts.addScope.forEach((scope: string) => currentScopes.add(scope))
+          }
+          
+          if (opts.removeScope?.length) {
+            opts.removeScope.forEach((scope: string) => currentScopes.delete(scope))
+          }
+          
+          oauthConnection.authorize.scope = Array.from(currentScopes).join(' ')
+        }
+      }
+    }
+  }
+
+  // DevRev objects updates
+  if (opts.addDevrevObject?.length || opts.removeDevrevObject?.length) {
+    const currentDevrevObjects = new Set(currentConfig.devrevObjects || [])
+    
+    if (opts.addDevrevObject?.length) {
+      // Validate DevRev objects
+      const invalidObjects = opts.addDevrevObject.filter(
+        (obj: string) => !SUPPORTED_DEVREV_OBJECTS.includes(obj as any)
+      )
+      if (invalidObjects.length > 0) {
+        logger.error(`Invalid DevRev objects: ${invalidObjects.join(", ")}`)
+        logger.info(`Supported objects: ${SUPPORTED_DEVREV_OBJECTS.join(", ")}`)
+        process.exit(1)
+      }
+      
+      opts.addDevrevObject.forEach((obj: string) => currentDevrevObjects.add(obj))
+    }
+    
+    if (opts.removeDevrevObject?.length) {
+      opts.removeDevrevObject.forEach((obj: string) => currentDevrevObjects.delete(obj))
+    }
+    
+    updates.devrevObjects = Array.from(currentDevrevObjects)
+  }
+
+  // Confirm updates if not in yes mode
+  if (!opts.yes) {
+    logger.info("The following updates will be applied:")
+    console.log(JSON.stringify(updates, null, 2))
+    
+    const { proceed } = await prompts({
+      type: "confirm",
+      name: "proceed",
+      message: "Apply these updates to snapin.config.mjs?",
+      initial: true,
+    })
+
+    if (!proceed) {
+      logger.info("Configuration update cancelled.")
+      return
+    }
+  }
+
+  // Apply updates
+  const { updateSnapinConfigFile } = await import("../utils/updaters/update-snapin-config-mjs")
+  
+  const configSpinner = spinner("Updating configuration...").start()
+  await updateSnapinConfigFile(cwd, updates)
+  
+  // Regenerate types
+  const updatedConfigResult = await readSnapinConfig(cwd)
+  if (updatedConfigResult.validatedConfig) {
+    await generateTypeDefinitions(cwd, updatedConfigResult.validatedConfig)
+  }
+  
+  configSpinner.succeed()
+  
+  logger.log(`${highlighter.success("Success!")} Configuration updated successfully.`)
 } 

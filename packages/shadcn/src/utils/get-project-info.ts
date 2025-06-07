@@ -54,15 +54,53 @@ const MANIFEST_SCHEMA = z.object({
   })).optional(),
   keyring_types: z.array(z.object({
     id: z.string(),
-    name: z.string().optional(),
-    description: z.string().optional(),
-    external_system_name: z.string().optional(),
-    kind: z.string().optional(),
-    is_subdomain: z.boolean().optional(),
-    secret_config: z.any().optional(),
-    token_verification: z.object({
+    name: z.string(),
+    description: z.string(),
+    kind: z.enum(["Oauth2", "Secret"]),
+    // OAuth2 specific fields
+    scopes: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      value: z.string(),
+    })).optional(),
+    scope_delimiter: z.string().optional(),
+    oauth_secret: z.string().optional(),
+    authorize: z.object({
+      type: z.string(),
+      auth_url: z.string(),
+      token_url: z.string(),
+      grant_type: z.string(),
+      auth_query_parameters: z.record(z.string()).optional(),
+      token_query_parameters: z.record(z.string()).optional(),
+    }).optional(),
+    refresh: z.object({
+      type: z.string(),
       url: z.string(),
       method: z.string(),
+      query_parameters: z.record(z.string()).optional(),
+      headers: z.record(z.string()).optional(),
+    }).optional(),
+    revoke: z.object({
+      type: z.string(),
+      url: z.string(),
+      method: z.string(),
+      headers: z.record(z.string()).optional(),
+      query_parameters: z.record(z.string()).optional(),
+    }).optional(),
+    // Secret specific fields
+    is_subdomain: z.boolean().optional(),
+    secret_config: z.object({
+      secret_transform: z.string(),
+      fields: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string(),
+      })),
+      token_verification: z.object({
+        url: z.string(),
+        method: z.string(),
+        headers: z.record(z.string()).optional(),
+      }).optional(),
     }).optional(),
   })).optional(),
   imports: z.array(z.object({
@@ -179,9 +217,9 @@ export async function validateAirdropProjectStructure(
         structureIsValid = false;
       }
       // Optional: code/src/functions/factory.ts
-      const factoryFilePath = path.join(functionsDirPath, "function-factory.ts");
+      const factoryFilePath = path.join(srcDirPath, "function-factory.ts");
       if (!(await fs.pathExists(factoryFilePath))) {
-        projectInfo.reasons.push("Optional: 'code/src/functions/function-factory.ts' is recommended but not found.");
+        projectInfo.reasons.push("Optional: 'code/src/function-factory.ts' is recommended but not found.");
         // Not setting structureIsValid = false as it's optional
       }
 
@@ -292,13 +330,13 @@ export async function getProjectInfo(cwd: string): Promise<ProjectInfo | null> {
       description: manifest.description,
       slug: manifest.imports?.[0]?.slug || "unknown-snapin-slug", // Use first import slug or default
       serviceAccountName: manifest.service_account?.display_name,
-      externalSystemName: manifest.keyring_types?.[0]?.external_system_name,
+      externalSystemName: manifest.keyring_types?.[0]?.name,
       functions: manifest.functions,
       keyring: manifest.keyring_types?.[0] ? {
         type: manifest.keyring_types[0].kind || "unknown",
         id: manifest.keyring_types[0].id,
       } : undefined,
-      tokenVerification: manifest.keyring_types?.[0]?.token_verification,
+      tokenVerification: manifest.keyring_types?.[0]?.secret_config?.token_verification,
       isTsx,
       aliasPrefix,
       manifestPath,
