@@ -431,9 +431,17 @@ async function executeTestConnection(options: TestConnectionOptions): Promise<vo
       return;
     }
 
-    const testApiUrl = externalSystem.testEndpoint;
-    if (!testApiUrl) {
-      testSpinner.fail("❌ No testEndpoint configured in external system");
+    // Use tokenVerification.url as the test endpoint
+    const connection = externalSystem.connection;
+    let testApiUrl: string;
+    
+    if (connection && connection.type === "secret" && connection.tokenVerification?.url) {
+      testApiUrl = connection.tokenVerification.url;
+    } else if (connection && connection.type === "oauth2") {
+      // For OAuth2, we could use a test endpoint from the config, but for now default to authorize URL
+      testApiUrl = connection.authorize?.url || externalSystem.apiBaseUrl;
+    } else {
+      testSpinner.fail("❌ No valid test endpoint found in connection configuration");
       return;
     }
 

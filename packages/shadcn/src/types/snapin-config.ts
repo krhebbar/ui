@@ -22,6 +22,7 @@ export const oAuth2ConnectionSchema = z.object({
     url: z.string(),
     method: z.string().default("POST"),
   }),
+  tokenEnvVarName: z.string().optional(),
 })
 
 export const secretConnectionSchema = z.object({
@@ -42,7 +43,7 @@ export const secretConnectionSchema = z.object({
       name: z.string(),
       description: z.string(),
     })
-  ),
+  ).optional(),
   tokenEnvVarName: z.string().optional(),
 })
 
@@ -53,7 +54,6 @@ export const externalSystemSchema = z.object({
   name: z.string(),
   slug: z.string(),
   apiBaseUrl: z.string(),
-  testEndpoint: z.string(),
   externalObjects: z.array(z.string()), // Renamed from supportedObjects
   accessMethod: z.enum(["sdk", "api"]),
   isComplete: z.boolean().optional(),
