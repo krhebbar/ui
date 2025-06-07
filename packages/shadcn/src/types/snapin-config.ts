@@ -6,6 +6,7 @@ export const oAuth2ConnectionSchema = z.object({
   id: z.string(),
   clientId: z.string(),
   clientSecret: z.string(),
+  headers: z.record(z.string()).optional(),
   authorize: z.object({
     url: z.string(),
     tokenUrl: z.string(),
@@ -29,6 +30,7 @@ export const secretConnectionSchema = z.object({
   isSubdomain: z.boolean().optional(),
   subdomain: z.string().optional(),
   secretTransform: z.string(),
+  headers: z.record(z.string()).optional(),
   tokenVerification: z.object({
     url: z.string(),
     method: z.string().default("GET"),

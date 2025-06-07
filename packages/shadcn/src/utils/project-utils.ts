@@ -88,6 +88,7 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
           type: "secret",
           id: "external-system-secret",
           secretTransform: "Bearer {token}",
+          headers: {},
           tokenVerification: {
             url: "https://api.example.com/v1/me",
             method: "GET",
@@ -108,6 +109,7 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
           type: "secret",
           id: "external-system-secret",
           secretTransform: "Bearer {token}",
+          headers: {},
           tokenVerification: {
             url: keyringType.secret_config?.token_verification?.url || "https://api.example.com/v1/me",
             method: "GET",
@@ -206,6 +208,7 @@ export function createMinimalSnapInConfig(): AirdropProjectConfig {
         type: "secret",
         id: "",
         secretTransform: "",
+        headers: {},
         tokenVerification: {
           url: "",
           method: "GET",
@@ -241,6 +244,7 @@ export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 
         id: "airdrop-oauth2",
         clientId: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_ID",
         clientSecret: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_SECRET",
+        headers: {},
         authorize: {
           url: "https://api.example.com/v1/oauth/authorize",
           tokenUrl: "https://api.example.com/v1/oauth/token",
