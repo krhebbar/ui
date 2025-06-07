@@ -121,12 +121,16 @@ async function checkSnapinConfig(cwd: string, issues: DoctorIssue[]): Promise<vo
     });
   }
 
-  if (!config.externalSystem?.testEndpoint || config.externalSystem.testEndpoint === "" || config.externalSystem.testEndpoint.includes("example.com")) {
-    issues.push({
-      category: "External System",
-      message: "externalSystem.testEndpoint is missing or using example.com",
-      suggestion: "shadcn config --test-endpoint '<valid-test-endpoint>'"
-    });
+  // Check if tokenVerification.url is configured properly (for secret connections)
+  if (config.externalSystem?.connection?.type === "secret") {
+    const secretConnection = config.externalSystem.connection as any;
+    if (!secretConnection.tokenVerification?.url || secretConnection.tokenVerification.url === "" || secretConnection.tokenVerification.url.includes("example.com")) {
+      issues.push({
+        category: "External System",
+        message: "connection.tokenVerification.url is missing or using example.com",
+        suggestion: "Update tokenVerification.url in your snapin.config.mjs connection configuration"
+      });
+    }
   }
 
   if (!config.externalSystem?.connection?.type) {

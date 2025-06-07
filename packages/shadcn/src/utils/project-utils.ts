@@ -81,18 +81,19 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
         name: importItem.display_name || manifestData.name || "External System",
         slug: importItem.slug || "external-system",
         apiBaseUrl: "https://api.example.com/v1",
-        testEndpoint: "https://api.example.com/v1/me",
         externalObjects: [],
         accessMethod: "api" as const,
         connection: {
           type: "secret",
           id: "external-system-secret",
           secretTransform: "Bearer {token}",
+          headers: {},
           tokenVerification: {
             url: "https://api.example.com/v1/me",
             method: "GET",
           },
           fields: [],
+          tokenEnvVarName: "",
         }
       };
     } else if (manifestData.keyring_types && manifestData.keyring_types[0]) {
@@ -101,18 +102,19 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
         name: keyringType.name || manifestData.name || "External System",
         slug: manifestData.name?.toLowerCase().replace(/\s+/g, '-') || "external-system",
         apiBaseUrl: "https://api.example.com/v1", // No longer in keyring_type
-        testEndpoint: keyringType.secret_config?.token_verification?.url || "https://api.example.com/v1/me",
         externalObjects: [],
         accessMethod: "api" as const,
         connection: {
           type: "secret",
           id: "external-system-secret",
           secretTransform: "Bearer {token}",
+          headers: {},
           tokenVerification: {
             url: keyringType.secret_config?.token_verification?.url || "https://api.example.com/v1/me",
             method: "GET",
           },
           fields: [],
+          tokenEnvVarName: "",
         }
       };
     }
@@ -199,18 +201,19 @@ export function createMinimalSnapInConfig(): AirdropProjectConfig {
       name: "",
       slug: "",
       apiBaseUrl: "",
-      testEndpoint: "",
       externalObjects: [],
       accessMethod: "api" as const,
       connection: {
         type: "secret",
         id: "",
         secretTransform: "",
+        headers: {},
         tokenVerification: {
           url: "",
           method: "GET",
         },
         fields: [],
+        tokenEnvVarName: "",
       } as SecretConnection,
     },
   };
@@ -233,7 +236,7 @@ export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 
       name: "My External System",
       slug: "airdrop-my-external-system",
       apiBaseUrl: "https://api.example.com/v1",
-      testEndpoint: "https://api.example.com/v1/me",
+
       externalObjects: [],
       accessMethod: "api" as const,
       connection: {
@@ -241,6 +244,7 @@ export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 
         id: "airdrop-oauth2",
         clientId: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_ID",
         clientSecret: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_SECRET",
+        headers: {},
         authorize: {
           url: "https://api.example.com/v1/oauth/authorize",
           tokenUrl: "https://api.example.com/v1/oauth/token",
@@ -256,6 +260,7 @@ export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 
           url: "https://api.example.com/v1/oauth/revoke",
           method: "POST",
         },
+        tokenEnvVarName: "",
       } as OAuth2Connection,
     },
     devrevObjects: ["account"],

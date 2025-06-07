@@ -34,7 +34,7 @@ export const config = new Command()
   .option("--access-method <method>", "set access method (api or sdk)")
   .option("--documentation-url <url>", "set documentation URL")
   .option("--api-base-url <url>", "set API base URL")
-  .option("--test-endpoint <url>", "set test endpoint URL")
+
   .option("--add-external-object <object>", "add external object to the list (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
   .option("--remove-external-object <object>", "remove external object from the list (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
   // Connection fields
@@ -51,6 +51,10 @@ export const config = new Command()
   .option("--refresh-method <method>", "set OAuth2 refresh method")
   .option("--revoke-url <url>", "set OAuth2 revoke URL")
   .option("--revoke-method <method>", "set OAuth2 revoke method")
+  // Headers
+  .option("--add-header <key:value>", "add connection header (format: key:value, can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--remove-header <key>", "remove connection header by key (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
+  .option("--set-headers <json>", "set all connection headers from JSON string (e.g., '{\"Content-Type\":\"application/json\"}')")
   // DevRev objects
   .option("--add-devrev-object <object>", "add DevRev object (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
   .option("--remove-devrev-object <object>", "remove DevRev object (can be used multiple times)", (value: string, previous: string[]) => previous.concat([value]), [] as string[])
@@ -71,163 +75,7 @@ export const config = new Command()
     }
   })
 
-// Add DevRev objects subcommand
-config
-  .command("add-devrev")
-  .description("add DevRev objects to sync configuration")
-  .argument("[objects...]", "DevRev objects to add")
-  .option("-y, --yes", "skip confirmation prompt.", false)
-  .option("-s, --silent", "mute output.", false)
-  .option(
-    "-c, --cwd <cwd>",
-    "the working directory. defaults to the current directory.",
-    process.cwd()
-  )
-  .action(async (objects, opts) => {
-    try {
-      const options = configOptionsSchema.parse({
-        cwd: path.resolve(opts.cwd),
-        ...opts,
-      })
 
-      // Configure logger based on silent flag
-      logger.setSilent(options.silent)
-
-      // Check if project config exists
-      if (!(await hasSnapinConfig(options.cwd))) { 
-        logger.error("No project configuration found. Run 'init' first.") // Updated message
-        process.exit(1)
-      }
-
-      let objectsToAdd = objects
-      if (!objectsToAdd?.length) {
-        objectsToAdd = await promptForDevRevObjects(options)
-      }
-
-      if (!objectsToAdd?.length) {
-        logger.warn("No objects selected.")
-        return
-      }
-
-      // Validate objects
-      const invalidObjects = objectsToAdd.filter(
-        (obj: string) => !SUPPORTED_DEVREV_OBJECTS.includes(obj as typeof SUPPORTED_DEVREV_OBJECTS[number])
-      )
-      if (invalidObjects.length > 0) {
-        logger.error(`Invalid DevRev objects: ${invalidObjects.join(", ")}`)
-        logger.info(`Supported objects: ${SUPPORTED_DEVREV_OBJECTS.join(", ")}`)
-        process.exit(1)
-      }
-
-      if (!options.yes) {
-        const { proceed } = await prompts({
-          type: "confirm",
-          name: "proceed",
-          message: `Add ${objectsToAdd.join(", ")} to DevRev objects?`,
-          initial: true,
-        })
-
-        if (!proceed) {
-          process.exit(0)
-        }
-      }
-
-      const configSpinner = spinner("Adding DevRev objects...").start()
-      await addDevRevObjectsToSnapinConfig(options.cwd, objectsToAdd) 
-      
-      // Regenerate types
-      const configResult = await readSnapinConfig(options.cwd)
-      const config = configResult.validatedConfig; // Extract validatedConfig
-      if (config) {
-        await generateTypeDefinitions(options.cwd, config)
-      } else {
-        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
-      }
-      
-      configSpinner.succeed()
-      
-      logger.log(
-        `${highlighter.success("Success!")} Added DevRev objects: ${objectsToAdd.join(", ")}`
-      )
-    } catch (error) {
-      logger.break()
-      handleError(error)
-    }
-  })
-
-// Add external sync units subcommand
-config
-  .command("add-external")
-  .description("add external sync units to configuration")
-  .argument("[units...]", "external sync units to add")
-  .option("-y, --yes", "skip confirmation prompt.", false)
-  .option("-s, --silent", "mute output.", false)
-  .option(
-    "-c, --cwd <cwd>",
-    "the working directory. defaults to the current directory.",
-    process.cwd()
-  )
-  .action(async (units, opts) => {
-    try {
-      const options = configOptionsSchema.parse({
-        cwd: path.resolve(opts.cwd),
-        ...opts,
-      })
-
-      // Configure logger based on silent flag
-      logger.setSilent(options.silent)
-
-      // Check if project config exists
-      if (!(await hasSnapinConfig(options.cwd))) { 
-        logger.error("No project configuration found. Run 'init' first.") // Updated message
-        process.exit(1)
-      }
-
-      let unitsToAdd = units
-      if (!unitsToAdd?.length) {
-        unitsToAdd = await promptForExternalSyncUnits(options)
-      }
-
-      if (!unitsToAdd?.length) {
-        logger.warn("No sync units selected.")
-        return
-      }
-
-      if (!options.yes) {
-        const { proceed } = await prompts({
-          type: "confirm",
-          name: "proceed",
-          message: `Add ${unitsToAdd.join(", ")} to external sync units?`,
-          initial: true,
-        })
-
-        if (!proceed) {
-          process.exit(0)
-        }
-      }
-
-      const configSpinner = spinner("Adding external sync units...").start()
-      await addExternalSyncUnitsToSnapinConfig(options.cwd, unitsToAdd) 
-      
-      // Regenerate types
-      const configResult = await readSnapinConfig(options.cwd)
-      const config = configResult.validatedConfig; // Extract validatedConfig
-      if (config) {
-        await generateTypeDefinitions(options.cwd, config)
-      } else {
-        logger.warn(`Could not regenerate types due to invalid configuration. Error: ${configResult.error?.message}`);
-      }
-      
-      configSpinner.succeed()
-      
-      logger.log(
-        `${highlighter.success("Success!")} Added external sync units: ${unitsToAdd.join(", ")}`
-      )
-    } catch (error) {
-      logger.break()
-      handleError(error)
-    }
-  })
 
 // Show current configuration
 config
@@ -302,91 +150,9 @@ config
     }
   })
 
-// Regenerate types
-config
-  .command("types")
-  .description("regenerate TypeScript definition files")
-  .option(
-    "-c, --cwd <cwd>",
-    "the working directory. defaults to the current directory.",
-    process.cwd()
-  )
-  .action(async (opts) => {
-    try {
-      const cwd = path.resolve(opts.cwd)
 
-      // Check if project config exists
-      if (!(await hasSnapinConfig(cwd))) { 
-        logger.error("No project configuration found. Run 'init' first.") // Updated message
-        process.exit(1)
-      }
 
-      const configResult = await readSnapinConfig(cwd)
-      const config = configResult.validatedConfig; // Extract validatedConfig
-      if (!config) {
-        logger.error(`Failed to load project configuration. Cannot regenerate types. Error: ${configResult.error?.message}`) // Updated message
-        process.exit(1)
-      }
 
-      const typesSpinner = spinner("Regenerating TypeScript definitions...").start()
-      await generateTypeDefinitions(cwd, config)
-      typesSpinner.succeed()
-
-      logger.log(`${highlighter.success("Success!")} TypeScript definitions regenerated.`)
-    } catch (error) {
-      logger.break()
-      handleError(error)
-    }
-  })
-
-async function promptForDevRevObjects(
-  options: z.infer<typeof configOptionsSchema>
-): Promise<string[]> {
-  const configResult = await readSnapinConfig(options.cwd)
-  const config = configResult.validatedConfig; // Extract validatedConfig
-  if (!config) {
-    logger.warn(`Could not load project configuration to suggest DevRev objects. Error: ${configResult.error?.message}`);
-    return []
-  }
-
-  const existingObjects = new Set(config.devrevObjects || []) // Added fallback for optional array
-  const availableObjects = SUPPORTED_DEVREV_OBJECTS.filter(
-    obj => !existingObjects.has(obj)
-  )
-
-  if (availableObjects.length === 0) {
-    logger.warn("All supported DevRev objects are already configured.")
-    return []
-  }
-
-  const { objects } = await prompts({
-    type: "multiselect",
-    name: "objects",
-    message: "Which DevRev objects would you like to add?",
-    hint: "Space to select. A to toggle all. Enter to submit.",
-    choices: availableObjects.map(obj => ({
-      title: obj,
-      value: obj,
-      selected: false,
-    })),
-  })
-
-  return objects || []
-}
-
-async function promptForExternalSyncUnits(
-  options: z.infer<typeof configOptionsSchema>
-): Promise<string[]> {
-  const { units } = await prompts({
-    type: "list",
-    name: "units",
-    message: "Enter external sync units to add (comma-separated):",
-    initial: "",
-    separator: ",",
-  })
-
-  return units || []
-}
 
 /**
  * Update snapin.config.mjs fields based on CLI flags
@@ -442,7 +208,7 @@ async function updateConfigFields(opts: any): Promise<void> {
 
   // External system updates
   if (opts.name || opts.slug || opts.accessMethod || opts.documentationUrl || 
-      opts.apiBaseUrl || opts.testEndpoint || opts.addExternalObject?.length || 
+      opts.apiBaseUrl || opts.addExternalObject?.length || 
       opts.removeExternalObject?.length) {
     
     const externalSystemUpdate: any = {
@@ -454,7 +220,6 @@ async function updateConfigFields(opts: any): Promise<void> {
     if (opts.accessMethod) externalSystemUpdate.accessMethod = opts.accessMethod
     if (opts.documentationUrl) externalSystemUpdate.documentationUrl = opts.documentationUrl
     if (opts.apiBaseUrl) externalSystemUpdate.apiBaseUrl = opts.apiBaseUrl
-    if (opts.testEndpoint) externalSystemUpdate.testEndpoint = opts.testEndpoint
     
     updates.externalSystem = externalSystemUpdate
 
@@ -478,7 +243,7 @@ async function updateConfigFields(opts: any): Promise<void> {
   if (opts.connectionType || opts.connectionId || opts.authorizeUrl || opts.tokenUrl ||
       opts.grantType || opts.scope || opts.addScope?.length || opts.removeScope?.length ||
       opts.scopeDelimiter || opts.refreshUrl || opts.refreshMethod || opts.revokeUrl ||
-      opts.revokeMethod) {
+      opts.revokeMethod || opts.addHeader?.length || opts.removeHeader?.length || opts.setHeaders) {
     
     if (!updates.externalSystem) {
       updates.externalSystem = { ...currentConfig.externalSystem }
@@ -498,6 +263,7 @@ async function updateConfigFields(opts: any): Promise<void> {
           id: opts.connectionId || currentConnection.id || "",
           clientId: (currentConnection as any).clientId || "",
           clientSecret: (currentConnection as any).clientSecret || "",
+          headers: (currentConnection as any).headers || {},
           authorize: {
             url: opts.authorizeUrl || (currentConnection as any).authorize?.url || "",
             tokenUrl: opts.tokenUrl || (currentConnection as any).authorize?.tokenUrl || "",
@@ -529,11 +295,78 @@ async function updateConfigFields(opts: any): Promise<void> {
           
           (updates.externalSystem!.connection as any).authorize.scope = Array.from(currentScopes).join(' ')
         }
+
+        // Handle headers for OAuth2
+        if (opts.addHeader?.length || opts.removeHeader?.length || opts.setHeaders) {
+          let currentHeaders = { ...(currentConnection as any).headers } || {}
+          
+          if (opts.setHeaders) {
+            try {
+              currentHeaders = JSON.parse(opts.setHeaders)
+            } catch (error) {
+              logger.error("Invalid JSON format for --set-headers")
+              process.exit(1)
+            }
+          }
+          
+          if (opts.addHeader?.length) {
+            opts.addHeader.forEach((header: string) => {
+              const [key, ...valueParts] = header.split(':')
+              if (!key || valueParts.length === 0) {
+                logger.error(`Invalid header format: ${header}. Use key:value format.`)
+                process.exit(1)
+              }
+              currentHeaders[key.trim()] = valueParts.join(':').trim()
+            })
+          }
+          
+          if (opts.removeHeader?.length) {
+            opts.removeHeader.forEach((key: string) => {
+              delete currentHeaders[key.trim()]
+            })
+          }
+          
+          (updates.externalSystem!.connection as any).headers = currentHeaders
+        }
+
+        // Handle headers for OAuth2
+        if (opts.addHeader?.length || opts.removeHeader?.length || opts.setHeaders) {
+          let currentHeaders = { ...(currentConnection as any).headers } || {}
+          
+          if (opts.setHeaders) {
+            try {
+              currentHeaders = JSON.parse(opts.setHeaders)
+            } catch (error) {
+              logger.error("Invalid JSON format for --set-headers")
+              process.exit(1)
+            }
+          }
+          
+          if (opts.addHeader?.length) {
+            opts.addHeader.forEach((header: string) => {
+              const [key, ...valueParts] = header.split(':')
+              if (!key || valueParts.length === 0) {
+                logger.error(`Invalid header format: ${header}. Use key:value format.`)
+                process.exit(1)
+              }
+              currentHeaders[key.trim()] = valueParts.join(':').trim()
+            })
+          }
+          
+          if (opts.removeHeader?.length) {
+            opts.removeHeader.forEach((key: string) => {
+              delete currentHeaders[key.trim()]
+            })
+          }
+          
+          (updates.externalSystem!.connection as any).headers = currentHeaders
+        }
       } else {
         updates.externalSystem!.connection = {
           type: "secret",
           id: opts.connectionId || currentConnection.id || "",
           secretTransform: (currentConnection as any).secretTransform || "",
+          headers: (currentConnection as any).headers || {},
           tokenVerification: (currentConnection as any).tokenVerification || { url: "", method: "GET" },
           fields: (currentConnection as any).fields || [],
         }
@@ -573,6 +406,43 @@ async function updateConfigFields(opts: any): Promise<void> {
           oauthConnection.authorize.scope = Array.from(currentScopes).join(' ')
         }
       }
+    }
+
+    // Handle headers for both OAuth2 and Secret connections
+    if (opts.addHeader?.length || opts.removeHeader?.length || opts.setHeaders) {
+      if (!updates.externalSystem!.connection) {
+        updates.externalSystem!.connection = { ...currentConnection } as any
+      }
+      
+      let currentHeaders = (updates.externalSystem!.connection as any).headers ? { ...(updates.externalSystem!.connection as any).headers } : {}
+      
+      if (opts.setHeaders) {
+        try {
+          currentHeaders = JSON.parse(opts.setHeaders)
+        } catch (error) {
+          logger.error("Invalid JSON format for --set-headers")
+          process.exit(1)
+        }
+      }
+      
+      if (opts.addHeader?.length) {
+        opts.addHeader.forEach((header: string) => {
+          const [key, ...valueParts] = header.split(':')
+          if (!key || valueParts.length === 0) {
+            logger.error(`Invalid header format: ${header}. Use key:value format.`)
+            process.exit(1)
+          }
+          currentHeaders[key.trim()] = valueParts.join(':').trim()
+        })
+      }
+      
+      if (opts.removeHeader?.length) {
+        opts.removeHeader.forEach((key: string) => {
+          delete currentHeaders[key.trim()]
+        })
+      }
+      
+      (updates.externalSystem!.connection as any).headers = currentHeaders
     }
   }
 

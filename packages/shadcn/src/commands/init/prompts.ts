@@ -213,7 +213,7 @@ async function gatherAirdropProjectConfiguration(
   });
 
   let apiBaseUrl: string | undefined;
-  let testEndpoint: string | undefined;
+
   let sdkBaseUrl: string | undefined;
   let sdkPackages: string[] = [];
 
@@ -227,14 +227,7 @@ async function gatherAirdropProjectConfiguration(
     });
     apiBaseUrl = promptedApiBaseUrl;
 
-    const { promptedTestEndpoint } = await prompts({
-      type: "text",
-      name: "promptedTestEndpoint",
-      message: "Test endpoint for connection verification (relative to API base URL or absolute):",
-      initial: existingSnapInConfig?.externalSystem?.testEndpoint || existingManifestConfig?.externalSystem?.testEndpoint || "https://api.example.com/v1/me",
-      validate: (value) => value.trim().length > 0 || "Test endpoint is required",
-    });
-    testEndpoint = promptedTestEndpoint;
+
   } else if (accessMethod === "sdk") {
     const { promptedSdkBaseUrl } = await prompts({
       type: "text",
@@ -319,7 +312,7 @@ async function gatherAirdropProjectConfiguration(
       accessMethod,
       documentationUrl,
       apiBaseUrl: accessMethod === "api" ? apiBaseUrl! : "https://api.example.com/v1",
-      testEndpoint: accessMethod === "api" ? testEndpoint! : "https://api.example.com/v1/me",
+
       sdkBaseUrl: accessMethod === "sdk" ? sdkBaseUrl : undefined,
       sdkPackages: accessMethod === "sdk" ? sdkPackages : undefined,
       externalObjects: externalObjects,

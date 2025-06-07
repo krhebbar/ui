@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { add } from "@/src/commands/add"
 import { config } from "@/src/commands/config"
-import { info } from "@/src/commands/info"
 import { init } from "@/src/commands/init"
 import { mcp as registryMcp } from "@/src/commands/registry/mcp"
 import { Command } from "commander"
@@ -13,6 +12,8 @@ import { build } from "@/src/commands/build";
 import { release } from "@/src/commands/release";
 import { logs } from "@/src/commands/logs";
 import { createKeyring } from "@/src/commands/keyring";
+import { testConnection } from "@/src/commands/test-connection";
+import { types } from "@/src/commands/types";
 // New command group imports
 import { packageCommands } from "@/src/commands/package";
 import { contextCommands } from "@/src/commands/context";
@@ -36,7 +37,6 @@ async function main() {
     .addCommand(init)
     .addCommand(add)
     .addCommand(config)
-    .addCommand(info)
     // Register new commands
     .addCommand(doctor)
     .addCommand(dev)
@@ -44,6 +44,8 @@ async function main() {
     .addCommand(release)
     .addCommand(logs)
     .addCommand(createKeyring)
+    .addCommand(testConnection)
+    .addCommand(types)
     // Register new command groups
     .addCommand(packageCommands)
     .addCommand(contextCommands);
