@@ -82,7 +82,18 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
         slug: importItem.slug || "external-system",
         apiBaseUrl: "https://api.example.com/v1",
         testEndpoint: "https://api.example.com/v1/me",
-        supportedObjects: []
+        externalObjects: [],
+        accessMethod: "api" as const,
+        connection: {
+          type: "secret",
+          id: "external-system-secret",
+          secretTransform: "Bearer {token}",
+          tokenVerification: {
+            url: "https://api.example.com/v1/me",
+            method: "GET",
+          },
+          fields: [],
+        }
       };
     } else if (manifestData.keyring_types && manifestData.keyring_types[0]) {
       const keyringType = manifestData.keyring_types[0];
@@ -91,7 +102,18 @@ export async function readExistingManifest(cwd: string): Promise<Partial<Airdrop
         slug: manifestData.name?.toLowerCase().replace(/\s+/g, '-') || "external-system",
         apiBaseUrl: keyringType.api_base_url || "https://api.example.com/v1",
         testEndpoint: keyringType.token_verification?.url || "https://api.example.com/v1/me",
-        supportedObjects: []
+        externalObjects: [],
+        accessMethod: "api" as const,
+        connection: {
+          type: "secret",
+          id: "external-system-secret",
+          secretTransform: "Bearer {token}",
+          tokenVerification: {
+            url: keyringType.token_verification?.url || "https://api.example.com/v1/me",
+            method: "GET",
+          },
+          fields: [],
+        }
       };
     }
 
@@ -169,8 +191,9 @@ export async function getProjectState(cwd: string): Promise<{
 export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
   const envVars: Record<string, string> = {};
 
-  if (config.connection?.type === "oauth2") {
-    const oauthConnection = config.connection;
+  const connection = config.externalSystem?.connection;
+  if (connection?.type === "oauth2") {
+    const oauthConnection = connection;
     if (typeof oauthConnection.clientId === 'string') {
       const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
       if (clientIdMatch && clientIdMatch[1]) {
@@ -183,8 +206,8 @@ export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<s
         envVars[clientSecretMatch[1]] = "your-client-secret-here";
       }
     }
-  } else if (config.connection?.type === "secret") {
-    const secretConnection = config.connection as SecretConnection;
+  } else if (connection?.type === "secret") {
+    const secretConnection = connection as SecretConnection;
     if (secretConnection.tokenEnvVarName) {
       envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
     }
@@ -194,62 +217,78 @@ export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<s
 }
 
 /**
+ * Create minimal configuration for snap-in projects
+ * Only includes projectType and empty/default structure
+ */
+export function createMinimalSnapInConfig(): AirdropProjectConfig {
+  return {
+    projectType: "snap-in",
+    devrevObjects: [],
+    externalSystem: {
+      name: "",
+      slug: "",
+      apiBaseUrl: "",
+      testEndpoint: "",
+      externalObjects: [],
+      accessMethod: "api" as const,
+      connection: {
+        type: "secret",
+        id: "",
+        secretTransform: "",
+        tokenVerification: {
+          url: "",
+          method: "GET",
+        },
+        fields: [],
+      } as SecretConnection,
+    },
+  };
+}
+
+/**
  * Create default configuration for airdrop/snap-in projects
  */
 export function createDefaultAirdropConfig(projectType: 'airdrop' | 'snap-in' = 'airdrop'): AirdropProjectConfig {
+  // For snap-ins, use minimal config by default unless we're merging with existing
+  if (projectType === 'snap-in') {
+    return createMinimalSnapInConfig();
+  }
+
+  // For airdrop projects, create a more complete default config
   const baseConfig: AirdropProjectConfig = {
     projectType: projectType,
+    syncDirection: "two-way",
     externalSystem: {
-      name: projectType === 'snap-in' ? "External System" : "My External System",
-      slug: projectType === 'snap-in' ? "external-system" : "airdrop-my-external-system",
+      name: "My External System",
+      slug: "airdrop-my-external-system",
       apiBaseUrl: "https://api.example.com/v1",
       testEndpoint: "https://api.example.com/v1/me",
-      supportedObjects: [],
-    },
-    connection: {
-      type: "secret",
-      id: "external-system-secret",
-      secretTransform: "Bearer {token}",
-      tokenVerification: {
-        url: "https://api.example.com/v1/me",
-        method: "GET",
-      },
-      fields: [
-        {
-          id: "token",
-          name: "API Token",
-          description: "Your API token for the external system",
+      externalObjects: [],
+      accessMethod: "api" as const,
+      connection: {
+        type: "oauth2",
+        id: "airdrop-oauth2",
+        clientId: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_ID",
+        clientSecret: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_SECRET",
+        authorize: {
+          url: "https://api.example.com/v1/oauth/authorize",
+          tokenUrl: "https://api.example.com/v1/oauth/token",
+          grantType: "authorization_code",
+          scope: "read write api",
+          scopeDelimiter: " ",
         },
-      ],
-      tokenEnvVarName: "EXTERNAL_SYSTEM_TOKEN",
-    } as SecretConnection,
+        refresh: {
+          url: "https://api.example.com/v1/oauth/token",
+          method: "POST",
+        },
+        revoke: {
+          url: "https://api.example.com/v1/oauth/revoke",
+          method: "POST",
+        },
+      } as OAuth2Connection,
+    },
     devrevObjects: ["account"],
   };
-
-  if (projectType === 'airdrop') {
-    baseConfig.syncDirection = "two-way";
-    baseConfig.connection = {
-      type: "oauth2",
-      id: "airdrop-oauth2",
-      clientId: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_ID",
-      clientSecret: "process.env.AIRDROP_MY_EXTERNAL_SYSTEM_CLIENT_SECRET",
-      authorize: {
-        url: "https://api.example.com/v1/oauth/authorize",
-        tokenUrl: "https://api.example.com/v1/oauth/token",
-        grantType: "authorization_code",
-        scope: "read write api",
-        scopeDelimiter: " ",
-      },
-      refresh: {
-        url: "https://api.example.com/v1/oauth/token",
-        method: "POST",
-      },
-      revoke: {
-        url: "https://api.example.com/v1/oauth/revoke",
-        method: "POST",
-      },
-    } as OAuth2Connection;
-  }
 
   return baseConfig;
 }

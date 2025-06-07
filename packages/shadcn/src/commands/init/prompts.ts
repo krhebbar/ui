@@ -267,7 +267,7 @@ async function gatherAirdropProjectConfiguration(
 
   // Connection type
   let connectionTypeResolved: 'oauth2' | 'secret';
-  const existingConnectionType = existingSnapInConfig?.connection?.type || existingManifestConfig?.connection?.type;
+  const existingConnectionType = existingSnapInConfig?.externalSystem?.connection?.type || existingManifestConfig?.externalSystem?.connection?.type;
 
   if (options.authType) {
     connectionTypeResolved = options.authType === 'oauth' ? 'oauth2' : 'secret';
@@ -303,9 +303,9 @@ async function gatherAirdropProjectConfiguration(
   let connection: OAuth2Connection | SecretConnection;
 
   if (connectionTypeResolved === "oauth2") {
-    connection = await gatherOAuth2Configuration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection, options);
+    connection = await gatherOAuth2Configuration(externalSystemSlug, existingSnapInConfig?.externalSystem?.connection, existingManifestConfig?.externalSystem?.connection, options);
   } else {
-    connection = await gatherSecretConfiguration(externalSystemSlug, existingSnapInConfig?.connection, existingManifestConfig?.connection, options);
+    connection = await gatherSecretConfiguration(externalSystemSlug, existingSnapInConfig?.externalSystem?.connection, existingManifestConfig?.externalSystem?.connection, options);
   }
 
   const config: AirdropProjectConfig & { 
@@ -320,8 +320,8 @@ async function gatherAirdropProjectConfiguration(
       slug: externalSystemSlug,
       accessMethod,
       documentationUrl,
-      apiBaseUrl: accessMethod === "api" ? apiBaseUrl : undefined,
-      testEndpoint: accessMethod === "api" ? testEndpoint : undefined,
+      apiBaseUrl: accessMethod === "api" ? apiBaseUrl! : "https://api.example.com/v1",
+      testEndpoint: accessMethod === "api" ? testEndpoint! : "https://api.example.com/v1/me",
       sdkBaseUrl: accessMethod === "sdk" ? sdkBaseUrl : undefined,
       sdkPackages: accessMethod === "sdk" ? sdkPackages : undefined,
       externalObjects: externalObjects,

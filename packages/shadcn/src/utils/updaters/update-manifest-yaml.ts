@@ -183,7 +183,7 @@ function applySurgicalUpdates(manifestContent: string, config: AirdropProjectCon
   }
   
   // 5. Smart keyring_types updates (only if section exists)
-  if (config.connection && config.externalSystem && updatedContent.includes('keyring_types:')) {
+  if (config.externalSystem?.connection && config.externalSystem && updatedContent.includes('keyring_types:')) {
     updatedContent = updateKeyringTypes(updatedContent, config, connectionId);
   }
   
@@ -266,7 +266,7 @@ function updateYamlNestedField(content: string, parentField: string, childField:
  */
 function updateKeyringTypes(content: string, config: AirdropProjectConfig, connectionId: string): string {
   const systemName = config.externalSystem?.name || 'External System';
-  const connectionType = config.connection?.type || 'secret';
+  const connectionType = config.externalSystem?.connection?.type || 'secret';
   
   // Generate the complete keyring_types block based on connection type
   const newKeyringTypesBlock = generateKeyringTypesBlock(config, connectionId);
@@ -301,7 +301,7 @@ function updateKeyringTypes(content: string, config: AirdropProjectConfig, conne
  */
 function generateKeyringTypesBlock(config: AirdropProjectConfig, connectionId: string): string {
   const systemName = config.externalSystem?.name || 'External System';
-  const connectionType = config.connection?.type || 'secret';
+  const connectionType = config.externalSystem?.connection?.type || 'secret';
   const systemSlug = toKebabCase(systemName);
   
   if (connectionType === 'oauth2') {
@@ -315,7 +315,7 @@ function generateKeyringTypesBlock(config: AirdropProjectConfig, connectionId: s
  * Generate OAuth2 keyring_types block
  */
 function generateOAuth2KeyringBlock(config: AirdropProjectConfig, connectionId: string, systemName: string, systemSlug: string): string {
-  const connection = config.connection as any; // OAuth2Connection type
+  const connection = config.externalSystem?.connection as any; // OAuth2Connection type
   const authUrl = connection.authorize?.url || `https://${systemSlug}.com/oauth/authorize`;
   const tokenUrl = connection.authorize?.tokenUrl || `https://${systemSlug}.com/oauth/token`;
   const scope = connection.authorize?.scope || 'read_api api';
@@ -372,7 +372,7 @@ function generateOAuth2KeyringBlock(config: AirdropProjectConfig, connectionId: 
  * Generate Secret keyring_types block
  */
 function generateSecretKeyringBlock(config: AirdropProjectConfig, connectionId: string, systemName: string, systemSlug: string): string {
-  const connection = config.connection as any; // SecretConnection type
+  const connection = config.externalSystem?.connection as any; // SecretConnection type
   const secretTransform = connection.secretTransform || 'Bearer {token}';
   const testEndpoint = config.externalSystem?.testEndpoint || `https://api.${systemSlug}.com/v1/me`;
   const isSubdomain = config.externalSystem?.apiBaseUrl?.includes('[SUBDOMAIN]') || false;
