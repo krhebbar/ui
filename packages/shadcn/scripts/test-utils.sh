@@ -81,7 +81,7 @@ run_with_timeout() {
 # Usage: setup_test_environment <TEST_DIR_NAME>
 setup_test_environment() {
     local test_dir_name="$1"
-    export TEST_DIR="/tmp/$test_dir_name-$(date +%s)" # Export TEST_DIR so it's available to calling script
+    export TEST_DIR="/Users/ravi/code/test/$test_dir_name-$(date +%s)" # Export TEST_DIR so it's available to calling script
 
     log_info "Setting up test environment for ${test_dir_name}..."
 

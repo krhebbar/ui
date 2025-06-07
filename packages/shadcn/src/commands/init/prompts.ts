@@ -78,7 +78,7 @@ export async function gatherAirdropConfiguration(
   let projectType: 'airdrop' | 'snap-in';
 
   if (options.projectType) {
-    projectType = options.projectType;
+    projectType = options.projectType as 'airdrop' | 'snap-in';
     logger.info(`Project type determined by --projectType flag: ${projectType}`);
   } else if (isInitialized && (existingManifestConfig?.projectType || existingSnapInConfig?.projectType)) {
     // Use existing project type for initialized projects
