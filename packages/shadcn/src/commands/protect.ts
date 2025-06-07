@@ -4,7 +4,7 @@ import { handleError } from "@/src/utils/handle-error"
 import { highlighter } from "@/src/utils/highlighter"
 import { logger } from "@/src/utils/logger"
 import { spinner } from "@/src/utils/spinner"
-import { PROTECTED_FILES } from "@/src/config/protect-files"
+import { PROTECTED_FILES } from "@/src/utils/file-protection/protect-files"
 import { makeReadOnly, makeWritable, getProtectionStatus } from "@/src/utils/protect"
 import { updateVSCodeReadonlySettings, hasVSCodeSettings } from "@/src/utils/vscode-settings"
 
@@ -23,10 +23,11 @@ export const protect = new Command()
   .action(async (opts) => {
     try {
       const cwd = path.resolve(opts.cwd)
+      const protectedFiles = [...PROTECTED_FILES] // Convert readonly to mutable array
       
       // Show status if requested
       if (opts.status) {
-        const status = getProtectionStatus(PROTECTED_FILES, cwd)
+        const status = getProtectionStatus(protectedFiles, cwd)
         
         logger.info("📊 File Protection Status:")
         logger.break()
@@ -86,13 +87,13 @@ export const protect = new Command()
 
       // Apply file system protection
       const result = enableProtection 
-        ? makeReadOnly(PROTECTED_FILES, cwd)
-        : makeWritable(PROTECTED_FILES, cwd)
+        ? makeReadOnly(protectedFiles, cwd)
+        : makeWritable(protectedFiles, cwd)
 
       // Update VS Code settings unless skipped
       let vscodeResult = { success: true }
       if (!opts.skipVscode) {
-        vscodeResult = updateVSCodeReadonlySettings(PROTECTED_FILES, cwd, enableProtection)
+        vscodeResult = updateVSCodeReadonlySettings(protectedFiles, cwd, enableProtection)
       }
 
       protectSpinner.succeed()
@@ -123,7 +124,7 @@ export const protect = new Command()
         if (vscodeResult.success) {
           logger.info(`${highlighter.success("VS Code:")} settings updated successfully`)
         } else {
-          logger.warn(`${highlighter.warn("VS Code:")} ${vscodeResult.error}`)
+          logger.warn(`${highlighter.warn("VS Code:")} ${'error' in vscodeResult ? vscodeResult.error : 'Unknown error'}`)
         }
       }
 

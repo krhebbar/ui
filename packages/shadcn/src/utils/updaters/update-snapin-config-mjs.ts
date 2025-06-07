@@ -59,7 +59,6 @@ export async function updateSnapinConfigFile(
 
       // Check operational URLs for "example.com"
       if (es.apiBaseUrl?.includes("example.com")) complete = false
-      if (es.testEndpoint?.includes("example.com")) complete = false
       if (es.documentationUrl?.includes("example.com")) complete = false // Also check documentationUrl
 
       if (es.accessMethod === "sdk") {

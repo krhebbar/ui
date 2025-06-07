@@ -372,7 +372,7 @@ function generateOAuth2KeyringBlock(config: AirdropProjectConfig, connectionId: 
 function generateSecretKeyringBlock(config: AirdropProjectConfig, connectionId: string, systemName: string, systemSlug: string): string {
   const connection = config.externalSystem?.connection as any; // SecretConnection type
   const secretTransform = connection.secretTransform || 'Bearer {token}';
-  const testEndpoint = config.externalSystem?.testEndpoint || `https://api.${systemSlug}.com/v1/me`;
+  const testEndpoint = `https://api.${systemSlug}.com/v1/me`;
   const isSubdomain = config.externalSystem?.apiBaseUrl?.includes('[SUBDOMAIN]') || false;
   
   // Extract the base64 encoding pattern if it exists
