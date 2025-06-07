@@ -41,28 +41,33 @@ export const secretConnectionSchema = z.object({
       description: z.string(),
     })
   ),
-  tokenEnvVarName: z.string().optional(), // New field
+  tokenEnvVarName: z.string().optional(),
 })
 
 export const connectionSchema = z.union([oAuth2ConnectionSchema, secretConnectionSchema])
 
-// External system schema
+// External system schema - updated to match the modern interface
 export const externalSystemSchema = z.object({
   name: z.string(),
   slug: z.string(),
   apiBaseUrl: z.string(),
   testEndpoint: z.string(),
-  supportedObjects: z.array(z.string()),
+  externalObjects: z.array(z.string()), // Renamed from supportedObjects
+  accessMethod: z.enum(["sdk", "api"]),
+  isComplete: z.boolean().optional(),
+  documentationUrl: z.string().optional(),
+  sdkBaseUrl: z.string().optional(),
+  sdkPackages: z.array(z.string()).optional(),
+  connection: connectionSchema, // Moved inside externalSystem
 })
 
-// Main airdrop config schema
+// Main airdrop config schema - updated structure
 export const airdropConfigSchema = z.object({
   projectType: z.enum(["airdrop", "snap-in"]),
   syncDirection: z.enum(["one-way", "two-way"]).optional(),
   devrevObjects: z.array(z.string()),
   externalSyncUnits: z.array(z.string()).optional(),
   externalSystem: externalSystemSchema.optional(),
-  connection: connectionSchema.optional(), 
   devrevPatEnvVarName: z.string().optional(), 
   devrevOrgEnvVarName: z.string().optional(),
 })

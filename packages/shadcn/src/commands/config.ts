@@ -239,8 +239,8 @@ config
         logger.info(`${highlighter.info("External System:")} ${config.externalSystem.name} (${config.externalSystem.slug})`)
         logger.info(`${highlighter.info("API Base URL:")} ${config.externalSystem.apiBaseUrl}`)
       }
-      if (config.connection) {
-        logger.info(`${highlighter.info("Connection Type:")} ${config.connection.type}`)
+          if (config.externalSystem?.connection) {
+      logger.info(`${highlighter.info("Connection Type:")} ${config.externalSystem.connection.type}`)
       }
       
       logger.break()

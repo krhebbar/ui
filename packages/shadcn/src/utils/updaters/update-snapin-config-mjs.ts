@@ -43,8 +43,39 @@ export async function updateSnapinConfigFile(
       return;
     }
 
-    const updatedConfig = existingConfig ? { ...existingConfig, ...patch } : patch as AirdropProjectConfig;
+    let mergedConfig = existingConfig ? { ...existingConfig, ...patch } : patch as AirdropProjectConfig;
     
+    // Compute isComplete for externalSystem if it exists
+    if (mergedConfig.externalSystem) {
+      let complete = true;
+      const es = mergedConfig.externalSystem;
+
+      // Check operational URLs for "example.com"
+      if (es.apiBaseUrl?.includes("example.com")) complete = false;
+      if (es.testEndpoint?.includes("example.com")) complete = false;
+      if (es.documentationUrl?.includes("example.com")) complete = false; // Also check documentationUrl
+
+      if (es.accessMethod === "sdk") {
+        // For SDK access, sdkBaseUrl must exist and not be an example.com URL
+        if (!es.sdkBaseUrl || es.sdkBaseUrl.includes("example.com")) complete = false;
+      }
+
+      // Check connection details if they exist
+      if (es.connection) {
+        if (es.connection.type === "oauth2") {
+          if (es.connection.authorize?.url?.includes("example.com")) complete = false;
+          if (es.connection.authorize?.tokenUrl?.includes("example.com")) complete = false;
+          if (es.connection.refresh?.url?.includes("example.com")) complete = false;
+          if (es.connection.revoke?.url?.includes("example.com")) complete = false;
+        }
+        // No specific "example.com" checks for 'secret' type connection,
+        // as it primarily relies on env vars.
+      }
+      es.isComplete = complete;
+    }
+
+    const updatedConfig = mergedConfig; // mergedConfig now contains isComplete
+
     // Validate the updated config if requested
     if (options.validate) {
       airdropConfigSchema.parse(updatedConfig);

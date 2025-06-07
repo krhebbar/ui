@@ -195,45 +195,30 @@ function toPascalCase(str: string): string {
 }
 
 /**
- * Copy the airdrop-config.ts types to the project types directory
+ * Copy the snapin configuration types to the project types directory
+ * This references the consolidated schema instead of duplicating definitions
  */
 export async function copyConfigTypes(cwd: string): Promise<void> {
   const typesDir = path.join(cwd, "types")
   await fs.mkdir(typesDir, { recursive: true })
 
-  // Generate snapin configuration types directly
-  const targetConfigPath = path.join(typesDir, "snapin-config.ts") // Renamed filename
+  // Generate snapin configuration types that reference the consolidated schema
+  const targetConfigPath = path.join(typesDir, "snapin-config.ts")
   
-  // Generate a complete airdrop configuration types file
-  const configTypes = `// Airdrop configuration types
-export interface AirdropProjectConfig {
-  projectType: "airdrop" | "snap-in";
-  syncDirection?: "one-way" | "two-way";
-  devrevObjects: string[]; // This is not optional in Zod, can be empty
-  externalSyncUnits?: string[];
-  externalSystem?: {
-    name: string;
-    slug: string;
-    apiBaseUrl: string;
-    testEndpoint: string;
-    supportedObjects: string[];
-  };
-  connection?: {
-    type: string; // If connection object exists, type is mandatory
-    id: string;
-    clientId?: string;
-    clientSecret?: string;
-    authorize?: { url: string; tokenUrl: string; grantType: string; scope: string; scopeDelimiter: string; };
-    refresh?: { url: string; method: string; };
-    revoke?: { url: string; method: string; };
-    isSubdomain?: boolean;
-    subdomain?: string;
-    secretTransform?: string;
-    tokenVerification?: { url: string; method: string; headers?: Record<string, string>; };
-    fields?: Array<{ id: string; name: string; description: string; }>;
-    [key: string]: any;
-  };
-}
+  // Export the types from the consolidated schema
+  const configTypes = `// Airdrop configuration types - references consolidated schema
+// This file is auto-generated and references the single source of truth
+
+export type {
+  AirdropProjectConfig,
+  OAuth2Connection,
+  SecretConnection,
+  Connection,
+  ExternalSystem,
+  SupportedDevRevObject
+} from '../src/types/snapin-config'
+
+export { SUPPORTED_DEVREV_OBJECTS } from '../src/types/snapin-config'
 `
   await fs.writeFile(targetConfigPath, configTypes, "utf8")
 } 

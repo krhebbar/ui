@@ -159,8 +159,9 @@ export async function validateEnvFile(
   }
 
   // Check connection-specific variables
-  if (config.connection?.type === "oauth2") {
-    const oauthConnection = config.connection;
+  const connection = config.externalSystem?.connection;
+  if (connection?.type === "oauth2") {
+    const oauthConnection = connection;
     if (typeof oauthConnection.clientId === 'string') {
       const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
       if (clientIdMatch?.[1]) {
@@ -183,8 +184,8 @@ export async function validateEnvFile(
         }
       }
     }
-  } else if (config.connection?.type === "secret") {
-    const secretConnection = config.connection as SecretConnection;
+  } else if (connection?.type === "secret") {
+    const secretConnection = connection as SecretConnection;
     if (secretConnection.tokenEnvVarName) {
       const tokenEnvVar = secretConnection.tokenEnvVarName;
       if (!envValues[tokenEnvVar] || 
@@ -209,8 +210,9 @@ export async function validateEnvFile(
 export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
   const envVars: Record<string, string> = {};
 
-  if (config.connection?.type === "oauth2") {
-    const oauthConnection = config.connection;
+  const connection = config.externalSystem?.connection;
+  if (connection?.type === "oauth2") {
+    const oauthConnection = connection;
     if (typeof oauthConnection.clientId === 'string') {
       const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
       if (clientIdMatch?.[1]) {
@@ -223,8 +225,8 @@ export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<s
         envVars[clientSecretMatch[1]] = "your-client-secret-here";
       }
     }
-  } else if (config.connection?.type === "secret") {
-    const secretConnection = config.connection as SecretConnection;
+  } else if (connection?.type === "secret") {
+    const secretConnection = connection as SecretConnection;
     if (secretConnection.tokenEnvVarName) {
       envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
     }
