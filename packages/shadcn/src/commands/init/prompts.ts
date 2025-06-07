@@ -193,30 +193,77 @@ async function gatherAirdropProjectConfiguration(
     validate: (value) => /^[a-z0-9-]+$/.test(value) || "Slug must be kebab-case (lowercase, hyphens only)",
   });
 
-  const { apiBaseUrl } = await prompts({
-    type: "text",
-    name: "apiBaseUrl",
-    message: "API base URL for the external system:",
-    initial: existingSnapInConfig?.externalSystem?.apiBaseUrl || existingManifestConfig?.externalSystem?.apiBaseUrl || "https://api.example.com/v1",
-    validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
+  // Access method
+  const { accessMethod } = await prompts({
+    type: "select",
+    name: "accessMethod",
+    message: "How will this system be accessed?",
+    choices: [
+      { title: "API", value: "api" },
+      { title: "SDK", value: "sdk" },
+    ],
+    initial: existingSnapInConfig?.externalSystem?.accessMethod === "sdk" || existingManifestConfig?.externalSystem?.accessMethod === "sdk" ? 1 : 0,
   });
 
-  const { testEndpoint } = await prompts({
+  // Documentation URL
+  const { documentationUrl } = await prompts({
     type: "text",
-    name: "testEndpoint",
-    message: "Test endpoint for connection verification (relative to API base URL or absolute):",
-    initial: existingSnapInConfig?.externalSystem?.testEndpoint || existingManifestConfig?.externalSystem?.testEndpoint || "https://api.example.com/v1/me",
-    validate: (value) => value.trim().length > 0 || "Test endpoint is required",
+    name: "documentationUrl",
+    message: "Documentation URL for the external system (optional):",
+    initial: existingSnapInConfig?.externalSystem?.documentationUrl || existingManifestConfig?.externalSystem?.documentationUrl || "https://docs.example.com",
+    validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
   });
 
-  const { objectTypesString } = await prompts({
+  let apiBaseUrl: string | undefined;
+  let testEndpoint: string | undefined;
+  let sdkBaseUrl: string | undefined;
+  let sdkPackages: string[] = [];
+
+  if (accessMethod === "api") {
+    const { promptedApiBaseUrl } = await prompts({
+      type: "text",
+      name: "promptedApiBaseUrl",
+      message: "API base URL for the external system:",
+      initial: existingSnapInConfig?.externalSystem?.apiBaseUrl || existingManifestConfig?.externalSystem?.apiBaseUrl || "https://api.example.com/v1",
+      validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
+    });
+    apiBaseUrl = promptedApiBaseUrl;
+
+    const { promptedTestEndpoint } = await prompts({
+      type: "text",
+      name: "promptedTestEndpoint",
+      message: "Test endpoint for connection verification (relative to API base URL or absolute):",
+      initial: existingSnapInConfig?.externalSystem?.testEndpoint || existingManifestConfig?.externalSystem?.testEndpoint || "https://api.example.com/v1/me",
+      validate: (value) => value.trim().length > 0 || "Test endpoint is required",
+    });
+    testEndpoint = promptedTestEndpoint;
+  } else if (accessMethod === "sdk") {
+    const { promptedSdkBaseUrl } = await prompts({
+      type: "text",
+      name: "promptedSdkBaseUrl",
+      message: "SDK base URL for the external system (optional, can be same as API base if applicable):",
+      initial: existingSnapInConfig?.externalSystem?.sdkBaseUrl || existingManifestConfig?.externalSystem?.sdkBaseUrl || "https://api.example.com/v1",
+      validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
+    });
+    sdkBaseUrl = promptedSdkBaseUrl;
+
+    const { sdkPackagesString } = await prompts({
+      type: "text",
+      name: "sdkPackagesString",
+      message: "Enter SDK package names (e.g., @scope/package-name, another-package, comma-separated):",
+      initial: existingSnapInConfig?.externalSystem?.sdkPackages?.join(", ") || existingManifestConfig?.externalSystem?.sdkPackages?.join(", ") || "",
+    });
+    sdkPackages = sdkPackagesString ? sdkPackagesString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+  }
+
+  const { externalObjectsString } = await prompts({
     type: "text",
-    name: "objectTypesString",
+    name: "externalObjectsString",
     message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
-    initial: existingSnapInConfig?.externalSystem?.supportedObjects?.join(", ") || existingManifestConfig?.externalSystem?.supportedObjects?.join(", ") || "",
+    initial: existingSnapInConfig?.externalSystem?.externalObjects?.join(", ") || existingManifestConfig?.externalSystem?.externalObjects?.join(", ") || "",
   });
 
-  const objectTypes = objectTypesString ? objectTypesString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+  const externalObjects = externalObjectsString ? externalObjectsString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
 
   // Connection type
   let connectionTypeResolved: 'oauth2' | 'secret';
@@ -271,11 +318,15 @@ async function gatherAirdropProjectConfiguration(
     externalSystem: {
       name: externalSystemName,
       slug: externalSystemSlug,
-      apiBaseUrl,
-      testEndpoint,
-      supportedObjects: objectTypes,
+      accessMethod,
+      documentationUrl,
+      apiBaseUrl: accessMethod === "api" ? apiBaseUrl : undefined,
+      testEndpoint: accessMethod === "api" ? testEndpoint : undefined,
+      sdkBaseUrl: accessMethod === "sdk" ? sdkBaseUrl : undefined,
+      sdkPackages: accessMethod === "sdk" ? sdkPackages : undefined,
+      externalObjects: externalObjects,
+      connection: connection, // Connection object is now nested
     },
-    connection,
     devrevObjects,
     projectName: airdropProjectNameResolved, // This is often used for directory creation
     projectTypeFromPrompt: "airdrop",
