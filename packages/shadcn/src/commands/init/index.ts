@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { exec } from "child_process";
+import { promisify } from "util";
+import { promises as fs } from "fs";
+import path from "path";
 import prompts from "prompts";
 import { addItems } from "../../utils/add-item";
 import { preFlightInit } from "../../preflights/preflight-init";
@@ -27,6 +31,9 @@ import {
   logValidationResults,
   extractEnvVarsFromConfig
 } from "../../utils/updaters/update-config-files";
+
+// Promisify exec for async execution
+const execAsync = promisify(exec);
 
 /**
  * Main init command orchestrator
@@ -129,6 +136,11 @@ export async function runInit(
     }
   }
 
+  // Run npm install for new projects
+  if (options.isNewProject) {
+    await runNpmInstall(options.cwd, options.silent);
+  }
+
   return null;
 }
 
@@ -196,12 +208,18 @@ async function handleNewProjectSetup(
   const shouldCloneTemplate = 
     airdropConfigResult.selectedSnapInTemplateName || 
     airdropConfigResult.projectTypeFromPrompt === 'airdrop';
-    
+  
   if (shouldCloneTemplate) {
+    // For airdrop projects, pass the project type directly to clone the airdrop template
+    // For snap-in projects, pass the specific template name
+    const templateNameToUse = airdropConfigResult.projectTypeFromPrompt === 'airdrop' 
+      ? undefined  // Let cloneProjectTemplate use default airdrop template
+      : airdropConfigResult.selectedSnapInTemplateName;
+      
     const cloneSuccess = await cloneProjectTemplate(
       airdropConfigResult.projectTypeFromPrompt,
       options.cwd,
-      airdropConfigResult.selectedSnapInTemplateName
+      templateNameToUse
     );
 
     if (!cloneSuccess) {
@@ -293,4 +311,42 @@ async function generateProjectFiles(
   const projectTypeLabel = airdropConfigResult.projectTypeFromPrompt === 'airdrop' ? 'Airdrop' : 'Snap-in';
   logger.success(`Success! ${projectTypeLabel} project initialization completed.`);
   logger.info("You may now add items.");
+}
+
+/**
+ * Run npm install in the code directory
+ */
+async function runNpmInstall(cwd: string, silent: boolean): Promise<void> {
+  const execAsync = promisify(exec);
+  const codeDir = path.join(cwd, "code");
+  
+  // Check if code directory exists
+  try {
+    await fs.access(codeDir);
+  } catch {
+    if (!silent) {
+      logger.warn("Code directory not found, skipping npm install");
+    }
+    return;
+  }
+  
+  if (!silent) {
+    const installSpinner = spinner("Installing dependencies with npm install in code/...").start();
+    
+    try {
+      await execAsync("npm install", { cwd: codeDir });
+      installSpinner.succeed("Dependencies installed successfully in code/ directory!");
+    } catch (error) {
+      installSpinner.fail("Failed to install dependencies in code/ directory");
+      logger.warn(`npm install failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      logger.info("You can run 'npm install' manually in the code/ directory.");
+    }
+  } else {
+    try {
+      await execAsync("npm install", { cwd: codeDir });
+      logger.info("Dependencies installed successfully in code/ directory");
+    } catch (error) {
+      logger.warn(`npm install failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 } 

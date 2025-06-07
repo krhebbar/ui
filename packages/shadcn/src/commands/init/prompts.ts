@@ -44,9 +44,11 @@ export async function gatherAirdropConfiguration(
     existingSnapInConfig = await readExistingSnapinConfig(options.cwd);
   }
 
-  if (options.silent || options.yes) {
-    // Return configuration for silent mode
-    const projectType = autoDetectedType || existingManifestConfig?.projectType || existingSnapInConfig?.projectType || 'snap-in';
+  if (options.silent) {
+    // Return configuration for silent mode (but not --yes mode, which should still process flags)
+    // Give precedence to explicit --project-type flag, then auto-detection, then existing config
+    const projectTypeFromFlag = options.projectType === 'snapin' ? 'snap-in' : options.projectType as 'airdrop' | 'snap-in' | undefined;
+    const projectType = projectTypeFromFlag || autoDetectedType || existingManifestConfig?.projectType || existingSnapInConfig?.projectType || 'snap-in';
     const defaultConfig = createDefaultAirdropConfig(projectType);
     
     // Merge existing configurations if available
@@ -76,8 +78,10 @@ export async function gatherAirdropConfiguration(
   let projectType: 'airdrop' | 'snap-in';
 
   if (options.projectType) {
-    projectType = options.projectType as 'airdrop' | 'snap-in';
-    logger.info(`Project type determined by --projectType flag: ${projectType}`);
+    // Handle both "snapin" and "snap-in" for backward compatibility
+    const projectTypeInput = options.projectType;
+    projectType = projectTypeInput === 'snapin' ? 'snap-in' : projectTypeInput as 'airdrop' | 'snap-in';
+    logger.info(`Project type determined by --project-type flag: ${projectType}`);
   } else if (isInitialized && (existingManifestConfig?.projectType || existingSnapInConfig?.projectType)) {
     // Use existing project type for initialized projects
     projectType = existingManifestConfig?.projectType || existingSnapInConfig?.projectType || 'snap-in';
@@ -112,6 +116,10 @@ export async function gatherAirdropConfiguration(
       }
       // If options.yes is true with autoDetectedType, we proceed with autoDetectedType
     }
+  } else if (options.yes) {
+    // Default to 'airdrop' when --yes is used without explicit project type
+    projectType = 'airdrop';
+    logger.info(`Defaulting to airdrop project type with --yes flag`);
   } else {
     // Manual project type selection if no flag, not initialized, and no auto-detection
     const response = await prompts({
@@ -146,11 +154,14 @@ async function gatherAirdropProjectConfiguration(
   projectTypeFromPrompt?: 'airdrop' | 'snap-in'; 
   airdropProjectName?: string; 
 }> {
-  // Project name
+  // Project name - auto-generate from external system name if provided
   let airdropProjectNameResolved: string;
-  if (options.projectName) {
+  if (options.externalSystemName) {
+    airdropProjectNameResolved = `airdrop-${options.externalSystemName.toLowerCase().replace(/\s+/g, "-")}`;
+    logger.info(`Auto-generated Airdrop project name from --external-system-name flag: ${airdropProjectNameResolved}`);
+  } else if (options.projectName) {
     airdropProjectNameResolved = options.projectName;
-    logger.info(`Using Airdrop project name from --projectName flag: ${airdropProjectNameResolved}`);
+    logger.info(`Using Airdrop project name from --project-name flag: ${airdropProjectNameResolved}`);
   } else {
     const { airdropProjectName: promptedName } = await prompts({
       type: "text",
@@ -163,54 +174,90 @@ async function gatherAirdropProjectConfiguration(
   }
 
   // Sync direction
-  const { syncDirection } = await prompts({
-    type: "select",
-    name: "syncDirection",
-    message: "What sync direction do you need for this Airdrop project?",
-    choices: [
-      { title: "Two-way sync", value: "two-way" },
-      { title: "One-way sync", value: "one-way" },
-    ],
-    initial: existingSnapInConfig?.syncDirection === "one-way" || existingManifestConfig?.syncDirection === "one-way" ? 1 : 0,
-  });
+  let syncDirection: "one-way" | "two-way";
+  if (options.syncDirection) {
+    syncDirection = options.syncDirection;
+    logger.info(`Using sync direction from --sync-direction flag: ${syncDirection}`);
+  } else {
+    const { syncDirection: promptedSyncDirection } = await prompts({
+      type: "select",
+      name: "syncDirection",
+      message: "What sync direction do you need for this Airdrop project?",
+      choices: [
+        { title: "Two-way sync", value: "two-way" },
+        { title: "One-way sync", value: "one-way" },
+      ],
+      initial: existingSnapInConfig?.syncDirection === "one-way" || existingManifestConfig?.syncDirection === "one-way" ? 1 : 0,
+    });
+    syncDirection = promptedSyncDirection;
+  }
 
   // External system details
-  const { externalSystemName } = await prompts({
-    type: "text",
-    name: "externalSystemName",
-    message: "What is the name of your external system (e.g., Notion, Jira)?",
-    initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "Enter your external system name",
-    validate: (value) => value.trim().length > 0 || "External system name is required",
-  });
+  let externalSystemName: string;
+  if (options.externalSystemName) {
+    externalSystemName = options.externalSystemName;
+    logger.info(`Using external system name from --external-system-name flag: ${externalSystemName}`);
+  } else {
+    const { externalSystemName: promptedName } = await prompts({
+      type: "text",
+      name: "externalSystemName",
+      message: "What is the name of your external system (e.g., Notion, Jira)?",
+      initial: existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name || "Enter your external system name",
+      validate: (value) => value.trim().length > 0 || "External system name is required",
+    });
+    externalSystemName = promptedName;
+  }
 
-  const { externalSystemSlug } = await prompts({
-    type: "text",
-    name: "externalSystemSlug",
-    message: "External system slug (machine-readable, kebab-case):",
-    initial: existingSnapInConfig?.externalSystem?.slug || existingManifestConfig?.externalSystem?.slug || `airdrop-${externalSystemName.toLowerCase().replace(/\s+/g, "-")}`,
-    validate: (value) => /^[a-z0-9-]+$/.test(value) || "Slug must be kebab-case (lowercase, hyphens only)",
-  });
+  // Auto-generate slug from external system name when using --yes flag
+  let externalSystemSlug: string;
+  if (options.yes || options.silent) {
+    externalSystemSlug = existingSnapInConfig?.externalSystem?.slug || existingManifestConfig?.externalSystem?.slug || `airdrop-${externalSystemName.toLowerCase().replace(/\s+/g, "-")}`;
+    logger.info(`Auto-generated external system slug: ${externalSystemSlug}`);
+  } else {
+    const { externalSystemSlug: promptedSlug } = await prompts({
+      type: "text",
+      name: "externalSystemSlug",
+      message: "External system slug (machine-readable, kebab-case):",
+      initial: existingSnapInConfig?.externalSystem?.slug || existingManifestConfig?.externalSystem?.slug || `airdrop-${externalSystemName.toLowerCase().replace(/\s+/g, "-")}`,
+      validate: (value) => /^[a-z0-9-]+$/.test(value) || "Slug must be kebab-case (lowercase, hyphens only)",
+    });
+    externalSystemSlug = promptedSlug;
+  }
 
   // Access method
-  const { accessMethod } = await prompts({
-    type: "select",
-    name: "accessMethod",
-    message: "How will this system be accessed?",
-    choices: [
-      { title: "API", value: "api" },
-      { title: "SDK", value: "sdk" },
-    ],
-    initial: existingSnapInConfig?.externalSystem?.accessMethod === "sdk" || existingManifestConfig?.externalSystem?.accessMethod === "sdk" ? 1 : 0,
-  });
+  let accessMethod: "api" | "sdk";
+  if (options.accessMethod) {
+    accessMethod = options.accessMethod;
+    logger.info(`Using access method from --access-method flag: ${accessMethod}`);
+  } else {
+    const { accessMethod: promptedAccessMethod } = await prompts({
+      type: "select",
+      name: "accessMethod",
+      message: "How will this system be accessed?",
+      choices: [
+        { title: "API", value: "api" },
+        { title: "SDK", value: "sdk" },
+      ],
+      initial: existingSnapInConfig?.externalSystem?.accessMethod === "sdk" || existingManifestConfig?.externalSystem?.accessMethod === "sdk" ? 1 : 0,
+    });
+    accessMethod = promptedAccessMethod;
+  }
 
   // Documentation URL
-  const { documentationUrl } = await prompts({
-    type: "text",
-    name: "documentationUrl",
-    message: "Documentation URL for the external system (optional):",
-    initial: existingSnapInConfig?.externalSystem?.documentationUrl || existingManifestConfig?.externalSystem?.documentationUrl || "https://docs.example.com",
-    validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
-  });
+  let documentationUrl: string;
+  if (options.documentationUrl) {
+    documentationUrl = options.documentationUrl;
+    logger.info(`Using documentation URL from --documentation-url flag: ${documentationUrl}`);
+  } else {
+    const { documentationUrl: promptedDocUrl } = await prompts({
+      type: "text",
+      name: "documentationUrl",
+      message: "Documentation URL for the external system (optional):",
+      initial: existingSnapInConfig?.externalSystem?.documentationUrl || existingManifestConfig?.externalSystem?.documentationUrl || "https://docs.example.com",
+      validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
+    });
+    documentationUrl = promptedDocUrl;
+  }
 
   let apiBaseUrl: string | undefined;
 
@@ -218,51 +265,73 @@ async function gatherAirdropProjectConfiguration(
   let sdkPackages: string[] = [];
 
   if (accessMethod === "api") {
-    const { promptedApiBaseUrl } = await prompts({
-      type: "text",
-      name: "promptedApiBaseUrl",
-      message: "API base URL for the external system:",
-      initial: existingSnapInConfig?.externalSystem?.apiBaseUrl || existingManifestConfig?.externalSystem?.apiBaseUrl || "https://api.example.com/v1",
-      validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
-    });
-    apiBaseUrl = promptedApiBaseUrl;
+    if (options.yes || options.silent) {
+      apiBaseUrl = existingSnapInConfig?.externalSystem?.apiBaseUrl || existingManifestConfig?.externalSystem?.apiBaseUrl || "https://api.example.com/v1";
+      logger.info(`Using API base URL: ${apiBaseUrl}`);
+    } else {
+      const { promptedApiBaseUrl } = await prompts({
+        type: "text",
+        name: "promptedApiBaseUrl",
+        message: "API base URL for the external system:",
+        initial: existingSnapInConfig?.externalSystem?.apiBaseUrl || existingManifestConfig?.externalSystem?.apiBaseUrl || "https://api.example.com/v1",
+        validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
+      });
+      apiBaseUrl = promptedApiBaseUrl;
+    }
 
 
   } else if (accessMethod === "sdk") {
-    const { promptedSdkBaseUrl } = await prompts({
-      type: "text",
-      name: "promptedSdkBaseUrl",
-      message: "SDK base URL for the external system (optional, can be same as API base if applicable):",
-      initial: existingSnapInConfig?.externalSystem?.sdkBaseUrl || existingManifestConfig?.externalSystem?.sdkBaseUrl || "https://api.example.com/v1",
-      validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
-    });
-    sdkBaseUrl = promptedSdkBaseUrl;
+    if (options.yes || options.silent) {
+      sdkBaseUrl = existingSnapInConfig?.externalSystem?.sdkBaseUrl || existingManifestConfig?.externalSystem?.sdkBaseUrl || "https://api.example.com/v1";
+      sdkPackages = existingSnapInConfig?.externalSystem?.sdkPackages || existingManifestConfig?.externalSystem?.sdkPackages || [];
+      logger.info(`Using SDK base URL: ${sdkBaseUrl}`);
+      logger.info(`Using SDK packages: ${sdkPackages.length > 0 ? sdkPackages.join(", ") : "none"}`);
+    } else {
+      const { promptedSdkBaseUrl } = await prompts({
+        type: "text",
+        name: "promptedSdkBaseUrl",
+        message: "SDK base URL for the external system (optional, can be same as API base if applicable):",
+        initial: existingSnapInConfig?.externalSystem?.sdkBaseUrl || existingManifestConfig?.externalSystem?.sdkBaseUrl || "https://api.example.com/v1",
+        validate: (value) => !value || /^https?:\/\/.+/.test(value) || "Must be a valid URL or empty",
+      });
+      sdkBaseUrl = promptedSdkBaseUrl;
 
-    const { sdkPackagesString } = await prompts({
-      type: "text",
-      name: "sdkPackagesString",
-      message: "Enter SDK package names (e.g., @scope/package-name, another-package, comma-separated):",
-      initial: existingSnapInConfig?.externalSystem?.sdkPackages?.join(", ") || existingManifestConfig?.externalSystem?.sdkPackages?.join(", ") || "",
-    });
-    sdkPackages = sdkPackagesString ? sdkPackagesString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+      const { sdkPackagesString } = await prompts({
+        type: "text",
+        name: "sdkPackagesString",
+        message: "Enter SDK package names (e.g., @scope/package-name, another-package, comma-separated):",
+        initial: existingSnapInConfig?.externalSystem?.sdkPackages?.join(", ") || existingManifestConfig?.externalSystem?.sdkPackages?.join(", ") || "",
+      });
+      sdkPackages = sdkPackagesString ? sdkPackagesString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+    }
   }
 
-  const { externalObjectsString } = await prompts({
-    type: "text",
-    name: "externalObjectsString",
-    message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
-    initial: existingSnapInConfig?.externalSystem?.externalObjects?.join(", ") || existingManifestConfig?.externalSystem?.externalObjects?.join(", ") || "",
-  });
-
-  const externalObjects = externalObjectsString ? externalObjectsString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+  // Auto-generate empty external objects when using --yes flag
+  let externalObjects: string[] = [];
+  if (options.yes || options.silent) {
+    const existingObjects = existingSnapInConfig?.externalSystem?.externalObjects || existingManifestConfig?.externalSystem?.externalObjects || [];
+    externalObjects = existingObjects;
+    logger.info(`Using existing external objects: ${externalObjects.length > 0 ? externalObjects.join(", ") : "none"}`);
+  } else {
+    const { externalObjectsString } = await prompts({
+      type: "text",
+      name: "externalObjectsString",
+      message: "Enter external system object types (e.g., tickets, conversations, comma-separated):",
+      initial: existingSnapInConfig?.externalSystem?.externalObjects?.join(", ") || existingManifestConfig?.externalSystem?.externalObjects?.join(", ") || "",
+    });
+    externalObjects = externalObjectsString ? externalObjectsString.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+  }
 
   // Connection type
   let connectionTypeResolved: 'oauth2' | 'secret';
   const existingConnectionType = existingSnapInConfig?.externalSystem?.connection?.type || existingManifestConfig?.externalSystem?.connection?.type;
 
-  if (options.authType) {
+  if (options.connectionType) {
+    connectionTypeResolved = options.connectionType === 'oauth' ? 'oauth2' : 'secret';
+    logger.info(`Connection type determined by --connection-type flag: ${options.connectionType} (resolved to ${connectionTypeResolved})`);
+  } else if (options.authType) {
     connectionTypeResolved = options.authType === 'oauth' ? 'oauth2' : 'secret';
-    logger.info(`Connection type determined by --authType flag: ${options.authType} (resolved to ${connectionTypeResolved})`);
+    logger.info(`Connection type determined by --auth-type flag: ${options.authType} (resolved to ${connectionTypeResolved})`);
   } else {
     const { connectionType: promptedConnectionType } = await prompts({
       type: "select",
@@ -278,18 +347,25 @@ async function gatherAirdropProjectConfiguration(
   }
 
   // DevRev objects
-  const existingDevRevObjects = existingSnapInConfig?.devrevObjects || existingManifestConfig?.devrevObjects || ["account"];
-  const { devrevObjects } = await prompts({
-    type: "multiselect",
-    name: "devrevObjects",
-    message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
-    choices: SUPPORTED_DEVREV_OBJECTS.map(obj => ({ 
-      title: obj, 
-      value: obj, 
-      selected: existingDevRevObjects.includes(obj) 
-    })),
-    min: 1,
-  });
+  const existingDevRevObjects = existingSnapInConfig?.devrevObjects || existingManifestConfig?.devrevObjects || [];
+  let devrevObjects: string[] = [];
+  if (options.yes || options.silent) {
+    devrevObjects = existingDevRevObjects;
+    logger.info(`Using existing DevRev objects: ${devrevObjects.length > 0 ? devrevObjects.join(", ") : "none"}`);
+  } else {
+    const { devrevObjects: promptedDevrevObjects } = await prompts({
+      type: "multiselect",
+      name: "devrevObjects",
+      message: "Select DevRev objects to sync/interact with (space to select, enter to confirm):",
+      choices: SUPPORTED_DEVREV_OBJECTS.map(obj => ({ 
+        title: obj, 
+        value: obj, 
+        selected: existingDevRevObjects.includes(obj) 
+      })),
+      min: 0, // Allow empty selection
+    });
+    devrevObjects = promptedDevrevObjects;
+  }
 
   let connection: OAuth2Connection | SecretConnection;
 
@@ -373,19 +449,22 @@ async function gatherSnapInProjectConfiguration(
     selectedSnapInTemplateName = response.selectedSnapInTemplateName;
   }
 
-  // Snap-in base name
+  // Snap-in base name / External system name
   let snapInBaseNameResolved: string;
-  if (options.projectName) {
+  if (options.externalSystemName) {
+    snapInBaseNameResolved = options.externalSystemName;
+    logger.info(`Using external system name from --external-system-name flag: ${snapInBaseNameResolved}`);
+  } else if (options.projectName) {
     snapInBaseNameResolved = options.projectName;
-    logger.info(`Using Snap-in base name from --projectName flag: ${snapInBaseNameResolved}`);
+    logger.info(`Using Snap-in base name from --project-name flag: ${snapInBaseNameResolved}`);
   } else {
     const existingName = existingSnapInConfig?.externalSystem?.name || existingManifestConfig?.externalSystem?.name;
     const { snapInBaseName: promptedName } = await prompts({
       type: "text",
       name: "snapInBaseName",
-      message: "Enter a base name for your Snap-in:",
-      initial: existingName || "my-snapin",
-      validate: (value) => value.trim().length > 0 || "Snap-in name is required",
+      message: "Enter the external system name for your Snap-in:",
+      initial: existingName || "my-system",
+      validate: (value) => value.trim().length > 0 || "External system name is required",
     });
     snapInBaseNameResolved = promptedName;
   }
@@ -474,6 +553,7 @@ async function gatherOAuth2Configuration(
     id: `${systemSlug}-oauth2`,
     clientId: `process.env.${clientIdEnvVarName}`,
     clientSecret: `process.env.${clientSecretEnvVarName}`,
+    headers: {},
     authorize: {
       url: authorizationUrl,
       tokenUrl,
@@ -489,6 +569,7 @@ async function gatherOAuth2Configuration(
       url: tokenUrl.replace("/token", "/revoke"),
       method: "POST",
     },
+    tokenEnvVarName: "", // OAuth doesn't use token env var name
   };
 }
 

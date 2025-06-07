@@ -11,7 +11,7 @@ export async function generateTypeDefinitions(
   cwd: string,
   config: AirdropProjectConfig
 ): Promise<void> {
-  const typesDir = path.join(cwd, "types")
+  const typesDir = path.join(cwd, "code", "types")
   
   // Ensure types directory exists
   await fs.mkdir(typesDir, { recursive: true })
@@ -196,29 +196,140 @@ function toPascalCase(str: string): string {
 
 /**
  * Copy the snapin configuration types to the project types directory
- * This references the consolidated schema instead of duplicating definitions
+ * This generates a self-contained schema for the cloned project
  */
 export async function copyConfigTypes(cwd: string): Promise<void> {
-  const typesDir = path.join(cwd, "types")
+  const typesDir = path.join(cwd, "code", "types")
   await fs.mkdir(typesDir, { recursive: true })
 
-  // Generate snapin configuration types that reference the consolidated schema
+  // Generate snapin configuration types - self-contained schema
   const targetConfigPath = path.join(typesDir, "snapin-config.ts")
   
-  // Export the types from the consolidated schema
-  const configTypes = `// Airdrop configuration types - references consolidated schema
-// This file is auto-generated and references the single source of truth
+  // Generate a clean, self-contained schema
+  const configTypes = `// Airdrop configuration types
+// This file is auto-generated - do not edit manually
 
-export type {
-  AirdropProjectConfig,
-  OAuth2Connection,
-  SecretConnection,
-  Connection,
-  ExternalSystem,
-  SupportedDevRevObject
-} from '../src/types/snapin-config'
+import { z } from "zod"
 
-export { SUPPORTED_DEVREV_OBJECTS } from '../src/types/snapin-config'
+// Connection type schemas
+export const oAuth2ConnectionSchema = z.object({
+  type: z.literal("oauth2"),
+  id: z.string(),
+  clientId: z.string(),
+  clientSecret: z.string(),
+  headers: z.record(z.string()).optional(),
+  authorize: z.object({
+    url: z.string(),
+    tokenUrl: z.string(),
+    grantType: z.string().default("authorization_code"),
+    scope: z.string(),
+    scopeDelimiter: z.string().default(" "),
+  }),
+  refresh: z.object({
+    url: z.string(),
+    method: z.string().default("POST"),
+  }),
+  revoke: z.object({
+    url: z.string(),
+    method: z.string().default("POST"),
+  }),
+  tokenEnvVarName: z.string().optional(),
+})
+
+export const secretConnectionSchema = z.object({
+  type: z.literal("secret"),
+  id: z.string(),
+  isSubdomain: z.boolean().optional(),
+  subdomain: z.string().optional(),
+  secretTransform: z.string(),
+  headers: z.record(z.string()).optional(),
+  tokenVerification: z.object({
+    url: z.string(),
+    method: z.string().default("GET"),
+    headers: z.record(z.string()).optional(),
+  }),
+  fields: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+    })
+  ).optional(),
+  tokenEnvVarName: z.string().optional(),
+})
+
+export const connectionSchema = z.union([oAuth2ConnectionSchema, secretConnectionSchema])
+
+// External system schema
+export const externalSystemSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  apiBaseUrl: z.string(),
+  externalObjects: z.array(z.string()),
+  accessMethod: z.enum(["sdk", "api"]),
+  isComplete: z.boolean().optional(),
+  documentationUrl: z.string().optional(),
+  sdkBaseUrl: z.string().optional(),
+  sdkPackages: z.array(z.string()).optional(),
+  connection: connectionSchema,
+})
+
+// Main airdrop config schema
+export const airdropConfigSchema = z.object({
+  projectType: z.enum(["airdrop", "snap-in"]),
+  syncDirection: z.enum(["one-way", "two-way"]).optional(),
+  devrevObjects: z.array(z.string()),
+  externalSyncUnits: z.array(z.string()).optional(),
+  externalSystem: externalSystemSchema.optional(),
+  devrevPatEnvVarName: z.string().optional(), 
+  devrevOrgEnvVarName: z.string().optional(),
+})
+
+// Export types
+export type OAuth2Connection = z.infer<typeof oAuth2ConnectionSchema>
+export type SecretConnection = z.infer<typeof secretConnectionSchema>
+export type Connection = z.infer<typeof connectionSchema>
+export type ExternalSystem = z.infer<typeof externalSystemSchema>
+export type AirdropProjectConfig = z.infer<typeof airdropConfigSchema>
+
+// Supported DevRev object types
+export const SUPPORTED_DEVREV_OBJECTS = [
+  "account",
+  "airdrop_authorization_policy", 
+  "airdrop_platform_group",
+  "article",
+  "capability",
+  "channel", 
+  "comment",
+  "component",
+  "conversation",
+  "custom_link",
+  "custom_part",
+  "devu",
+  "directory",
+  "dm",
+  "enhancement",
+  "feature",
+  "group",
+  "incident",
+  "issue",
+  "link",
+  "linkable",
+  "meeting",
+  "microservice",
+  "object_member",
+  "opportunity",
+  "product",
+  "revu",
+  "runnable",
+  "sysu",
+  "tag",
+  "task",
+  "test_custom_type",
+  "ticket",
+] as const
+
+export type SupportedDevRevObject = typeof SUPPORTED_DEVREV_OBJECTS[number]
 `
   await fs.writeFile(targetConfigPath, configTypes, "utf8")
 } 
