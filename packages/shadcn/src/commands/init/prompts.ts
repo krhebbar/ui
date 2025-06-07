@@ -508,45 +508,73 @@ async function gatherOAuth2Configuration(
   const clientIdEnvVar = `${systemSlug.toUpperCase().replace(/-/g, "_")}_CLIENT_ID`;
   const clientSecretEnvVar = `${systemSlug.toUpperCase().replace(/-/g, "_")}_CLIENT_SECRET`;
 
-  const { clientIdEnvVarName } = await prompts({
-    type: "text",
-    name: "clientIdEnvVarName",
-    message: "Environment variable name for OAuth client ID:",
-    initial: existingOAuth?.clientId?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientIdEnvVar,
-    validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
-  });
+  let clientIdEnvVarName: string;
+  let clientSecretEnvVarName: string;
+  let authorizationUrl: string;
+  let tokenUrl: string;
+  let scope: string;
 
-  const { clientSecretEnvVarName } = await prompts({
-    type: "text",
-    name: "clientSecretEnvVarName",
-    message: "Environment variable name for OAuth client secret:",
-    initial: existingOAuth?.clientSecret?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientSecretEnvVar,
-    validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
-  });
+  if (options?.yes || options?.silent) {
+    // Use default values when --yes flag is used
+    clientIdEnvVarName = existingOAuth?.clientId?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientIdEnvVar;
+    clientSecretEnvVarName = existingOAuth?.clientSecret?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientSecretEnvVar;
+    authorizationUrl = existingOAuth?.authorize?.url || "https://api.example.com/v1/oauth/authorize";
+    tokenUrl = existingOAuth?.authorize?.tokenUrl || "https://api.example.com/v1/oauth/token";
+    scope = existingOAuth?.authorize?.scope || "read write api";
+    
+    logger.info(`Using OAuth configuration with --yes flag:`);
+    logger.info(`  Client ID env var: ${clientIdEnvVarName}`);
+    logger.info(`  Client Secret env var: ${clientSecretEnvVarName}`);
+    logger.info(`  Authorization URL: ${authorizationUrl}`);
+    logger.info(`  Token URL: ${tokenUrl}`);
+    logger.info(`  Scope: ${scope}`);
+  } else {
+    // Interactive prompts
+    const clientIdResponse = await prompts({
+      type: "text",
+      name: "clientIdEnvVarName",
+      message: "Environment variable name for OAuth client ID:",
+      initial: existingOAuth?.clientId?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientIdEnvVar,
+      validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
+    });
+    clientIdEnvVarName = clientIdResponse.clientIdEnvVarName;
 
-  const { authorizationUrl } = await prompts({
-    type: "text",
-    name: "authorizationUrl",
-    message: "OAuth authorization URL:",
-    initial: existingOAuth?.authorize?.url || "https://api.example.com/v1/oauth/authorize",
-    validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
-  });
+    const clientSecretResponse = await prompts({
+      type: "text",
+      name: "clientSecretEnvVarName",
+      message: "Environment variable name for OAuth client secret:",
+      initial: existingOAuth?.clientSecret?.toString().match(/process\.env\.([A-Z_0-9]+)/)?.[1] || clientSecretEnvVar,
+      validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
+    });
+    clientSecretEnvVarName = clientSecretResponse.clientSecretEnvVarName;
 
-  const { tokenUrl } = await prompts({
-    type: "text",
-    name: "tokenUrl",
-    message: "OAuth token URL:",
-    initial: existingOAuth?.authorize?.tokenUrl || "https://api.example.com/v1/oauth/token",
-    validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
-  });
+    const authUrlResponse = await prompts({
+      type: "text",
+      name: "authorizationUrl",
+      message: "OAuth authorization URL:",
+      initial: existingOAuth?.authorize?.url || "https://api.example.com/v1/oauth/authorize",
+      validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
+    });
+    authorizationUrl = authUrlResponse.authorizationUrl;
 
-  const { scope } = await prompts({
-    type: "text",
-    name: "scope",
-    message: "OAuth scope (space-separated):",
-    initial: existingOAuth?.authorize?.scope || "read write api",
-    validate: (value) => value.trim().length > 0 || "Scope is required",
-  });
+    const tokenUrlResponse = await prompts({
+      type: "text",
+      name: "tokenUrl",
+      message: "OAuth token URL:",
+      initial: existingOAuth?.authorize?.tokenUrl || "https://api.example.com/v1/oauth/token",
+      validate: (value) => /^https?:\/\/.+/.test(value) || "Must be a valid URL",
+    });
+    tokenUrl = tokenUrlResponse.tokenUrl;
+
+    const scopeResponse = await prompts({
+      type: "text",
+      name: "scope",
+      message: "OAuth scope (space-separated):",
+      initial: existingOAuth?.authorize?.scope || "read write api",
+      validate: (value) => value.trim().length > 0 || "Scope is required",
+    });
+    scope = scopeResponse.scope;
+  }
 
   return {
     type: "oauth2",
@@ -587,13 +615,24 @@ async function gatherSecretConfiguration(
   
   const tokenEnvVar = `${systemSlug.toUpperCase().replace(/-/g, "_")}_TOKEN`;
 
-  const { tokenEnvVarName } = await prompts({
-    type: "text",
-    name: "tokenEnvVarName",
-    message: "Environment variable name for API token:",
-    initial: existingSecret?.tokenEnvVarName || tokenEnvVar,
-    validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
-  });
+  let tokenEnvVarName: string;
+
+  if (options?.yes || options?.silent) {
+    // Use default value when --yes flag is used
+    tokenEnvVarName = existingSecret?.tokenEnvVarName || tokenEnvVar;
+    logger.info(`Using Secret configuration with --yes flag:`);
+    logger.info(`  Token env var: ${tokenEnvVarName}`);
+  } else {
+    // Interactive prompt
+    const tokenResponse = await prompts({
+      type: "text",
+      name: "tokenEnvVarName",
+      message: "Environment variable name for API token:",
+      initial: existingSecret?.tokenEnvVarName || tokenEnvVar,
+      validate: (value) => /^[A-Z_][A-Z0-9_]*$/.test(value) || "Must be a valid environment variable name",
+    });
+    tokenEnvVarName = tokenResponse.tokenEnvVarName;
+  }
 
   return {
     type: "secret",

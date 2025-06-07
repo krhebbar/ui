@@ -16,9 +16,11 @@ shadcn init \
   --project-type airdrop \
   --external-system-name "Notion" \
   --access-method api \
-  --connection-type secret \
+  --connection-type oauth \
+  --sync-direction two-way \
   --documentation-url https://developers.notion.com/ \
-  --yes
+  --yes \
+  --cwd airdrop-notion
 ```
 
 ```bash

@@ -4,8 +4,8 @@ import { z } from "zod"
 export const oAuth2ConnectionSchema = z.object({
   type: z.literal("oauth2"),
   id: z.string(),
-  clientId: z.string(),
-  clientSecret: z.string(),
+  clientId: z.union([z.string(), z.undefined()]).transform(val => val || ""),
+  clientSecret: z.union([z.string(), z.undefined()]).transform(val => val || ""),
   headers: z.record(z.string()).optional(),
   authorize: z.object({
     url: z.string(),
@@ -44,7 +44,7 @@ export const secretConnectionSchema = z.object({
       description: z.string(),
     })
   ).optional(),
-  tokenEnvVarName: z.string().optional(),
+  tokenEnvVarName: z.union([z.string(), z.undefined()]).transform(val => val || "").optional(),
 })
 
 export const connectionSchema = z.union([oAuth2ConnectionSchema, secretConnectionSchema])
