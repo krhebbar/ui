@@ -45,7 +45,7 @@ async function checkPackageManager(): Promise<{ name: string; found: boolean }> 
   return { name: "npm, pnpm, or yarn", found: false };
 }
 
-export async function validateDependencies(
+async function validateDependencies(
   attemptFix: boolean // attemptFix is not used here yet, could be for auto-install later
 ): Promise<DepsValidationResult> {
   const result: DepsValidationResult = {

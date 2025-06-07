@@ -70,17 +70,7 @@ const templatesConfig: TemplatesConfig = {
 // Template Access Functions
 // =============================================================================
 
-export function getTemplatesConfig(): TemplatesConfig {
-  return templatesConfig;
-}
 
-export function getSnapInTemplates(): SnapInTemplate[] {
-  return templatesConfig.snapInTemplates;
-}
-
-export function getAirdropTemplates(): AirdropTemplate[] {
-  return templatesConfig.airdropTemplates;
-}
 
 export function getDefaultSnapInTemplate(): SnapInTemplate | null {
   return templatesConfig.snapInTemplates.find(t => t.name === templatesConfig.defaultSnapInTemplateName) || null;

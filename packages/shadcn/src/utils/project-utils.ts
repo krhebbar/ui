@@ -185,36 +185,7 @@ export async function getProjectState(cwd: string): Promise<{
 // Manifest operations have been moved to the unified updaters module
 // See: src/utils/updaters/update-manifest-file.ts
 
-/**
- * Extract environment variables from configuration
- */
-export function extractEnvVarsFromConfig(config: AirdropProjectConfig): Record<string, string> {
-  const envVars: Record<string, string> = {};
 
-  const connection = config.externalSystem?.connection;
-  if (connection?.type === "oauth2") {
-    const oauthConnection = connection;
-    if (typeof oauthConnection.clientId === 'string') {
-      const clientIdMatch = oauthConnection.clientId.match(/process\.env\.([A-Z_0-9]+)/);
-      if (clientIdMatch && clientIdMatch[1]) {
-        envVars[clientIdMatch[1]] = "your-client-id-here";
-      }
-    }
-    if (typeof oauthConnection.clientSecret === 'string') {
-      const clientSecretMatch = oauthConnection.clientSecret.match(/process\.env\.([A-Z_0-9]+)/);
-      if (clientSecretMatch && clientSecretMatch[1]) {
-        envVars[clientSecretMatch[1]] = "your-client-secret-here";
-      }
-    }
-  } else if (connection?.type === "secret") {
-    const secretConnection = connection as SecretConnection;
-    if (secretConnection.tokenEnvVarName) {
-      envVars[secretConnection.tokenEnvVarName] = "your-api-token-here";
-    }
-  }
-
-  return envVars;
-}
 
 /**
  * Create minimal configuration for snap-in projects

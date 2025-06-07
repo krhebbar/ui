@@ -7,7 +7,7 @@ export interface DevRevValidationResult {
   issues: string[];
 }
 
-export async function validateDevRev(
+async function validateDevRev(
   projectInfo: ValidationProjectInfo | null, // Project info might be needed to check specific config
   attemptFix: boolean
 ): Promise<DevRevValidationResult> {

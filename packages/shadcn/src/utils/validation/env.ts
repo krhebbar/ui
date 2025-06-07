@@ -13,7 +13,7 @@ export interface EnvValidationResult {
 
 const REQUIRED_ENV_VARS = ["DEV_ORG", "USER_IMAIL"];
 
-export async function validateEnv(
+async function validateEnv(
   projectRootPath: string | null,
   attemptFix: boolean
 ): Promise<EnvValidationResult> {

@@ -126,7 +126,7 @@ async function findManifestFile(dir: string): Promise<string | null> {
   return null;
 }
 
-export async function getProjectRoot(cwd: string): Promise<ValidationProjectInfo> {
+async function getProjectRoot(cwd: string): Promise<ValidationProjectInfo> {
   let currentDir = path.resolve(cwd);
   const root = path.parse(currentDir).root; // Get the root of the filesystem
 
@@ -185,7 +185,7 @@ const MINIMAL_MANIFEST_SCHEMA_FOR_VALIDATION = z.object({
   functions: z.array(z.object({}).passthrough()).min(1, { message: "Manifest must define at least one function." }),
 }).passthrough(); // Allow other fields
 
-export async function validateAirdropProjectStructure(
+async function validateAirdropProjectStructure(
   projectInfo: ValidationProjectInfo
 ): Promise<ValidationProjectInfo> {
   if (!projectInfo.rootPath) {
@@ -378,45 +378,4 @@ export async function isTypeScriptProject(cwd: string) {
   return fs.existsSync(tsConfigPath)
 }
 
-export async function getTsConfig(cwd: string) {
-  for (const fallback of [
-    "tsconfig.json"
-  ]) {
-    const filePath = path.resolve(cwd, fallback)
-    if (!(await fs.pathExists(filePath))) {
-      continue
-    }
 
-    // We can't use fs.readJSON because it doesn't support comments.
-    const contents = await fs.readFile(filePath, "utf8")
-    const cleanedContents = contents.replace(/\/\*\s*\*\//g, "")
-    const result = TS_CONFIG_SCHEMA.safeParse(JSON.parse(cleanedContents))
-
-    if (result.error) {
-      continue
-    }
-
-    return result.data
-  }
-
-  return null
-}
-
-export async function getAirdropProjectValidation(cwd: string): Promise<ValidationProjectInfo> {
-  // First, determine the project root and basic Airdrop project identification
-  const rootCheckResult = await getProjectRoot(cwd);
-
-  // If no rootPath was found, it means it's not an Airdrop project according to getProjectRoot.
-  // getProjectRoot will have already populated reasons.
-  // We can return early if isAirdropProject is false.
-  if (!rootCheckResult.isAirdropProject || !rootCheckResult.rootPath) {
-    // Ensure isValid is false if not an Airdrop project or root path is missing
-    rootCheckResult.isValid = false;
-    return rootCheckResult;
-  }
-
-  // Now, validate the structure of the found project root
-  const finalValidationResult = await validateAirdropProjectStructure(rootCheckResult);
-
-  return finalValidationResult;
-}

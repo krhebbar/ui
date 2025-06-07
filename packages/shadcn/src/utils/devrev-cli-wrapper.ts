@@ -62,30 +62,7 @@ export async function validateManifest(manifestPath: string): Promise<any> {
   }
 }
 
-/**
- * Upgrades a Snap-in version.
- *
- * @param versionId - ID of the Snap-in version to upgrade.
- * @param packageId - Optional ID of the package.
- * @returns A promise that resolves with the upgrade result.
- * @throws If the command fails or the output cannot be parsed.
- */
-export async function upgradeSnapInVersion(
-  versionId: string,
-  packageId?: string
-): Promise<any> {
-  const args = ["upgrade", versionId];
-  if (packageId) {
-    args.push("--package", packageId);
-  }
-  try {
-    const output = await executeDevrevCommand("snap_in_version", args);
-    return JSON.parse(output);
-  } catch (error) {
-    console.error(`Error upgrading Snap-in version ${versionId}: ${error}`);
-    throw error;
-  }
-}
+
 
 /**
  * Updates a Snap-in.
@@ -196,49 +173,9 @@ export async function createSnapInVersion(
   }
 }
 
-/**
- * Shows details of a Snap-in version.
- *
- * @param id - Optional ID of the Snap-in version. Relies on context if not provided.
- * @returns A promise that resolves with the Snap-in version information.
- * @throws If the command fails or the output cannot be parsed.
- */
-export async function showSnapInVersion(id?: string): Promise<any> {
-  const args = ["show"];
-  if (id) {
-    args.push(id);
-  }
-  try {
-    const output = await executeDevrevCommand("snap_in_version", args);
-    return JSON.parse(output);
-  } catch (error) {
-    console.error(`Error showing Snap-in version: ${error}`);
-    throw error;
-  }
-}
 
-/**
- * Lists Snap-in versions.
- *
- * @param packageId - Optional ID of the package to filter versions.
- * @returns A promise that resolves with an array of Snap-in versions.
- * @throws If the command fails or the output cannot be parsed.
- */
-export async function listSnapInVersions(
-  packageId?: string
-): Promise<any[]> {
-  const args = ["list"];
-  if (packageId) {
-    args.push("--package", packageId);
-  }
-  try {
-    const output = await executeDevrevCommand("snap_in_version", args);
-    return JSON.parse(output);
-  } catch (error) {
-    console.error(`Error listing Snap-in versions: ${error}`);
-    throw error;
-  }
-}
+
+
 
 /**
  * Drafts a Snap-in.

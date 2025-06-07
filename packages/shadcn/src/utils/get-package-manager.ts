@@ -34,12 +34,4 @@ export async function getPackageManager(
   return "npm"
 }
 
-export async function getPackageRunner(cwd: string) {
-  const packageManager = await getPackageManager(cwd)
 
-  if (packageManager === "pnpm") return "pnpm dlx"
-
-  if (packageManager === "bun") return "bunx"
-
-  return "npx"
-}

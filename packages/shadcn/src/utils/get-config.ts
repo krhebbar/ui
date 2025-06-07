@@ -8,8 +8,7 @@ import { getProjectState } from "@/src/utils/project-utils"
 import { readSnapinConfig } from "@/src/utils/project-config"
 
 export const DEFAULT_STYLE = "new-york"
-export const DEFAULT_COMPONENTS = "@/functions"
-export const DEFAULT_UTILS = "@/lib/utils"
+
 
 export const configSchema = z.object({
   $schema: z.string().optional(),
