@@ -12,7 +12,7 @@ import { build } from "@/src/commands/build";
 import { release } from "@/src/commands/release";
 import { logs } from "@/src/commands/logs";
 import { createKeyring } from "@/src/commands/keyring";
-import { testConnection } from "@/src/commands/test-connection";
+import { testConnection } from "@/src/commands/connection";
 import { types } from "@/src/commands/types";
 // New command group imports
 import { packageCommands } from "@/src/commands/package";
