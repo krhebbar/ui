@@ -113,12 +113,6 @@ function applySurgicalUpdates(manifestContent: string, config: AirdropProjectCon
   const systemSlug = config.externalSystem?.slug || 'my-snapin';
   const connectionId = toKebabCase(systemName) + '-connection';
   
-  // 0. Clean up incorrectly inserted entries first
-  // Remove the "- id: example-pat-connection" and its associated content
-  updatedContent = updatedContent.replace(
-    /\s*-\s*id:\s*example-pat-connection[\s\S]*?(?=\n\S|\n*$)/,
-    ''
-  );
   
   // 1. Update name field (only if different)
   if (config.externalSystem?.slug) {
@@ -166,11 +160,11 @@ function applySurgicalUpdates(manifestContent: string, config: AirdropProjectCon
   
   // 4. Fix any corruption in service_account.display_name first
   if (config.externalSystem?.name) {
-    // Fix corrupted patterns like "Gong"ng Bot" -> "Gong Bot"
-    updatedContent = updatedContent.replace(
-      /(display_name:\s*)(["']?)([^"'\n]*"ng Bot[^"'\n]*)(["']?)/g,
-      `$1$2${systemName} Bot$4`
-    );
+    // // Fix corrupted patterns like "Gong"ng Bot" -> "Gong Bot"
+    // updatedContent = updatedContent.replace(
+    //   /(display_name:\s*)(["']?)([^"'\n]*"ng Bot[^"'\n]*)(["']?)/g,
+    //   `$1$2${systemName} Bot$4`
+    // );
     
     // Then update service_account.display_name if it exists with template text
     const serviceAccountMatch = updatedContent.match(/service_account:\s*\n/);
@@ -270,28 +264,91 @@ function updateKeyringTypes(content: string, config: AirdropProjectConfig, conne
   // Generate the complete keyring_types block based on connection type
   const newKeyringTypesBlock = generateKeyringTypesBlock(config, connectionId);
   
-  // Check if keyring_types section already exists
-  const keyringTypesRegex = /(keyring_types:\s*(?:#[^\n]*\n)?)((?:\s+[^\n]*\n)*?)(?=\n[a-zA-Z_][a-zA-Z0-9_]*:\s|\n*$)/;
-  const match = content.match(keyringTypesRegex);
+  // Split content into lines for easier manipulation
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let i = 0;
+  let foundKeyringSection = false;
+  let keyringStartIndex = -1;
+  let keyringEndIndex = -1;
   
-  if (match) {
-    // Replace only the keyring_types content, preserving the header  
-    const beforeKeyring = content.substring(0, match.index!);
-    const afterKeyring = content.substring(match.index! + match[0].length);
+  // Find the keyring_types section boundaries
+  while (i < lines.length) {
+    const line = lines[i];
     
-    return beforeKeyring + 'keyring_types:\n' + newKeyringTypesBlock + '\n' + afterKeyring;
+    // Look for the start of keyring_types section
+    if (line.trim() === 'keyring_types:' && !foundKeyringSection) {
+      foundKeyringSection = true;
+      keyringStartIndex = i;
+      
+      // Find the end of the keyring_types section
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j];
+        // Stop at next major section (not indented, contains colon, not a comment)
+        if (nextLine.trim() && 
+            !nextLine.startsWith(' ') && 
+            !nextLine.startsWith('\t') && 
+            !nextLine.startsWith('#') && 
+            nextLine.includes(':')) {
+          keyringEndIndex = j - 1;
+          break;
+        }
+        j++;
+      }
+      
+      // If we reached the end without finding another section
+      if (keyringEndIndex === -1) {
+        keyringEndIndex = lines.length - 1;
+      }
+      
+      break;
+    }
+    i++;
   }
   
-  // If keyring_types section doesn't exist, add it before imports section if it exists
-  const importsIndex = content.indexOf('\nimports:');
-  if (importsIndex !== -1) {
-    const beforeImports = content.substring(0, importsIndex);
-    const afterImports = content.substring(importsIndex);
-    return beforeImports + '\nkeyring_types:\n' + newKeyringTypesBlock + afterImports;
+  if (foundKeyringSection) {
+    // Replace the existing keyring_types section
+    // Add lines before keyring_types
+    for (let idx = 0; idx < keyringStartIndex; idx++) {
+      result.push(lines[idx]);
+    }
+    
+    // Add the new keyring_types section
+    result.push('keyring_types:');
+    newKeyringTypesBlock.split('\n').forEach(line => {
+      if (line.trim()) result.push(line);
+    });
+    
+    // Add lines after keyring_types section
+    for (let idx = keyringEndIndex + 1; idx < lines.length; idx++) {
+      result.push(lines[idx]);
+    }
+    
+    return result.join('\n');
+  } else {
+    // No existing keyring_types section found, insert before imports
+    const importsIndex = lines.findIndex(line => line.trim() === 'imports:');
+    
+    if (importsIndex !== -1) {
+      // Insert before imports section
+      const beforeImports = lines.slice(0, importsIndex);
+      const afterImports = lines.slice(importsIndex);
+      
+      const newLines = [
+        ...beforeImports,
+        'keyring_types:',
+        ...newKeyringTypesBlock.split('\n').filter(line => line.trim()),
+        '',
+        ...afterImports
+      ];
+      
+      return newLines.join('\n');
+    } else {
+      // Add at the end
+      return content + '\nkeyring_types:\n' + newKeyringTypesBlock;
+    }
   }
-  
-  // Otherwise add at the end
-  return content + '\nkeyring_types:\n' + newKeyringTypesBlock;
 }
 
 /**

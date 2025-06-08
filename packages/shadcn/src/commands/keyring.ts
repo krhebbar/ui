@@ -21,7 +21,7 @@ const createKeyringOptionsSchema = z.object({
 });
 
 export const createKeyring = new Command()
-  .name("createKeyring")
+  .name("create-keyring")
   .description("Create developer keyrings (oauth-secret or snap-in-secret) required by the manifest.yaml")
   .option("--name <keyring-name>", "name of the keyring (must match keyring_types[].id in manifest.yaml)")
   .option("--type <type>", "type of keyring (oauth-secret or snap-in-secret)")

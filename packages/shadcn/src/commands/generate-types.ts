@@ -7,8 +7,8 @@ import { spinner } from "@/src/utils/spinner"
 import { readSnapinConfig, hasSnapinConfig } from "@/src/utils/project-config"
 import { generateTypeDefinitions } from "@/src/utils/generators/type-generator"
 
-export const types = new Command()
-  .name("types")
+export const generateTypes = new Command()
+  .name("generate-types")
   .description("regenerate TypeScript definition files")
   .option(
     "-c, --cwd <cwd>",

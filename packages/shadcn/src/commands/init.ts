@@ -28,11 +28,7 @@ export const initOptionsSchema = z.object({
 
 export const init = new Command()
   .name("init")
-  .description("initialize your airdrop project and install dependencies")
-  .argument(
-    "[components...]",
-    "the items to add or a url to the item."
-  )
+  .description("Initialize your airdrop project and install dependencies")
   .option("--project-name <name>", "name for the project directory")
   .option("--project-type <type>", "type of project to initialize (airdrop or snapin)")
   .option("--template-name <name>", "name of the Snap-in template to use")
@@ -50,12 +46,11 @@ export const init = new Command()
   )
   .option("-s, --silent", "mute output.", false)
   .option("--auth-type <type>", "authentication type for Airdrop projects (oauth or pat) or Snap-in authentication strategy")
-  .action(async (components, opts) => {
+  .action(async (opts) => {
     try {
       const options = initOptionsSchema.parse({
         cwd: path.resolve(opts.cwd),
         isNewProject: false,
-        components,
         ...opts,
       })
 

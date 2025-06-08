@@ -13,7 +13,7 @@ import { release } from "@/src/commands/release";
 import { logs } from "@/src/commands/logs";
 import { createKeyring } from "@/src/commands/keyring";
 import { testConnection } from "@/src/commands/connection";
-import { types } from "@/src/commands/types";
+import { generateTypes } from "@/src/commands/generate-types";
 // New command group imports
 import { packageCommands } from "@/src/commands/package";
 import { contextCommands } from "@/src/commands/context";
@@ -35,23 +35,24 @@ async function main() {
 
   program
     .addCommand(init)
-    .addCommand(add)
-    .addCommand(config)
+    // .addCommand(add)
+    // .addCommand(config)
     // Register new commands
     .addCommand(doctor)
-    .addCommand(dev)
-    .addCommand(build)
-    .addCommand(release)
-    .addCommand(logs)
+
     .addCommand(createKeyring)
     .addCommand(testConnection)
-    .addCommand(types)
-    // Register new command groups
-    .addCommand(packageCommands)
-    .addCommand(contextCommands);
+    .addCommand(generateTypes)
+    .addCommand(registryMcp);
 
+    // Register new command groups
+    // .addCommand(packageCommands)
+    // .addCommand(contextCommands);
+    // .addCommand(dev)
+    // .addCommand(build)
+    // .addCommand(release)
+    // .addCommand(logs)
   // Registry commands
-  program.addCommand(registryMcp);
 
   program.parse()
 }

@@ -510,7 +510,7 @@ async function executeTestConnection(options: TestConnectionOptions): Promise<vo
 // =============================================================================
 
 export const testConnection = new Command()
-  .name("test-connection")
+  .name("connection-test")
   .description("Test OAuth2 or secret-based API connections")
   .option("--type <type>", "connection type (oauth2 or secret)", (value) => {
     const result = connectionTypeSchema.safeParse(value);
