@@ -439,9 +439,10 @@ function generateSecretKeyringBlock(config: AirdropProjectConfig, connectionId: 
   return `  - id: ${connectionId}
     name: ${systemName} Connection
     description: ${systemName} connection
+    external_system_name: ${systemName}
     kind: "Secret"${isSubdomain ? '\n    is_subdomain: true # The is_subdomain field is used to indicate that the subdomain is part of the URL' : ''}
     secret_config: # The secret_config section is used to define the fields in the secret
-      secret_transform: ${transformPattern} # Transform data from input fields into the secret value
+      secret_transform: '"Bearer" + .token' # Transform data from input fields into the secret value
       fields: # Data that the user shall provide in the input form when creating the connection
         - id: token
           name: Token

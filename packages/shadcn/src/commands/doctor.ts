@@ -56,7 +56,7 @@ export const doctor = new Command()
         for (const issue of issues) {
           logger.error(`${highlighter.error("●")} ${highlighter.info(issue.category)}: ${issue.message}`);
           if (issue.suggestion) {
-            logger.info(`  ${highlighter.success("Fix:")} ${issue.suggestion}`);
+            logger.info(`  ${highlighter.success("Fix:")} run MCP tool snapin_mcp_update_config to gather the external system information`);
           }
           logger.break();
         }
@@ -385,57 +385,52 @@ async function validateManifest(cwd: string, issues: DoctorIssue[]): Promise<voi
     const result = await execDevRevCommand(cwd, ["snap_in_version", "validate-manifest", "manifest.yaml"]);
     const output = result.stdout || result.stderr || "";
     console.log("result", result);
-    // result {
-    //   exitCode: 0,
-    //   stdout: '',
-    //   stderr: 'Manifest is invalid. Error: Bad Request: yaml: line 39: did not find expected key'
-    // }
-    if (result.stderr === '' && result.stdout === '') {
-      logger.success("Manifest validation passed.");
-    } else {
-      // Check for specific "Manifest is invalid." pattern
-      if (output.startsWith("Manifest is invalid.")) {
-        const lines = output.split('\n').filter(line => line.trim());
-        const invalidMessage = lines[0]; // "Manifest is invalid."
-        const errorMessage = lines.slice(1).join('\n').trim(); // Everything after the first line
-        
-        logger.error(`${highlighter.error("❌")} ${invalidMessage}`);
-        if (errorMessage) {
-          logger.info(`${highlighter.info("🔎")} ${errorMessage}`);
-        }
-        
-        // Parse the error to provide specific suggestions
-        let suggestion = "Review your manifest.yaml file and fix the validation errors";
-        
-        // Check for oauth secret not found
-        const oauthSecretMatch = errorMessage.match(/oauth secret '([^']+)' not found/);
-        const snapinSecretMatch = errorMessage.match(/snap-in secret '([^']+)' not found/);
-        
-        if (oauthSecretMatch || snapinSecretMatch) {
-          suggestion = `shadcn createKeyring --auto  (automatically create all required keyrings from your .env file)`;
-        }
-        
-        logger.info(`${highlighter.success("💡 Try:")} ${suggestion}`);
-        
-        issues.push({
-          category: "Manifest",
-          message: `${invalidMessage} ${errorMessage}`,
-          suggestion: suggestion
-        });
-      } else {
-        // Generic validation failure
-        issues.push({
-          category: "Manifest",
-          message: `Manifest validation failed: ${output}`,
-          suggestion: "Review your manifest.yaml file and fix the validation errors"
-        });
+
+    if (result.stdout.includes("Manifest is valid")) {
+      logger.success("✅ Manifest validation passed.");
+      return;
+    }
+
+    // Handle known validation failure format
+    if (output.startsWith("Manifest is invalid.")) {
+      const lines = output.split('\n').filter(line => line.trim());
+      const invalidMessage = lines[0]; // "Manifest is invalid."
+      const errorMessage = lines.slice(1).join('\n').trim();
+
+      logger.error(`${highlighter.error("❌")} ${invalidMessage}`);
+      if (errorMessage) {
+        logger.info(`${highlighter.info("🔎")} ${errorMessage}`);
       }
+
+      // Parse the error to provide specific suggestions
+      let suggestion = "Review your manifest.yaml file and fix the validation errors";
+
+      const oauthSecretMatch = errorMessage.match(/oauth secret '([^']+)' not found/);
+      const snapinSecretMatch = errorMessage.match(/snap-in secret '([^']+)' not found/);
+
+      if (oauthSecretMatch || snapinSecretMatch) {
+        suggestion = `shadcn createKeyring --auto  (automatically create all required keyrings from your .env file)`;
+      }
+
+      logger.info(`${highlighter.success("💡 Try:")} ${suggestion}`);
+
+      issues.push({
+        category: "Manifest",
+        message: `${invalidMessage} ${errorMessage}`,
+        suggestion,
+      });
+    } else {
+      // Generic validation failure
+      issues.push({
+        category: "Manifest",
+        message: `Manifest validation failed: ${output}`,
+        suggestion: "Review your manifest.yaml file and fix the validation errors"
+      });
     }
   } catch (error: any) {
-    // Extract meaningful error message
     const errorOutput = error.stderr || error.stdout || error.message;
     issues.push({
-      category: "Manifest", 
+      category: "Manifest",
       message: `Manifest validation failed: ${errorOutput}`,
       suggestion: "Review your manifest.yaml file and fix the validation errors"
     });
