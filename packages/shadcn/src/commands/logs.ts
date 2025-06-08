@@ -6,6 +6,7 @@ import { logger } from "@/src/utils/logger"; // Adjust path
 // import { getConfig } from "@/src/utils/get-config"; // To load snapin.config.mjs
 import { getSnapInLogs } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 
 export const logs = new Command()
   .name("logs")
@@ -32,6 +33,15 @@ export const logs = new Command()
     }
 
     logger.info("Fetching Snap-in logs using devrev-cli...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     try {
       const logOptions: {
@@ -62,6 +72,9 @@ export const logs = new Command()
       } else {
         logger.info("No logs found for the given criteria.");
       }
+      
+      logger.info("✅ Logs retrieved successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error("Failed to fetch Snap-in logs.");
       if (error.message.includes("DevRev CLI command failed")) {

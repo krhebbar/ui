@@ -1,8 +1,10 @@
 import { execa } from "execa";
 import fs from "fs";
+import { execDevRevCommand } from "./devrev-auth";
 
 /**
- * Executes a DevRev CLI command.
+ * Executes a DevRev CLI command with automatic authentication.
+ * This function now uses the PAT-based authentication from devrev-auth.ts
  *
  * @param subcommand - The subcommand to execute.
  * @param args - An array of arguments for the subcommand.
@@ -13,29 +15,17 @@ async function executeDevrevCommand(
   subcommand: string,
   args: string[] = []
 ): Promise<string> {
-  const commandArgs = [...args];
-
-  // Read DEVREV_PAT and DEV_ORG from .env file if available
-  if (process.env.DEVREV_PAT) {
-    commandArgs.push("--token", process.env.DEVREV_PAT);
-  }
-  if (process.env.DEV_ORG) {
-    commandArgs.push("--org", process.env.DEV_ORG);
-  }
-
   try {
-    const { stdout, stderr, exitCode } = await execa("devrev", [
-      subcommand,
-      ...commandArgs,
-    ]);
+    // Use the PAT-based authentication from devrev-auth.ts
+    const result = await execDevRevCommand(process.cwd(), [subcommand, ...args]);
 
-    if (exitCode !== 0) {
+    if (result.exitCode !== 0) {
       throw new Error(
-        `DevRev CLI command failed with exit code ${exitCode}: ${stderr}`
+        `DevRev CLI command failed with exit code ${result.exitCode}: ${result.stderr}`
       );
     }
 
-    return stdout;
+    return result.stdout;
   } catch (error) {
     console.error(`Error executing DevRev CLI command: ${error}`);
     throw error;
@@ -147,16 +137,25 @@ export async function createSnapInVersion(
     testingUrl?: string;
   } = {}
 ): Promise<any> {
-  const args = ["create-one", "--path", path];
+  const args = ["create-one"];
+  
+  // Add path or archive, but not both
+  if (options.archivePath) {
+    args.push("--archive", options.archivePath);
+  } else if (path) {
+    args.push("--path", path);
+  }
+  
   if (options.packageId) {
     args.push("--package", options.packageId);
   }
-  if (options.manifestPath) {
+  
+  // Only add manifest if we're not using --path (since --path expects manifest to be in the directory)
+  // or if we're using --archive (archives can have separate manifest files)
+  if (options.manifestPath && options.archivePath) {
     args.push("--manifest", options.manifestPath);
   }
-  if (options.archivePath) {
-    args.push("--archive", options.archivePath);
-  }
+  
   if (options.createPackage) {
     args.push("--create-package");
   }

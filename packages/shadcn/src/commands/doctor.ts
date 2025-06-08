@@ -3,7 +3,7 @@ import { logger } from "@/src/utils/logger";
 import { highlighter } from "@/src/utils/highlighter";
 import { readSnapinConfig, hasSnapinConfig } from "@/src/utils/project-config";
 import { SUPPORTED_DEVREV_OBJECTS } from "@/src/types/snapin-config";
-import { getDevRevAuthFromEnv, validateDevRevToken, execDevRevCommand } from "@/src/utils/devrev-auth";
+import { getDevRevAuthFromEnv, validateDevRevToken, execDevRevCommand, bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import path from "path";
 import fs from "fs-extra";
 import { execa } from "execa";
@@ -39,7 +39,7 @@ export const doctor = new Command()
       // 3. Check dependencies
       await checkDependencies(cwd, issues);
 
-      // 4. Check DevRev authentication
+      // 4. Check DevRev authentication (PAT-based)
       await checkDevRevAuth(cwd, issues);
 
       // 5. Validate manifest.yaml
@@ -191,7 +191,7 @@ async function checkSnapinConfig(cwd: string, issues: DoctorIssue[]): Promise<vo
 }
 
 /**
- * Check .env file for missing environment variables
+ * Check .env file for missing environment variables including DEVREV_PAT
  */
 async function checkEnvFile(cwd: string, issues: DoctorIssue[]): Promise<void> {
   logger.info("Checking .env file...");
@@ -201,7 +201,7 @@ async function checkEnvFile(cwd: string, issues: DoctorIssue[]): Promise<void> {
     issues.push({
       category: "Environment",
       message: ".env file not found",
-      suggestion: "Create a .env file with your environment variables"
+      suggestion: "Create a .env file with your environment variables (USER_EMAIL, DEV_ORG, DEVREV_PAT)"
     });
     return;
   }
@@ -217,6 +217,18 @@ async function checkEnvFile(cwd: string, issues: DoctorIssue[]): Promise<void> {
   const envContent = await fs.readFile(envPath, "utf-8");
   const envLines = envContent.split("\n").filter(line => line.trim() && !line.startsWith("#"));
   const envVars = new Set(envLines.map(line => line.split("=")[0].trim()));
+
+  // Check for required DevRev authentication variables
+  const requiredDevRevVars = ["USER_EMAIL", "DEV_ORG", "DEVREV_PAT"];
+  for (const envVar of requiredDevRevVars) {
+    if (!envVars.has(envVar)) {
+      issues.push({
+        category: "DevRev Authentication",
+        message: `Required variable '${envVar}' is missing from .env`,
+        suggestion: `Add ${envVar}=<your-value> to your .env file`
+      });
+    }
+  }
 
   // Check for environment variables referenced in config
   const requiredEnvVars: string[] = [];
@@ -251,7 +263,7 @@ async function checkEnvFile(cwd: string, issues: DoctorIssue[]): Promise<void> {
 }
 
 /**
- * Check DevRev authentication
+ * Check DevRev authentication with PAT support
  */
 async function checkDevRevAuth(cwd: string, issues: DoctorIssue[]): Promise<void> {
   logger.info("Checking DevRev authentication...");
@@ -262,7 +274,17 @@ async function checkDevRevAuth(cwd: string, issues: DoctorIssue[]): Promise<void
     issues.push({
       category: "DevRev Authentication",
       message: "Missing USER_EMAIL or DEV_ORG in .env file",
-      suggestion: "Add USER_EMAIL=<your-email> and DEV_ORG=<your-org-slug> to your .env file"
+      suggestion: "Add USER_EMAIL=<your-email>, DEV_ORG=<your-org-slug>, and DEVREV_PAT=<your-token> to your .env file"
+    });
+    return;
+  }
+
+  // Check for DEVREV_PAT
+  if (!auth.pat) {
+    issues.push({
+      category: "DevRev Authentication",
+      message: "Missing DEVREV_PAT in .env file",
+      suggestion: "Add DEVREV_PAT=<your-personal-access-token> to your .env file"
     });
     return;
   }
@@ -274,7 +296,7 @@ async function checkDevRevAuth(cwd: string, issues: DoctorIssue[]): Promise<void
       issues.push({
         category: "DevRev Authentication",
         message: "DevRev JWT token is expired or invalid",
-        suggestion: `Run 'devrev profiles authenticate -o ${auth.org} -u ${auth.email}' to re-authenticate`
+        suggestion: `Run 'shadcn doctor --fix-auth' or manually set token: echo $DEVREV_PAT | devrev profiles set-token --org ${auth.org} --usr ${auth.email}`
       });
     } else {
       issues.push({

@@ -6,6 +6,7 @@ import { logger } from "@/src/utils/logger"; // Adjust path
 // import { getConfig } from "@/src/utils/get-config"; // To load snapin.config.mjs
 import { createSnapInVersion, getSnapInContext } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import prompts from "prompts";
 
 export const build = new Command()
@@ -35,6 +36,15 @@ export const build = new Command()
     }
 
     logger.info("Creating Snap-in version using devrev-cli...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     let { path, packageId, manifestPath, archivePath, createPackage } = options;
 
@@ -143,6 +153,9 @@ export const build = new Command()
 
       logger.info("Snap-in version created successfully:");
       console.log(JSON.stringify(versionInfo, null, 2));
+      
+      logger.info("✅ Build completed successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error("Failed to create Snap-in version.");
       if (error.message.includes("DevRev CLI command failed")) {

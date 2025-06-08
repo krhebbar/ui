@@ -1,12 +1,22 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { getSnapInContext } from "../../utils/devrev-cli-wrapper";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 
 export const contextShow = new Command()
   .name("show")
   .description("Show the current Snap-in context using devrev-cli.")
   .action(async () => {
     logger.info("Fetching current Snap-in context...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     try {
       const contextInfo = await getSnapInContext();
@@ -22,6 +32,9 @@ export const contextShow = new Command()
         logger.info("Raw output from CLI (if any was captured by wrapper and returned as empty object):");
         console.log(JSON.stringify(contextInfo, null, 2));
       }
+      
+      logger.info("✅ Context information retrieved successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error("Failed to get Snap-in context.");
       if (error.message.includes("DevRev CLI command failed")) {

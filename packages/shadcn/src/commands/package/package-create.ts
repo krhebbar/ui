@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { createSnapInPackage } from "../../utils/devrev-cli-wrapper";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import prompts from "prompts";
 
 export const packageCreate = new Command()
@@ -9,6 +10,15 @@ export const packageCreate = new Command()
   .option("-s, --slug <slug_name>", "The slug name for the new package.")
   .action(async (options: { slug?: string }) => {
     logger.info("Attempting to create a new Snap-in package...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     let { slug } = options;
 
@@ -36,6 +46,9 @@ export const packageCreate = new Command()
       const packageInfo = await createSnapInPackage(slug!); // slug will be defined here due to prompt
       logger.info("Snap-in package created successfully:");
       console.log(JSON.stringify(packageInfo, null, 2));
+      
+      logger.info("✅ Package created successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error("Failed to create Snap-in package.");
       if (error.message.includes("DevRev CLI command failed")) {

@@ -1,12 +1,22 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { listSnapInContexts } from "../../utils/devrev-cli-wrapper";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 
 export const contextList = new Command()
   .name("list")
   .description("List all available Snap-in contexts using devrev-cli.")
   .action(async () => {
     logger.info("Fetching list of available Snap-in contexts...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     try {
       const contexts = await listSnapInContexts();
@@ -23,6 +33,9 @@ export const contextList = new Command()
       } else {
         logger.info("No Snap-in contexts found or defined.");
       }
+      
+      logger.info("✅ Context list retrieved successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error("Failed to list Snap-in contexts.");
       if (error.message.includes("DevRev CLI command failed")) {

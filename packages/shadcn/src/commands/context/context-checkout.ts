@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { logger } from "@/src/utils/logger";
 import { checkoutSnapInContext, listSnapInContexts } from "../../utils/devrev-cli-wrapper";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import prompts from "prompts";
 
 export const contextCheckout = new Command()
@@ -9,6 +10,15 @@ export const contextCheckout = new Command()
   .argument("[context_name]", "The name of the context to checkout.")
   .action(async (contextNameArg?: string) => {
     let contextName = contextNameArg;
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     try {
       if (!contextName) {
@@ -45,6 +55,9 @@ export const contextCheckout = new Command()
       const result = await checkoutSnapInContext(contextName);
       logger.info("Snap-in context checkout successful:");
       console.log(result); // Display confirmation message from CLI
+      
+      logger.info("✅ Context checkout completed successfully!");
+      process.exit(0);
     } catch (error: any) {
       logger.error(`Failed to checkout Snap-in context '${contextName || ''}'.`);
       if (error.message.includes("DevRev CLI command failed")) {

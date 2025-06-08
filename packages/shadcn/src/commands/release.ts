@@ -9,6 +9,7 @@ import {
   getSnapInContext,
 } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import prompts from "prompts";
 
 export const release = new Command()
@@ -16,6 +17,15 @@ export const release = new Command()
   .description("Validates, creates a new version, deploys (updates or drafts), and activates a Snap-in.")
   .action(async () => {
     logger.info("Starting Smart Snap-in Release Process...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     // (a) Get Project Information & Manifest Path
     const projectInfo = await getProjectInfo(process.cwd());
@@ -159,4 +169,6 @@ export const release = new Command()
     }
 
     logger.info("Smart Snap-in Release Process completed.");
+    logger.info("✅ Release completed successfully!");
+    process.exit(0);
   });

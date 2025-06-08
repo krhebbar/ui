@@ -4,26 +4,98 @@ import { AirdropProjectConfig, SUPPORTED_DEVREV_OBJECTS } from "@/src/types/snap
 import { logger } from "@/src/utils/logger"
 
 /**
- * Find the monorepo root by looking for common monorepo markers
+ * Find the shadcn CLI package directory using Node.js module resolution
  */
-function findMonorepoRoot(startDir: string): string {
-  let currentDir = startDir
-  const markers = ["pnpm-workspace.yaml", "lerna.json", "nx.json", "rush.json"]
-  
-  while (currentDir !== path.dirname(currentDir)) {
-    for (const marker of markers) {
+function findShadcnPackageRoot(): string {
+  try {
+    // Method 1: Use process.argv to find the CLI script location
+    // process.argv[1] contains the path to the currently executing script
+    try {
+      const scriptPath = process.argv[1]
+      if (scriptPath) {
+        // The script is usually in dist/index.js or dist/chunk-xyz.js
+        // We need to find the parent directory that contains package.json
+        let searchDir = path.dirname(scriptPath)
+        let depth = 0
+        const maxDepth = 5 // Should find it quickly
+        
+        while (searchDir !== path.dirname(searchDir) && depth < maxDepth) {
+          try {
+            const packageJsonPath = path.join(searchDir, "package.json")
+            const packageJson = require("fs").readFileSync(packageJsonPath, "utf8")
+            const pkg = JSON.parse(packageJson)
+            
+            // Check if this is the shadcn CLI package
+            if (pkg.name === "shadcn") {
+              return searchDir
+            }
+          } catch {
+            // Continue searching up the directory tree
+          }
+          searchDir = path.dirname(searchDir)
+          depth++
+        }
+      }
+    } catch {
+      // process.argv not available or other error, continue to next method
+    }
+
+    // Method 2: Look for monorepo patterns from current working directory
+    let currentDir = process.cwd()
+    const markers = ["pnpm-workspace.yaml", "lerna.json", "nx.json", "rush.json"]
+    
+    while (currentDir !== path.dirname(currentDir)) {
+      for (const marker of markers) {
+        try {
+          const markerPath = path.join(currentDir, marker)
+          require("fs").accessSync(markerPath)
+          
+          // Check if this monorepo has the shadcn package
+          const shadcnPackagePath = path.join(currentDir, "packages/shadcn")
+          const packageJsonPath = path.join(shadcnPackagePath, "package.json")
+          try {
+            const packageJson = require("fs").readFileSync(packageJsonPath, "utf8")
+            const pkg = JSON.parse(packageJson)
+            if (pkg.name === "shadcn") {
+              return shadcnPackagePath
+            }
+          } catch {
+            // This monorepo doesn't have shadcn package
+          }
+        } catch {
+          // Continue searching
+        }
+      }
+      currentDir = path.dirname(currentDir)
+    }
+
+    // Method 3: Try common development paths relative to cwd
+    const commonPaths = [
+      // Relative to current working directory
+      path.resolve(process.cwd(), "../ui/packages/shadcn"),
+      path.resolve(process.cwd(), "../../ui/packages/shadcn"),
+      path.resolve(process.cwd(), "../../../ui/packages/shadcn"),
+    ]
+    
+    for (const commonPath of commonPaths) {
       try {
-        const markerPath = path.join(currentDir, marker)
-        require("fs").accessSync(markerPath)
-        return currentDir
+        const packageJsonPath = path.join(commonPath, "package.json")
+        const packageJson = require("fs").readFileSync(packageJsonPath, "utf8")
+        const pkg = JSON.parse(packageJson)
+        if (pkg.name === "shadcn") {
+          return commonPath
+        }
       } catch {
-        // Continue searching
+        // Continue to next path
       }
     }
-    currentDir = path.dirname(currentDir)
+
+  } catch (error) {
+    // All methods failed
   }
   
-  return startDir // Fallback to original directory
+  // Fallback: return current working directory
+  return process.cwd()
 }
 
 /**
@@ -171,14 +243,16 @@ async function copyDevRevObjectTypes(cwd: string): Promise<void> {
   const targetPath = path.join(typesDir, "devrev-objects.ts")
   
   // Try to find the source devrev-objects.ts file from various possible locations
+  const shadcnPackageRoot = findShadcnPackageRoot()
   const possibleSourcePaths = [
+    // From discovered shadcn package root (most reliable)
+    path.resolve(shadcnPackageRoot, "src/types/devrev-objects.ts"),
     // Relative to current working directory (monorepo development)
     path.resolve(process.cwd(), "packages/shadcn/src/types/devrev-objects.ts"),
     path.resolve(process.cwd(), "../../packages/shadcn/src/types/devrev-objects.ts"),
     path.resolve(process.cwd(), "../../../packages/shadcn/src/types/devrev-objects.ts"),
-    // Try from monorepo root discovery
-    path.resolve(findMonorepoRoot(process.cwd()), "packages/shadcn/src/types/devrev-objects.ts"),
-
+    // Additional fallback paths
+    path.resolve(process.cwd(), "../../../../packages/shadcn/src/types/devrev-objects.ts"),
   ]
   
   let sourceContent: string | null = null
@@ -380,12 +454,6 @@ ${(config.devrevObjects || []).map(obj => `  validate${toPascalCase(obj)}: (data
   await fs.writeFile(apiTypesPath, apiTypesContent, "utf8")
 }
 
-
-
-
-
-
-
 /**
  * Generate TypeScript type definition for an external sync unit
  */
@@ -449,14 +517,20 @@ export async function copyConfigTypes(cwd: string): Promise<void> {
   const targetConfigPath = path.join(typesDir, "snapin-config.ts")
   
   // Try to find the source snapin-config.ts file from various possible locations
+  const shadcnPackageRoot = findShadcnPackageRoot()
+  
+  // Debug logging
+  logger.info(`Shadcn package root discovered: ${shadcnPackageRoot}`)
+  
   const possibleSourcePaths = [
+    // From discovered shadcn package root (most reliable)
+    path.resolve(shadcnPackageRoot, "src/types/snapin-config.ts"),
     // Relative to current working directory (monorepo development)
     path.resolve(process.cwd(), "packages/shadcn/src/types/snapin-config.ts"),
     path.resolve(process.cwd(), "../../packages/shadcn/src/types/snapin-config.ts"),
     path.resolve(process.cwd(), "../../../packages/shadcn/src/types/snapin-config.ts"),
-    // Try from monorepo root discovery
-    path.resolve(findMonorepoRoot(process.cwd()), "packages/shadcn/src/types/snapin-config.ts"),
-
+    // Additional fallback paths
+    path.resolve(process.cwd(), "../../../../packages/shadcn/src/types/snapin-config.ts"),
   ]
   
   let sourceContent: string | null = null

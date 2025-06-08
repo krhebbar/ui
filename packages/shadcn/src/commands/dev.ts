@@ -7,6 +7,7 @@ import {
   getSnapInContext,
 } from "../utils/devrev-cli-wrapper";
 import { getProjectInfo } from "@/src/utils/get-project-info";
+import { bootstrapDevRevAuth } from "@/src/utils/devrev-auth";
 import prompts from "prompts";
 
 export const dev = new Command()
@@ -36,6 +37,15 @@ export const dev = new Command()
     }
 
     logger.info("Starting Snap-in development and testing workflow using devrev-cli...");
+
+    // Bootstrap DevRev authentication using PAT
+    logger.info("🔐 Ensuring DevRev authentication...");
+    const authResult = await bootstrapDevRevAuth(process.cwd());
+    if (!authResult.success) {
+      logger.error(`❌ Authentication failed: ${authResult.message}`);
+      logger.info("💡 Make sure your .env file contains USER_EMAIL, DEV_ORG, and DEVREV_PAT");
+      process.exit(1);
+    }
 
     let { path, url, packageId, createPackage, manifestPath } = options;
 
@@ -178,6 +188,9 @@ export const dev = new Command()
 
       logger.info("Local development setup complete. Your Snap-in should be routing to your local server via the provided URL.");
       logger.info("Remember to keep your local server and forwarding service (e.g., ngrok) running.");
+      
+      logger.info("✅ Dev setup completed successfully!");
+      process.exit(0);
 
     } catch (error: any) {
       logger.error("Failed during Snap-in development workflow.");

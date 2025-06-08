@@ -39,19 +39,17 @@ async function main() {
     // .addCommand(config)
     // Register new commands
     .addCommand(doctor)
-
     .addCommand(createKeyring)
     .addCommand(testConnection)
     .addCommand(generateTypes)
-    .addCommand(registryMcp);
-
+    .addCommand(registryMcp)
     // Register new command groups
-    // .addCommand(packageCommands)
-    // .addCommand(contextCommands);
-    // .addCommand(dev)
-    // .addCommand(build)
-    // .addCommand(release)
-    // .addCommand(logs)
+    .addCommand(packageCommands)
+    .addCommand(contextCommands)
+    .addCommand(dev)
+    .addCommand(build)
+    .addCommand(release)
+    .addCommand(logs)
   // Registry commands
 
   program.parse()
